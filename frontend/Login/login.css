@@ -1,0 +1,149 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Arial', sans-serif;
+}
+
+body {
+    background-color: #f5f5f5;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.container {
+    width: 100%;
+    max-width: 1200px;
+    padding: 20px;
+}
+
+.login-card {
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    display: flex;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.login-form {
+    flex: 3;
+    padding: 50px;
+}
+
+.welcome-message {
+    flex: 2;
+    background-color: #27ae60;
+    color: white;
+    padding: 50px 30px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.welcome-message h2 {
+    font-size: 2.5rem;
+    margin-bottom: 20px;
+}
+
+h2 {
+    color: #333;
+    margin-bottom: 30px;
+    font-size: 1.8rem;
+}
+
+.form-group {
+    margin-bottom: 25px;
+    position: relative;
+}
+
+.form-group label {
+    position: absolute;
+    top: 12px;
+    left: 15px;
+    color: #777;
+}
+
+.form-group svg {
+    width: 20px;
+    height: 20px;
+}
+
+input[type="text"],
+input[type="password"] {
+    width: 100%;
+    padding: 12px 12px 12px 45px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+    transition: border-color 0.3s;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus {
+    border-color: #27ae60;
+    outline: none;
+}
+
+.error-message {
+    color: #e74c3c;
+    margin-bottom: 15px;
+    font-size: 14px;
+    min-height: 20px;
+}
+
+.sign-in-btn {
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    width: 100%;
+    transition: background-color 0.3s;
+}
+
+.sign-in-btn:hover {
+    background-color: #219653;
+}
+
+.additional-links {
+    margin-top: 25px;
+    text-align: center;
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.forgot-password a {
+    color: #27ae60;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.forgot-password a:hover {
+    text-decoration: underline;
+}
+
+.member-note {
+    margin-top: 5px;
+    color: #555;
+    font-style: italic;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .login-card {
+        flex-direction: column;
+    }
+    
+    .login-form,
+    .welcome-message {
+        padding: 30px;
+    }
+}

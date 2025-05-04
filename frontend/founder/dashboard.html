@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Founder Dashboard - Prayer Tracker</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="wrapper">
+        <!-- Sidebar -->
+        <nav id="sidebar">
+            <div class="sidebar-header">
+                <h3>Prayer Tracker</h3>
+                <h4>Founder</h4>
+            </div>
+
+            <ul class="list-unstyled components">
+                <li class="active">
+                    <a href="#"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                </li>
+                <li>
+                    <a href="#"><i class="fas fa-users"></i> Members</a>
+                </li>
+                <li>
+                    <a href="#"><i class="fas fa-mosque"></i> Mosque</a>
+                </li>
+                <li>
+                    <a href="#"><i class="fas fa-car"></i> Pickup Requests</a>
+                </li>
+                <li>
+                    <a href="#"><i class="fas fa-bullhorn"></i> Announcements</a>
+                </li>
+                <li>
+                    <a href="#"><i class="fas fa-chart-bar"></i> Statistics</a>
+                </li>
+                <li>
+                    <a href="#"><i class="fas fa-user"></i> Profile</a>
+                </li>
+            </ul>
+
+            <div class="sidebar-footer">
+                <a href="#" id="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            </div>
+        </nav>
+
+        <!-- Page Content -->
+        <div id="content">
+            <nav class="navbar">
+                <div class="container-fluid">
+                    <button type="button" id="sidebarCollapse" class="btn">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <div class="navbar-profile">
+                        <span>Welcome, Founder</span>
+                        <img src="https://ui-avatars.com/api/?name=Founder&background=27ae60&color=fff" alt="Profile" class="rounded-circle">
+                    </div>
+                </div>
+            </nav>
+
+            <div class="dashboard-content">
+                <div class="container-fluid">
+                    <h2 class="page-title">Mosque Dashboard</h2>
+                    
+                    <!-- Summary Cards -->
+                    <div class="summary-cards">
+                        <div class="summary-card">
+                            <div class="summary-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="summary-details">
+                                <h3>32</h3>
+                                <p>Total Members</p>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-icon">
+                                <i class="fas fa-pray"></i>
+                            </div>
+                            <div class="summary-details">
+                                <h3>78%</h3>
+                                <p>Prayer Attendance</p>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-icon">
+                                <i class="fas fa-calendar-check"></i>
+                            </div>
+                            <div class="summary-details">
+                                <h3>14</h3>
+                                <p>Today's Attendance</p>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-icon">
+                                <i class="fas fa-car"></i>
+                            </div>
+                            <div class="summary-details">
+                                <h3>5</h3>
+                                <p>Pending Pickups</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Main Content Area -->
+                    <div class="row mt-4">
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Member Prayer Attendance</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="attendance-table">
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th>Member</th>
+                                                    <th>Fajr</th>
+                                                    <th>Dhuhr</th>
+                                                    <th>Asr</th>
+                                                    <th>Maghrib</th>
+                                                    <th>Isha</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td>Ahmed Ali</td>
+                                                    <td class="present"><i class="fas fa-check-circle"></i></td>
+                                                    <td class="present"><i class="fas fa-check-circle"></i></td>
+                                                    <td class="present"><i class="fas fa-check-circle"></i></td>
+                                                    <td class="absent"><i class="fas fa-times-circle"></i></td>
+                                                    <td class="upcoming"><i class="fas fa-clock"></i></td>
+                                                    <td><span class="status active">Active</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Fatima Hassan</td>
+                                                    <td class="present"><i class="fas fa-check-circle"></i></td>
+                                                    <td class="absent"><i class="fas fa-times-circle"></i></td>
+                                                    <td class="present"><i class="fas fa-check-circle"></i></td>
+                                                    <td class="absent"><i class="fas fa-times-circle"></i></td>
+                                                    <td class="upcoming"><i class="fas fa-clock"></i></td>
+                                                    <td><span class="status active">Active</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Ibrahim Khan</td>
+                                                    <td class="absent"><i class="fas fa-times-circle"></i></td>
+                                                    <td class="present"><i class="fas fa-check-circle"></i></td>
+                                                    <td class="present"><i class="fas fa-check-circle"></i></td>
+                                                    <td class="absent"><i class="fas fa-times-circle"></i></td>
+                                                    <td class="upcoming"><i class="fas fa-clock"></i></td>
+                                                    <td><span class="status inactive">Inactive</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Aisha Malik</td>
+                                                    <td class="present"><i class="fas fa-check-circle"></i></td>
+                                                    <td class="present"><i class="fas fa-check-circle"></i></td>
+                                                    <td class="absent"><i class="fas fa-times-circle"></i></td>
+                                                    <td class="absent"><i class="fas fa-times-circle"></i></td>
+                                                    <td class="upcoming"><i class="fas fa-clock"></i></td>
+                                                    <td><span class="status active">Active</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Mohammed Rahman</td>
+                                                    <td class="absent"><i class="fas fa-times-circle"></i></td>
+                                                    <td class="absent"><i class="fas fa-times-circle"></i></td>
+                                                    <td class="present"><i class="fas fa-check-circle"></i></td>
+                                                    <td class="absent"><i class="fas fa-times-circle"></i></td>
+                                                    <td class="upcoming"><i class="fas fa-clock"></i></td>
+                                                    <td><span class="status inactive">Inactive</span></td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Quick Actions</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="quick-actions">
+                                        <button class="action-btn"><i class="fas fa-bullhorn"></i> Post Announcement</button>
+                                        <button class="action-btn"><i class="fas fa-user-plus"></i> Add Member</button>
+                                        <button class="action-btn"><i class="fas fa-sms"></i> Send Reminder</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card mt-4">
+                                <div class="card-header">
+                                    <h5>Recent Pickup Requests</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="pickup-request">
+                                        <div class="pickup-user">Ahmad Siddiq</div>
+                                        <div class="pickup-details">
+                                            <p>For Fajr - 5:00am tomorrow</p>
+                                            <p class="pickup-address">123 Olive Street</p>
+                                        </div>
+                                        <div class="pickup-actions">
+                                            <button class="btn-approve"><i class="fas fa-check"></i> Approve</button>
+                                            <button class="btn-decline"><i class="fas fa-times"></i> Decline</button>
+                                        </div>
+                                    </div>
+                                    <div class="pickup-request">
+                                        <div class="pickup-user">Sarah Ahmed</div>
+                                        <div class="pickup-details">
+                                            <p>For Maghrib - 7:30pm today</p>
+                                            <p class="pickup-address">456 Palm Avenue</p>
+                                        </div>
+                                        <div class="pickup-actions">
+                                            <button class="btn-approve"><i class="fas fa-check"></i> Approve</button>
+                                            <button class="btn-decline"><i class="fas fa-times"></i> Decline</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Announcements Section -->
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="d-flex">
+                                        <h5>Recent Announcements</h5>
+                                        <button class="btn-new-announcement">+ New Announcement</button>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="announcement-list">
+                                        <div class="announcement-item">
+                                            <div class="announcement-header">
+                                                <h6>Eid Prayer Announcement</h6>
+                                                <span class="announcement-date">Posted on: Apr 28, 2025</span>
+                                            </div>
+                                            <p class="announcement-text">
+                                                Eid prayer will be held at the main hall at 8:00 AM. Please arrive early as we expect a large attendance.
+                                                Bring your family and friends. There will be refreshments after the prayer.
+                                            </p>
+                                            <div class="announcement-footer">
+                                                <span class="announcement-stats">32 views</span>
+                                                <div class="announcement-actions">
+                                                    <button><i class="fas fa-edit"></i> Edit</button>
+                                                    <button><i class="fas fa-trash"></i> Delete</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="announcement-item">
+                                            <div class="announcement-header">
+                                                <h6>Community Iftar</h6>
+                                                <span class="announcement-date">Posted on: Apr 25, 2025</span>
+                                            </div>
+                                            <p class="announcement-text">
+                                                Join us for the community iftar this Saturday at 7:30 PM. Please RSVP by Thursday.
+                                                Donations are welcome to support this community event.
+                                            </p>
+                                            <div class="announcement-footer">
+                                                <span class="announcement-stats">28 views</span>
+                                                <div class="announcement-actions">
+                                                    <button><i class="fas fa-edit"></i> Edit</button>
+                                                    <button><i class="fas fa-trash"></i> Delete</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+</html>

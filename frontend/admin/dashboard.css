@@ -1,0 +1,390 @@
+/* Green Theme Dashboard Styles */
+:root {
+    --primary-color: #27ae60;
+    --primary-dark: #219653;
+    --primary-light: #6FCF97;
+    --text-color: #333;
+    --light-text: #777;
+    --white: #ffffff;
+    --light-bg: #f8f9fa;
+    --border-color: #e9ecef;
+    --success: #27ae60;
+    --info: #2d9cdb;
+    --warning: #f2c94c;
+    --danger: #eb5757;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Arial', sans-serif;
+}
+
+body {
+    background-color: #f5f5f5;
+    color: var(--text-color);
+}
+
+.wrapper {
+    display: flex;
+    width: 100%;
+    min-height: 100vh;
+}
+
+/* Sidebar Styles */
+#sidebar {
+    width: 260px;
+    background-color: var(--primary-color);
+    color: var(--white);
+    transition: all 0.3s;
+    position: fixed;
+    height: 100%;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+}
+
+#sidebar.collapsed {
+    width: 80px;
+}
+
+.sidebar-header {
+    padding: 20px;
+    background-color: var(--primary-dark);
+}
+
+.sidebar-header h3 {
+    margin-bottom: 5px;
+    font-size: 1.4rem;
+}
+
+.sidebar-header h4 {
+    font-size: 1rem;
+    font-weight: normal;
+    opacity: 0.85;
+}
+
+#sidebar ul.components {
+    padding: 20px 0;
+    flex: 1;
+}
+
+#sidebar ul li {
+    padding: 0 15px;
+    margin-bottom: 5px;
+    list-style: none;
+}
+
+#sidebar ul li a {
+    color: var(--white);
+    padding: 12px 15px;
+    display: block;
+    text-decoration: none;
+    border-radius: 5px;
+    transition: all 0.3s;
+}
+
+#sidebar ul li a i {
+    margin-right: 10px;
+    width: 20px;
+    text-align: center;
+}
+
+#sidebar ul li a:hover,
+#sidebar ul li.active a {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.sidebar-footer {
+    background-color: var(--primary-dark);
+    padding: 15px;
+    text-align: center;
+}
+
+.sidebar-footer a {
+    color: var(--white);
+    text-decoration: none;
+    display: block;
+    padding: 8px;
+    border-radius: 5px;
+    transition: all 0.3s;
+}
+
+.sidebar-footer a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Content Styles */
+#content {
+    width: calc(100% - 260px);
+    min-height: 100vh;
+    margin-left: 260px;
+    transition: all 0.3s;
+    padding-bottom: 40px;
+}
+
+#content.expanded {
+    width: calc(100% - 80px);
+    margin-left: 80px;
+}
+
+/* Navbar Styles */
+.navbar {
+    background-color: var(--white);
+    padding: 15px 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    margin-bottom: 30px;
+}
+
+.navbar .container-fluid {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#sidebarCollapse {
+    background-color: transparent;
+    border: none;
+    color: var(--primary-color);
+    font-size: 1.3rem;
+    padding: 5px;
+    cursor: pointer;
+}
+
+.navbar-profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.navbar-profile span {
+    font-weight: 500;
+}
+
+.navbar-profile img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Dashboard Content Styles */
+.dashboard-content {
+    padding: 0 30px;
+}
+
+.page-title {
+    margin-bottom: 30px;
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+/* Card Styles */
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0 -15px;
+}
+
+.col-md-3 {
+    width: 25%;
+    padding: 0 15px;
+}
+
+.col-md-4 {
+    width: 33.33%;
+    padding: 0 15px;
+}
+
+.col-md-8 {
+    width: 66.67%;
+    padding: 0 15px;
+}
+
+.mt-4 {
+    margin-top: 30px;
+}
+
+.stats-cards {
+    display: flex;
+    flex-wrap: wrap;
+    margin-bottom: 30px;
+}
+
+.card {
+    background-color: var(--white);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    margin-bottom: 30px;
+}
+
+.card-header {
+    background-color: var(--white);
+    padding: 15px 20px;
+    border-bottom: 1px solid var(--border-color);
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
+
+.card-header h5 {
+    margin: 0;
+    color: var(--text-color);
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.card-body {
+    padding: 20px;
+}
+
+.stats-cards .card-body {
+    display: flex;
+    align-items: center;
+}
+
+.card-icon {
+    background-color: rgba(39, 174, 96, 0.1);
+    color: var(--primary-color);
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 15px;
+    font-size: 1.5rem;
+}
+
+.card-data h3 {
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+    color: var(--text-color);
+}
+
+.card-data p {
+    margin: 0;
+    color: var(--light-text);
+    font-size: 0.9rem;
+}
+
+/* Table Styles */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table th, .table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.table th {
+    color: var(--text-color);
+    font-weight: 600;
+    font-size: 0.9rem;
+    background-color: var(--light-bg);
+}
+
+.table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.badge {
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--white);
+}
+
+.bg-success {
+    background-color: var(--success);
+}
+
+.bg-info {
+    background-color: var(--info);
+}
+
+.bg-warning {
+    background-color: var(--warning);
+}
+
+.bg-danger {
+    background-color: var(--danger);
+}
+
+/* Prayer Times */
+.prayer-times {
+    padding: 10px;
+}
+
+.prayer-time {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.prayer-time:last-child {
+    border-bottom: none;
+}
+
+.prayer-name {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.prayer-hour {
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 992px) {
+    #sidebar {
+        width: 80px;
+    }
+    
+    #content {
+        width: calc(100% - 80px);
+        margin-left: 80px;
+    }
+    
+    #sidebar ul li a span,
+    .sidebar-header h3,
+    .sidebar-header h4 {
+        display: none;
+    }
+    
+    #sidebar ul li a i {
+        margin-right: 0;
+        font-size: 1.2rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .col-md-3 {
+        width: 50%;
+    }
+    
+    .col-md-4,
+    .col-md-8 {
+        width: 100%;
+    }
+    
+    .navbar-profile span {
+        display: none;
+    }
+}
+
+@media (max-width: 576px) {
+    .col-md-3 {
+        width: 100%;
+    }
+    
+    .dashboard-content {
+        padding: 0 15px;
+    }
+}
