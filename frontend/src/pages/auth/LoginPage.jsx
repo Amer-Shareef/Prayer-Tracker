@@ -1,25 +1,41 @@
-import React, { useState } from "react";
-import axios from "axios";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 const LoginPage = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { login, user } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      const redirectPath = user.role === "Member" ? "/member/dashboard" : 
+                          user.role === "Founder" ? "/founder/dashboard" : 
+                          user.role === "SuperAdmin" ? "/superadmin/dashboard" : 
+                          "/login";
+      navigate(redirectPath);
+    }
+  }, [user, navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setError("");
+    setLoading(true);
+    
     try {
-      const res = await axios.post("http://localhost:5000/api/auth/login", { username, password });
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("role", res.data.role);
-
-      if (res.data.role === "Member") navigate("/member/dashboard");
-      else if (res.data.role === "Founder") navigate("/founder/dashboard");
-      else if (res.data.role === "SuperAdmin") navigate("/superadmin/dashboard");
+      const result = await login(username, password);
+      if (!result.success) {
+        setError(result.message);
+      }
     } catch (err) {
-      setError(err.response?.data?.message || "Something went wrong");
+      setError("An unexpected error occurred. Please try again.");
+      console.error("Login error:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -39,6 +55,7 @@ const LoginPage = () => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
+                  disabled={loading}
                 />
                 <span className="absolute left-3 top-2.5 text-gray-400">
                   <i className="fas fa-user"></i>
@@ -54,6 +71,7 @@ const LoginPage = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  disabled={loading}
                 />
                 <span className="absolute left-3 top-2.5 text-gray-400">
                   <i className="fas fa-lock"></i>
@@ -61,8 +79,13 @@ const LoginPage = () => {
               </div>
             </div>
             {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-            <button className="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">
-              LOGIN
+            <button 
+              className={`w-full bg-green-500 text-white py-2 rounded-lg ${
+                loading ? "opacity-70 cursor-not-allowed" : "hover:bg-green-600"
+              }`}
+              disabled={loading}
+            >
+              {loading ? "LOGGING IN..." : "LOGIN"}
             </button>
           </form>
           <p className="text-sm text-gray-500 mt-4 text-center">

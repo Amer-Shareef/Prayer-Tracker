@@ -6,16 +6,31 @@ exports.loginUser = async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    // Check if user exists
-    const [user] = await db.query("SELECT * FROM users WHERE username = ?", [
+    // Check if user exists - mysql2 returns [rows, fields]
+    const [rows] = await db.query("SELECT * FROM users WHERE username = ?", [
       username,
     ]);
-    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // If no user found or empty array
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Get the first user
+    const user = rows[0];
+
+    // Debug
+    console.log("Found user:", {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+    });
 
     // Verify password
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
+    if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
+    }
 
     // Generate JWT token
     const token = jwt.sign(
@@ -26,6 +41,7 @@ exports.loginUser = async (req, res) => {
 
     res.json({ token, role: user.role });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Login error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };

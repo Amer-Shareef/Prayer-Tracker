@@ -1,19 +1,22 @@
 import { useNavigate } from "react-router-dom";
 
-export const roleRedirect = (role) => {
-  const navigate = useNavigate();
+// Utility function that returns the appropriate path for a role
+// but does not perform navigation directly
 
+export const getRedirectPathForRole = (role) => {
   switch (role) {
     case "Member":
-      navigate("/member/dashboard");
-      break;
+      return "/member/dashboard";
     case "Founder":
-      navigate("/founder/dashboard");
-      break;
+      return "/founder/dashboard";
     case "SuperAdmin":
-      navigate("/superadmin/dashboard");
-      break;
+      return "/superadmin/dashboard";
     default:
-      navigate("/login");
+      return "/login";
   }
 };
+
+// This can be used inside components with navigate:
+// const navigate = useNavigate();
+// const redirectPath = getRedirectPathForRole(userRole);
+// navigate(redirectPath);
