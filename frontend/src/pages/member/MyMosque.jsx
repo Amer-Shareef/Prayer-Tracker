@@ -1,109 +1,182 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { mosqueService } from '../../services/api';
+import MemberLayout from '../../components/layouts/MemberLayout';
 
 const MyMosque = () => {
-  const [mosque, setMosque] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const { user } = useAuth();
-
+  const [mosque, setMosque] = useState({
+    name: 'Masjid Al-Taqwa',
+    address: '123 Faith Avenue, Cityville, CA 90210',
+    phone: '(555) 123-4567',
+    imam: 'Imam Abdullah Rahman',
+    prayerTimes: {
+      fajr: '5:03 AM',
+      dhuhr: '12:15 PM',
+      asr: '3:45 PM',
+      maghrib: '7:23 PM',
+      isha: '8:53 PM',
+      jumuah: '1:30 PM'
+    }
+  });
+  
+  const [announcements, setAnnouncements] = useState([
+    {
+      id: 1,
+      title: 'Ramadan Preparation Workshop',
+      date: 'May 12, 2025',
+      content: 'Join us for a special workshop to prepare for the upcoming Ramadan. Topics include spiritual preparation, meal planning, and maintaining health during fasting.'
+    },
+    {
+      id: 2,
+      title: 'Community Iftar Planning',
+      date: 'May 15, 2025',
+      content: 'We are organizing community iftars for the coming Ramadan. Please register to volunteer or sponsor meals.'
+    },
+    {
+      id: 3,
+      title: 'Mosque Cleaning Day',
+      date: 'May 10, 2025',
+      content: 'Please join us for our monthly mosque cleaning day. Bring your family and earn rewards while helping maintain our beautiful mosque.'
+    }
+  ]);
+  
   useEffect(() => {
-    const fetchMosqueData = async () => {
-      try {
-        setLoading(true);
-        // In a real implementation, you would get the user's mosque ID from user data
-        // and pass it to the service
-        const mosqueData = await mosqueService.getMosques();
-        // For now, we'll just use the first mosque in the list
-        setMosque(mosqueData.data[0] || {
-          name: "Sample Mosque",
-          address: "123 Prayer St, Faith City",
-          imamName: "Imam Abdullah",
-          prayerTimes: {
-            fajr: "5:30 AM",
-            dhuhr: "1:15 PM",
-            asr: "4:45 PM",
-            maghrib: "7:30 PM",
-            isha: "9:00 PM"
-          }
-        });
-      } catch (err) {
-        setError("Failed to load mosque information");
-        console.error(err);
-      } finally {
-        setLoading(false);
+    // In a real app, you would fetch this data from your API
+    // For now, we'll use the static data defined above
+    
+    // Load Google Maps script
+    const googleMapScript = document.createElement('script');
+    googleMapScript.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places`;
+    googleMapScript.async = true;
+    googleMapScript.defer = true;
+    window.document.body.appendChild(googleMapScript);
+    
+    googleMapScript.addEventListener('load', () => {
+      if (window.google) {
+        initMap();
       }
+    });
+    
+    return () => {
+      // Cleanup
+      window.document.body.removeChild(googleMapScript);
     };
-
-    fetchMosqueData();
   }, []);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-100 p-6">
-        <div className="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-6">
-          <div className="text-red-500">{error}</div>
-        </div>
-      </div>
-    );
-  }
+  
+  const initMap = () => {
+    // Sample coordinates for the mosque
+    const mosqueLocation = { lat: 34.0522, lng: -118.2437 };
+    
+    const mapElement = document.getElementById('mosque-map');
+    if (mapElement && window.google) {
+      const map = new window.google.maps.Map(mapElement, {
+        center: mosqueLocation,
+        zoom: 15,
+      });
+      
+      new window.google.maps.Marker({
+        position: mosqueLocation,
+        map: map,
+        title: mosque.name
+      });
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-6">
-        <h1 className="text-2xl font-bold mb-4">My Mosque</h1>
+    <MemberLayout>
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-2xl font-bold mb-6">My Mosque</h1>
         
-        {mosque ? (
-          <div>
-            <div className="bg-green-50 p-6 rounded-lg shadow mb-6">
-              <h2 className="text-xl font-bold mb-2">{mosque.name}</h2>
-              <p className="text-gray-700 mb-2"><span className="font-medium">Address:</span> {mosque.address}</p>
-              <p className="text-gray-700"><span className="font-medium">Imam:</span> {mosque.imamName}</p>
-            </div>
-            
-            <h3 className="text-lg font-bold mb-3">Prayer Times</h3>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-              <div className="bg-green-100 p-4 rounded-lg shadow text-center">
-                <h4 className="font-bold">Fajr</h4>
-                <p>{mosque.prayerTimes?.fajr || "5:30 AM"}</p>
+        {/* Mosque Information Card */}
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-xl font-bold mb-4">{mosque.name}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <div className="mb-4">
+                <label className="font-semibold text-gray-700 block mb-1">Address:</label>
+                <p>{mosque.address}</p>
               </div>
-              <div className="bg-green-100 p-4 rounded-lg shadow text-center">
-                <h4 className="font-bold">Dhuhr</h4>
-                <p>{mosque.prayerTimes?.dhuhr || "1:15 PM"}</p>
+              <div className="mb-4">
+                <label className="font-semibold text-gray-700 block mb-1">Phone:</label>
+                <p>{mosque.phone}</p>
               </div>
-              <div className="bg-green-100 p-4 rounded-lg shadow text-center">
-                <h4 className="font-bold">Asr</h4>
-                <p>{mosque.prayerTimes?.asr || "4:45 PM"}</p>
+              <div className="mb-4">
+                <label className="font-semibold text-gray-700 block mb-1">Imam:</label>
+                <p>{mosque.imam}</p>
               </div>
-              <div className="bg-green-100 p-4 rounded-lg shadow text-center">
-                <h4 className="font-bold">Maghrib</h4>
-                <p>{mosque.prayerTimes?.maghrib || "7:30 PM"}</p>
-              </div>
-              <div className="bg-green-100 p-4 rounded-lg shadow text-center">
-                <h4 className="font-bold">Isha</h4>
-                <p>{mosque.prayerTimes?.isha || "9:00 PM"}</p>
+              <div>
+                <label className="font-semibold text-gray-700 block mb-1">Jumu'ah Prayer:</label>
+                <p className="text-green-600">{mosque.prayerTimes.jumuah}</p>
               </div>
             </div>
             
-            <h3 className="text-lg font-bold mb-3">Recent Announcements</h3>
-            <div className="border rounded-lg p-4">
-              <p className="italic text-gray-500">No recent announcements</p>
+            {/* Google Map */}
+            <div>
+              <div 
+                id="mosque-map" 
+                className="h-64 rounded-lg border border-gray-300" 
+                style={{ width: '100%' }}
+              >
+                <div className="flex items-center justify-center h-full bg-gray-100">
+                  <p className="text-gray-500">Map loading...</p>
+                </div>
+              </div>
+              <div className="mt-2">
+                <a 
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mosque.address)}`} 
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-green-600 text-sm hover:underline"
+                >
+                  Open in Google Maps
+                </a>
+              </div>
             </div>
           </div>
-        ) : (
-          <p>You are not associated with any mosque yet.</p>
-        )}
+        </div>
+        
+        {/* Prayer Times Card */}
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-xl font-bold mb-4">Prayer Times</h2>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            {Object.entries(mosque.prayerTimes)
+              .filter(([key]) => key !== 'jumuah')  // Exclude Jumuah from this display
+              .map(([prayer, time]) => (
+                <div 
+                  key={prayer}
+                  className="bg-green-50 rounded-lg p-4 text-center"
+                >
+                  <h3 className="font-bold text-lg capitalize">{prayer}</h3>
+                  <p className="text-green-600 text-lg">{time}</p>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+        
+        {/* Announcements Card */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-bold mb-4">Mosque Announcements</h2>
+          
+          {announcements.length === 0 ? (
+            <p className="text-gray-500">No current announcements</p>
+          ) : (
+            <div className="space-y-4">
+              {announcements.map(announcement => (
+                <div 
+                  key={announcement.id}
+                  className="border-l-4 border-green-500 pl-4 py-1"
+                >
+                  <div className="flex justify-between items-start mb-1">
+                    <h3 className="font-bold">{announcement.title}</h3>
+                    <span className="text-sm text-gray-500">{announcement.date}</span>
+                  </div>
+                  <p className="text-gray-700">{announcement.content}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </MemberLayout>
   );
 };
 
