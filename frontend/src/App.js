@@ -7,13 +7,10 @@ import {
 } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import LoginPage from "./pages/auth/LoginPage";
-import MemberDashboard from "./components/dashboard/MemberDashboard";
-import FounderDashboard from "./components/dashboard/FounderDashboard";
-import SuperAdminDashboard from "./components/dashboard/SuperAdminDashboard";
 import ProtectedRoute from "./utils/ProtectedRoute";
-import NavigationBar from "./components/shared/NavigationBar";
 
 // Member Pages
+import Dashboard from "./pages/member/Dashboard";
 import MyMosque from "./pages/member/MyMosque";
 import MyPrayers from "./pages/member/MyPrayers";
 import MyStats from "./pages/member/MyStats";
@@ -22,11 +19,15 @@ import RequestPickup from "./pages/member/RequestPickup";
 import WakeupCall from "./pages/member/WakeupCall";
 
 // Founder Pages
+import FounderDashboard from "./components/dashboard/FounderDashboard";
 import ApprovePickup from "./pages/founder/ApprovePickup";
 import PostAnnouncement from "./pages/founder/PostAnnouncement";
 import ViewAttendance from "./pages/founder/ViewAttendance";
+import ManageMembers from "./pages/founder/ManageMembers";
+import SendReminder from "./pages/founder/SendReminder";
 
 // SuperAdmin Pages
+import SuperAdminDashboard from "./components/dashboard/SuperAdminDashboard";
 import AssignFounder from "./pages/superadmin/AssignFounder";
 import PromoteUser from "./pages/superadmin/PromoteUser";
 import ViewMosques from "./pages/superadmin/ViewMosques";
@@ -35,7 +36,6 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <NavigationBar />
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
@@ -54,7 +54,7 @@ function App() {
             path="/member/dashboard"
             element={
               <ProtectedRoute role="Member">
-                <MemberDashboard />
+                <Dashboard />
               </ProtectedRoute>
             }
           />
@@ -145,6 +145,22 @@ function App() {
             element={
               <ProtectedRoute role="Founder">
                 <ViewAttendance />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/founder/manage-members"
+            element={
+              <ProtectedRoute role="Founder">
+                <ManageMembers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/founder/send-reminder"
+            element={
+              <ProtectedRoute role="Founder">
+                <SendReminder />
               </ProtectedRoute>
             }
           />

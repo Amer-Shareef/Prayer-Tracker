@@ -5,14 +5,14 @@ import { useAuth } from '../../context/AuthContext';
 const Profile = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState({
-    firstName: 'Ahmed',
-    lastName: 'Khan',
+    firstName: 'Muhammed',
+    lastName: 'Ali',
     username: 'testmember',
-    email: 'ahmed.khan@example.com',
-    phone: '+1 (555) 123-4567',
-    address: '123 Main St, Cityville, CA 90210',
-    mosque: 'Masjid Al-Taqwa',
-    joinedDate: '2022-05-01',
+    email: 'muhammed.ali@gmail.com',
+    phone: '077 123 4567',
+    address: '123 Kawdana Road, Dehiwala, 10350',
+    mosque: 'Kawdana Jumma Masjid',
+    joinedDate: '2025-05-01',
     avatar: null
   });
   
@@ -31,7 +31,7 @@ const Profile = () => {
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   
   useEffect(() => {
-    // In a real app, you would fetch the user's profile data from your API
+    // In a real app, we would fetch the user's profile data from the API
     // For now, we'll use the static data defined above
   }, []);
   

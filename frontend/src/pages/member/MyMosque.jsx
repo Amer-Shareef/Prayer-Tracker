@@ -4,16 +4,16 @@ import MemberLayout from '../../components/layouts/MemberLayout';
 const MyMosque = () => {
   const [mosque, setMosque] = useState({
     name: 'Masjid Al-Taqwa',
-    address: '123 Faith Avenue, Cityville, CA 90210',
-    phone: '(555) 123-4567',
-    imam: 'Imam Abdullah Rahman',
+    address: '123 Kawdana Road, Dehiwala, 10350',
+    phone: '077 123 4567',
+    imam: 'Imam Abdurahman',
     prayerTimes: {
-      fajr: '5:03 AM',
-      dhuhr: '12:15 PM',
-      asr: '3:45 PM',
-      maghrib: '7:23 PM',
-      isha: '8:53 PM',
-      jumuah: '1:30 PM'
+      fajr: '4:50 AM',
+      dhuhr: '12:30 PM',
+      asr: '3:20 PM',
+      maghrib: '6:20 PM',
+      isha: '7:30 PM',
+      jumuah: '12:30 PM'
     }
   });
   
@@ -39,7 +39,7 @@ const MyMosque = () => {
   ]);
   
   useEffect(() => {
-    // In a real app, you would fetch this data from your API
+    // In a real app, we would fetch this data from API
     // For now, we'll use the static data defined above
     
     // Load Google Maps script

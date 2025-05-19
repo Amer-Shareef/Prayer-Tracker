@@ -30,7 +30,7 @@ const WakeupCall = () => {
   ];
   
   useEffect(() => {
-    // In a real app, you would fetch the user's existing wake-up schedules from your API
+    // In a real app, we would fetch the user's existing wake-up schedules from the API
     // For now, we'll create some mock data
     setSchedules([
       {
@@ -39,7 +39,7 @@ const WakeupCall = () => {
         days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
         method: 'phone',
         active: true,
-        phone: '+1 (555) 123-4567'
+        phone: '077 123 4567'
       },
       {
         id: 2,
@@ -47,7 +47,7 @@ const WakeupCall = () => {
         days: ['saturday', 'sunday'],
         method: 'sms',
         active: false,
-        phone: '+1 (555) 123-4567'
+        phone: '077 123 4567'
       }
     ]);
   }, []);
