@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import MemberLayout from '../../components/layouts/MemberLayout';
 
-const MyMosque = () => {
-  const [mosque, setMosque] = useState({
-    name: 'Masjid Al-Taqwa',
-    address: '123 Kawdana Road, Dehiwala, 10350',
-    phone: '077 123 4567',
-    imam: 'Imam Abdurahman',
+const MyMosque = () => {  const [mosque, setMosque] = useState({
+    name: 'Masjid Dawatagaha',
+    address: '78 Baseline Road, Colombo 09',
+    phone: '+94 77 123 4567',
+    imam: 'Imam Mohammed Farook',
     prayerTimes: {
       fajr: '4:50 AM',
       dhuhr: '12:30 PM',
@@ -16,8 +15,7 @@ const MyMosque = () => {
       jumuah: '12:30 PM'
     }
   });
-  
-  const [announcements, setAnnouncements] = useState([
+    const [announcements, setAnnouncements] = useState([
     {
       id: 1,
       title: 'Ramadan Preparation Workshop',

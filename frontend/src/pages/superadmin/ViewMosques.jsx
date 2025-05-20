@@ -6,55 +6,45 @@ const ViewMosques = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all'); // all, active, inactive
-
   // Mock data for mosques
   useEffect(() => {
     // In a real app, this would be an API call
     const mockMosques = [
       {
         id: 1,
-        name: 'Masjid Al-Noor',
-        address: '123 Faith Street, Cityville, CA 90210',
-        founder: 'Ahmed Khan',
+        name: 'Masjid Dawatagaha',
+        address: '78 Baseline Road, Colombo 09',
+        founder: 'Mohamed Rizwan',
         members: 156,
         status: 'active',
         established: '2023-04-15'
       },
       {
         id: 2,
-        name: 'Islamic Center of Rivertown',
-        address: '456 Prayer Avenue, Rivertown, NY 10001',
-        founder: 'Muhammed Ali',
+        name: 'Jami Ul-Alfar Mosque (Red Mosque)',
+        address: '2nd Cross Street, Pettah, Colombo 11',
+        founder: 'Ahmed Fazil',
         members: 210,
         status: 'active',
         established: '2022-08-22'
       },
       {
         id: 3,
-        name: 'Masjid Al-Falah',
-        address: '789 Blessing Road, Hometown, TX 75001',
-        founder: 'Ibrahim Hassan',
+        name: 'Colombo Grand Mosque',
+        address: '45 New Moor Street, Hulftsdorp, Colombo 12',
+        founder: 'Mohammed Farook',
         members: 89,
         status: 'active',
         established: '2023-12-05'
       },
       {
         id: 4,
-        name: 'Central Mosque',
-        address: '321 Worship Lane, Metropolis, IL 60007',
+        name: 'Masjid Akbar',
+        address: '10 Dawson Road, Slave Island, Colombo 02',
         founder: 'Pending Assignment',
         members: 42,
         status: 'inactive',
         established: '2024-02-10'
-      },
-      {
-        id: 5,
-        name: 'Masjid Al-Taqwa',
-        address: '555 Faith Circle, Lakeside, WA 98001',
-        founder: 'Omar Farooq',
-        members: 123,
-        status: 'active',
-        established: '2023-06-30'
       }
     ];
     

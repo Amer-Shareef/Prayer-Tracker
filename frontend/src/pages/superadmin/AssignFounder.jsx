@@ -7,27 +7,33 @@ const AssignFounder = () => {
   const [loading, setLoading] = useState(true);
   const [selectedMosque, setSelectedMosque] = useState('');
   const [selectedUser, setSelectedUser] = useState('');
-  const [searchMosque, setSearchMosque] = useState('');
-  const [searchUser, setSearchUser] = useState('');
+  const [searchMosque, setSearchMosque] = useState('');  const [searchUser, setSearchUser] = useState('');
   const [success, setSuccess] = useState(false);
-
+  
   // Mock data for mosques and users
   useEffect(() => {
     // In a real app, this would be API calls
     const mockMosques = [
-      { id: 1, name: 'Masjid Al-Noor', address: '123 Faith Street, Cityville', hasFounder: false },
-      { id: 2, name: 'Islamic Center of Rivertown', address: '456 Prayer Avenue, Rivertown', hasFounder: true },
-      { id: 3, name: 'Masjid Al-Falah', address: '789 Blessing Road, Hometown', hasFounder: false },
-      { id: 4, name: 'Central Mosque', address: '321 Worship Lane, Metropolis', hasFounder: false },
-      { id: 5, name: 'Masjid Al-Taqwa', address: '555 Faith Circle, Lakeside', hasFounder: true }
+      { id: 1, name: 'Masjid Dawatagaha', address: '78 Baseline Road, Colombo 09', hasFounder: false },
+      { id: 2, name: 'Jami Ul-Alfar Mosque (Red Mosque)', address: '2nd Cross Street, Pettah, Colombo 11', hasFounder: true },
+      { id: 3, name: 'Colombo Grand Mosque', address: '45 New Moor Street, Hulftsdorp, Colombo 12', hasFounder: false },
+      { id: 4, name: 'Masjid Akbar', address: '10 Dawson Road, Slave Island, Colombo 02', hasFounder: false },
+      { id: 5, name: 'Masjid Al-Noor', address: '25 Galle Road, Dehiwala, Colombo', hasFounder: true },
+      { id: 6, name: 'Kolonnawa Jummah Mosque', address: '27 Kolonnawa Road, Kolonnawa', hasFounder: false },
+      { id: 7, name: 'Wellampitiya Central Mosque', address: '48 Main Street, Wellampitiya', hasFounder: false }
     ];
     
     const mockUsers = [
-      { id: 101, name: 'Abdullah Mahmood', email: 'abdullah@example.com', role: 'Member' },
-      { id: 102, name: 'Fatima Rahman', email: 'fatima@example.com', role: 'Member' },
-      { id: 103, name: 'Yusuf Ali', email: 'yusuf@example.com', role: 'Member' },
-      { id: 104, name: 'Aisha Khan', email: 'aisha@example.com', role: 'Member' },
-      { id: 105, name: 'Mohammed Hassan', email: 'mohammed@example.com', role: 'Member' }
+      { id: 101, name: 'Mohamed Rizwan', email: 'rizwan@example.com', role: 'Member' },
+      { id: 102, name: 'Ahmed Fazil', email: 'fazil@example.com', role: 'Member' },
+      { id: 103, name: 'Mohammed Farook', email: 'farook@example.com', role: 'Member' },
+      { id: 104, name: 'Hussain Ismail', email: 'hussain@example.com', role: 'Member' },
+      { id: 105, name: 'Abdul Hameed', email: 'abdul@example.com', role: 'Member' },
+      { id: 106, name: 'Mohamed Imthiaz', email: 'imthiaz@example.com', role: 'Member' },
+      { id: 107, name: 'Ahamed Niyas', email: 'niyas@example.com', role: 'Member' },
+      { id: 108, name: 'Mohideen Bawa', email: 'mohideen@example.com', role: 'Member' },
+      { id: 109, name: 'Seyed Uwais', email: 'uwais@example.com', role: 'Member' },
+      { id: 110, name: 'Riyaz Salley', email: 'riyaz@example.com', role: 'Member' }
     ];
     
     setTimeout(() => {

@@ -14,8 +14,7 @@ const RequestPickup = () => {
 
   const prayerOptions = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha', 'Jumu\'ah'];
   
-  useEffect(() => {
-    // In a real app, you would fetch existing pickup requests from your API
+  useEffect(() => {    // In a real app, you would fetch existing pickup requests from your API
     // For now, we'll create some mock data
     setPickupRequests([
       {
@@ -23,7 +22,7 @@ const RequestPickup = () => {
         date: '2025-05-10',
         prayer: 'Fajr',
         time: '4:45 AM',
-        location: '123 Main St, Cityville',
+        location: '23 Baseline Road, Colombo 09',
         status: 'approved',
         notes: 'Please pick me up from the side entrance'
       },
@@ -32,7 +31,7 @@ const RequestPickup = () => {
         date: '2025-05-09',
         prayer: 'Jumu\'ah',
         time: '12:45 PM',
-        location: '456 Oak Ave, Townsburg',
+        location: '12 Galle Road, Dehiwala',
         status: 'pending',
         notes: 'I will be waiting at the bus stop'
       }

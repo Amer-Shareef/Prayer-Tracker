@@ -8,51 +8,50 @@ const PromoteUser = () => {
   const [roleFilter, setRoleFilter] = useState('all');
   const [selectedUser, setSelectedUser] = useState(null);
   const [isPromoting, setIsPromoting] = useState(false);
-  const [newRole, setNewRole] = useState('');
-  const [success, setSuccess] = useState(false);
-
+  const [newRole, setNewRole] = useState('');  const [success, setSuccess] = useState(false);
+  
   // Mock data for users
   useEffect(() => {
     // In a real app, this would be an API call
     const mockUsers = [
       { 
         id: 1, 
-        name: 'Ahmed Khan', 
-        email: 'ahmed@example.com', 
+        name: 'Mohamed Rizwan', 
+        email: 'rizwan@example.com', 
         role: 'Member',
-        mosque: 'Masjid Al-Noor',
+        mosque: 'Masjid Dawatagaha',
         joined: '2023-05-12'
       },
       { 
         id: 2, 
-        name: 'Fatima Rahman', 
-        email: 'fatima@example.com', 
+        name: 'Ahmed Fazil', 
+        email: 'fazil@example.com', 
         role: 'Member',
-        mosque: 'Masjid Al-Falah',
+        mosque: 'Colombo Grand Mosque',
         joined: '2023-08-20'
       },
       { 
         id: 3, 
-        name: 'Muhammed Ali', 
-        email: 'muhammed@example.com', 
+        name: 'Mohammed Farook', 
+        email: 'farook@example.com', 
         role: 'Founder',
-        mosque: 'Islamic Center of Rivertown',
+        mosque: 'Jami Ul-Alfar Mosque (Red Mosque)',
         joined: '2022-11-05'
       },
       { 
         id: 4, 
-        name: 'Ibrahim Hassan', 
-        email: 'ibrahim@example.com', 
+        name: 'Hussain Ismail', 
+        email: 'hussain@example.com', 
         role: 'Member',
-        mosque: 'Masjid Al-Taqwa',
+        mosque: 'Masjid Al-Noor',
         joined: '2024-01-15'
       },
       { 
-        id: 5, 
-        name: 'Aisha Malik', 
-        email: 'aisha@example.com', 
+        id: 5,        
+        name: 'Abdul Hameed',
+        email: 'abdul@example.com',
         role: 'Founder',
-        mosque: 'Masjid Al-Falah',
+        mosque: 'Colombo Grand Mosque',
         joined: '2023-03-28'
       }
     ];

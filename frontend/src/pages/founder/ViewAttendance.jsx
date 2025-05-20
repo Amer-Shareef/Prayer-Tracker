@@ -18,17 +18,15 @@ const ViewAttendance = () => {
 
   // Generate mock data for this demo
   useEffect(() => {
-    setLoading(true);
-
-    // Generate member data
+    setLoading(true);    // Generate member data
     const mockMembers = [
-      { id: 1, name: 'Ahmed Khan', joinedDate: '2024-03-15', phone: '+1 (555) 123-4567', attendance: 90 },
-      { id: 2, name: 'Mariam Ali', joinedDate: '2024-01-20', phone: '+1 (555) 987-6543', attendance: 85 },
-      { id: 3, name: 'Yusuf Ahmed', joinedDate: '2024-04-05', phone: '+1 (555) 555-1212', attendance: 70 },
-      { id: 4, name: 'Aisha Omar', joinedDate: '2023-11-28', phone: '+1 (555) 444-3333', attendance: 95 },
-      { id: 5, name: 'Mohamed Said', joinedDate: '2024-02-10', phone: '+1 (555) 222-9876', attendance: 65 },
-      { id: 6, name: 'Fatima Kabir', joinedDate: '2023-09-15', phone: '+1 (555) 111-2233', attendance: 88 },
-      { id: 7, name: 'Ibrahim Malik', joinedDate: '2024-05-01', phone: '+1 (555) 777-8899', attendance: 75 }
+      { id: 1, name: 'Mohamed Rizwan', joinedDate: '2024-03-15', phone: '+94 77 123 4567', attendance: 90 },
+      { id: 2, name: 'Ahmed Fazil', joinedDate: '2024-01-20', phone: '+94 76 234 5678', attendance: 85 },
+      { id: 3, name: 'Mohammed Farook', joinedDate: '2024-04-05', phone: '+94 71 345 6789', attendance: 70 },
+      { id: 4, name: 'Hussain Ismail', joinedDate: '2023-11-28', phone: '+94 75 456 7890', attendance: 95 },
+      { id: 5, name: 'Abdul Hameed', joinedDate: '2024-02-10', phone: '+94 70 567 8901', attendance: 65 },
+      { id: 6, name: 'Mohamed Imthiaz', joinedDate: '2023-09-15', phone: '+94 72 678 9012', attendance: 88 },
+      { id: 7, name: 'Ahamed Niyas', joinedDate: '2024-05-01', phone: '+94 78 789 0123', attendance: 75 }
     ];
     
     // Generate prayer attendance data

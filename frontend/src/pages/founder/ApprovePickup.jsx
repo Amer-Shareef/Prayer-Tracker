@@ -7,42 +7,41 @@ const ApprovePickup = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
   const [prayerFilter, setPrayerFilter] = useState('all');
-
   // All pickup requests
   const [pickupRequests, setPickupRequests] = useState([
     {
       id: 1,
-      memberName: "Ahmed Khan",
+      memberName: "Mohamed Rizwan",
       memberId: "M12345",
-      phoneNumber: "+1 (555) 123-4567",
+      phoneNumber: "+94 77 123 4567",
       date: "2025-05-09",
       prayer: "Fajr",
       time: "4:30 AM",
-      location: "123 Main St, Cityville",
+      location: "23 Baseline Road, Colombo 09",
       status: "pending",
       notes: "Please pick me up from the side entrance"
     },
     {
       id: 2,
-      memberName: "Yusuf Ali",
+      memberName: "Ahmed Fazil",
       memberId: "M23456",
-      phoneNumber: "+1 (555) 234-5678",
+      phoneNumber: "+94 76 234 5678",
       date: "2025-05-09",
       prayer: "Jumu'ah",
       time: "12:45 PM",
-      location: "456 Oak Ave, Townsburg",
+      location: "12 Galle Road, Dehiwala",
       status: "pending",
       notes: "I will be waiting at the bus stop"
     },
     {
       id: 3,
-      memberName: "Ibrahim Hassan",
+      memberName: "Mohammed Farook",
       memberId: "M34567",
-      phoneNumber: "+1 (555) 345-6789",
+      phoneNumber: "+94 71 345 6789",
       date: "2025-05-10",
       prayer: "Fajr",
       time: "4:30 AM",
-      location: "789 Pine Rd, Villageton",
+      location: "45 Dawson Road, Slave Island, Colombo 02",
       status: "pending",
       notes: "Please call when you arrive"
     },

@@ -2,16 +2,15 @@ import React, { useState, useEffect } from 'react';
 import MemberLayout from '../../components/layouts/MemberLayout';
 import { useAuth } from '../../context/AuthContext';
 
-const Profile = () => {
-  const { user } = useAuth();
+const Profile = () => {  const { user } = useAuth();
   const [profile, setProfile] = useState({
-    firstName: 'Muhammed',
-    lastName: 'Ali',
+    firstName: 'Mohamed',
+    lastName: 'Rizwan',
     username: 'testmember',
-    email: 'muhammed.ali@gmail.com',
-    phone: '077 123 4567',
-    address: '123 Kawdana Road, Dehiwala, 10350',
-    mosque: 'Kawdana Jumma Masjid',
+    email: 'rizwan@example.com',
+    phone: '+94 77 123 4567',
+    address: '23 Baseline Road, Colombo 09',
+    mosque: 'Masjid Dawatagaha',
     joinedDate: '2025-05-01',
     avatar: null
   });

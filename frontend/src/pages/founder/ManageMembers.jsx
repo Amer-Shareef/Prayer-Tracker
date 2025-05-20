@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import FounderLayout from '../../components/layouts/FounderLayout';
 
-const ManageMembers = () => {
-  const [members, setMembers] = useState([
+const ManageMembers = () => {  const [members, setMembers] = useState([
     {
       id: 1,
-      name: 'Ahmed Khan',
-      email: 'ahmed.khan@example.com',
-      phone: '+1 (555) 123-4567',
+      name: 'Mohamed Rizwan',
+      email: 'rizwan@example.com',
+      phone: '+94 77 123 4567',
       joinDate: '2024-12-15',
       status: 'active',
       prayerAttendance: 85,
@@ -15,9 +14,9 @@ const ManageMembers = () => {
     },
     {
       id: 2,
-      name: 'Fatima Ali',
-      email: 'fatima.ali@example.com',
-      phone: '+1 (555) 234-5678',
+      name: 'Ahmed Fazil',
+      email: 'fazil@example.com',
+      phone: '+94 76 234 5678',
       joinDate: '2025-01-10',
       status: 'active',
       prayerAttendance: 92,
@@ -25,9 +24,9 @@ const ManageMembers = () => {
     },
     {
       id: 3,
-      name: 'Muhammad Rahman',
-      email: 'muhammad.r@example.com',
-      phone: '+1 (555) 345-6789',
+      name: 'Mohammed Farook',
+      email: 'farook@example.com',
+      phone: '+94 71 345 6789',
       joinDate: '2025-02-05',
       status: 'active',
       prayerAttendance: 78,
@@ -35,9 +34,9 @@ const ManageMembers = () => {
     },
     {
       id: 4,
-      name: 'Aisha Begum',
-      email: 'aisha.b@example.com',
-      phone: '+1 (555) 456-7890',
+      name: 'Hussain Ismail',
+      email: 'hussain@example.com',
+      phone: '+94 75 456 7890',
       joinDate: '2025-03-20',
       status: 'inactive',
       prayerAttendance: 32,
@@ -45,9 +44,9 @@ const ManageMembers = () => {
     },
     {
       id: 5,
-      name: 'Omar Farooq',
-      email: 'omar.f@example.com',
-      phone: '+1 (555) 567-8901',
+      name: 'Abdul Hameed',
+      email: 'abdul@example.com',
+      phone: '+94 70 567 8901',
       joinDate: '2025-01-25',
       status: 'active',
       prayerAttendance: 89,

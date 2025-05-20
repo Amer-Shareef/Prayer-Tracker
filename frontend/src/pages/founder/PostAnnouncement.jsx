@@ -23,8 +23,7 @@ const PostAnnouncement = () => {
   const [success, setSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [activeTab, setActiveTab] = useState('editor');
-  
-  // All announcements
+    // All announcements
   const [announcements, setAnnouncements] = useState([
     {
       id: 1,
@@ -33,17 +32,17 @@ const PostAnnouncement = () => {
       createdAt: "2025-05-05T14:30:00",
       expiresAt: "2025-05-12",
       priority: "high",
-      author: "Abdullah Rahman",
+      author: "Mohamed Imthiaz",
       views: 78
     },
     {
       id: 2,
       title: "Community Iftar Planning",
-      content: "We are organizing community iftars for the coming Ramadan. Please register to volunteer or sponsor meals. We need volunteers for setup, cooking, serving, and cleanup. Please sign up at the reception desk or contact Br. Ahmad.",
+      content: "We are organizing community iftars for the coming Ramadan. Please register to volunteer or sponsor meals. We need volunteers for setup, cooking, serving, and cleanup. Please sign up at the reception desk or contact Br. Rizwan.",
       createdAt: "2025-05-05T16:45:00",
       expiresAt: "2025-05-15",
       priority: "normal",
-      author: "Abdullah Rahman",
+      author: "Ahmed Fazil",
       views: 65
     },
     {

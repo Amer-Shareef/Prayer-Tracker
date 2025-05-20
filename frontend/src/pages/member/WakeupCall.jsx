@@ -28,8 +28,7 @@ const WakeupCall = () => {
     { value: 'sms', label: 'SMS Message' },
     { value: 'whatsapp', label: 'WhatsApp' }
   ];
-  
-  useEffect(() => {
+    useEffect(() => {
     // In a real app, we would fetch the user's existing wake-up schedules from the API
     // For now, we'll create some mock data
     setSchedules([
@@ -39,7 +38,7 @@ const WakeupCall = () => {
         days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
         method: 'phone',
         active: true,
-        phone: '077 123 4567'
+        phone: '+94 77 123 4567'
       },
       {
         id: 2,
@@ -47,7 +46,7 @@ const WakeupCall = () => {
         days: ['saturday', 'sunday'],
         method: 'sms',
         active: false,
-        phone: '077 123 4567'
+        phone: '+94 77 123 4567'
       }
     ]);
   }, []);
