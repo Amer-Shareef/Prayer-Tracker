@@ -45,13 +45,10 @@ Prayer Tracker is a full-stack application designed to help Muslim communities k
 
 ### Prerequisites
 
-- Node.js (v14.0.0 or later)
-- npm (v6.0.0 or later)
-
 1. **Clone the repository**
 
    ```
-   git clone https://github.com/yourusername/Prayer-Tracker.git
+   git clone https://github.com/Amer-Shareef/Prayer-Tracker.git
    cd Prayer-Tracker
    ```
 
@@ -67,7 +64,7 @@ Prayer Tracker is a full-stack application designed to help Muslim communities k
    ```
     DB_HOST=localhost
     DB_USER=root
-    DB_PASSWORD=12345678
+    DB_PASSWORD=your_local_password
     DB_NAME=prayer_tracker
     PORT=5000
     JWT_SECRET=supersecretkey
@@ -91,9 +88,9 @@ Prayer Tracker is a full-stack application designed to help Muslim communities k
 
    This will create initial user accounts:
 
-   - Super Admin: admin@example.com / password123
-   - Founder: founder@example.com / password123
-   - Member: member@example.com / password123
+   - Super Admin: testadmin / password123
+   - Founder: testfounder / password123
+   - Member: testmember / password123
 
 5. **Start the Application**
 
