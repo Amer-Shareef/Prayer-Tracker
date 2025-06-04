@@ -28,7 +28,7 @@ const ApprovePickup = () => {
       phoneNumber: "+94 76 234 5678",
       date: "2025-05-09",
       prayer: "Jumu'ah",
-      time: "12:45 PM",
+      time: "12:00 PM",
       location: "12 Galle Road, Dehiwala",
       status: "pending",
       notes: "I will be waiting at the bus stop"
@@ -47,13 +47,13 @@ const ApprovePickup = () => {
     },
     {
       id: 4,
-      memberName: "Fatima Mohammad",
+      memberName: "Mohammad Ali",
       memberId: "M45678",
-      phoneNumber: "+1 (555) 456-7890",
+      phoneNumber: "+94 76 123 7890",
       date: "2025-05-09",
       prayer: "Maghrib",
-      time: "7:15 PM",
-      location: "321 Elm St, Villageton",
+      time: "6:15 PM",
+      location: "321 Sylvester Rd, Mount Lavinia",
       status: "approved",
       notes: "Needs assistance walking",
       approvedBy: "Abdullah Rahman",
@@ -64,11 +64,11 @@ const ApprovePickup = () => {
       id: 5,
       memberName: "Sarah Khan",
       memberId: "M56789",
-      phoneNumber: "+1 (555) 567-8901",
+      phoneNumber: "+94 76 123 7890",
       date: "2025-05-08",
       prayer: "Isha",
-      time: "8:45 PM",
-      location: "654 Maple Ave, Cityville",
+      time: "7:25 PM",
+      location: "654 Alen Ave, Dehiwala",
       status: "rejected",
       notes: "",
       rejectedBy: "Abdullah Rahman",
@@ -85,8 +85,8 @@ const ApprovePickup = () => {
   ]);
 
   useEffect(() => {
-    // In a real app, you would fetch pickup requests from your API
-    // For now, we'll use the static data defined above
+    // In a real app, fetch pickup requests from API
+    // For now, using the static data defined above
   }, []);
 
   // Handler for approving pickup requests
@@ -97,7 +97,7 @@ const ApprovePickup = () => {
         return {
           ...request,
           status: 'approved',
-          approvedBy: "Abdullah Rahman", // In a real app, this would be the current user
+          approvedBy: "Abdullah Rahman", // In the app, this would be the current user
           approvedAt: new Date().toISOString(),
           driver: selectedDriver ? selectedDriver.name : null
         };
@@ -113,7 +113,7 @@ const ApprovePickup = () => {
         return {
           ...request,
           status: 'rejected',
-          rejectedBy: "Abdullah Rahman", // In a real app, this would be the current user
+          rejectedBy: "Abdullah Rahman", // In the app, this would be the current user
           rejectedAt: new Date().toISOString(),
           rejectionReason: reason
         };

@@ -1,4 +1,3 @@
-// filepath: c:\Users\Dr_Shareef\Desktop\Prayer-Tracker\frontend\src\pages\founder\PostAnnouncement.jsx
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import FounderLayout from '../../components/layouts/FounderLayout';
@@ -68,7 +67,7 @@ const PostAnnouncement = () => {
   ]);
 
   useEffect(() => {
-    // In a real app, you would fetch announcements from your API
+    // In the app, fetch announcements from your API
     // For now, we'll use the static data defined above
     
     // Check if we're in edit mode

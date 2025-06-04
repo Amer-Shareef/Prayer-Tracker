@@ -19,21 +19,21 @@ const SuperAdminDashboard = () => {
     {
       id: 1,
       action: "New mosque registered",
-      mosque: "Masjid Al-Noor",
+      mosque: "Zainab Mosque",
       date: "2 hours ago"
     },
     {
       id: 2,
       action: "Founder assigned",
-      mosque: "Islamic Center of Cityville",
-      user: "Ahmed Khan",
+      mosque: "Rathmala Jummah Mosque",
+      user: "Ahmed Saleh",
       date: "5 hours ago"
     },
     {
       id: 3,
       action: "User promoted to founder",
       user: "Hasan Ali",
-      mosque: "Masjid Al-Falah",
+      mosque: "Dehiwala Junction Masjid",
       date: "Yesterday"
     },
     {

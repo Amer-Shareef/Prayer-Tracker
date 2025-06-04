@@ -14,8 +14,8 @@ const FounderDashboard = () => {
       fajr: '5:03 AM',
       dhuhr: '12:15 PM',
       asr: '3:45 PM',
-      maghrib: '7:23 PM',
-      isha: '8:53 PM',
+      maghrib: '6:23 PM',
+      isha: '7:43 PM',
       jumuah: '1:30 PM'
     }
   });
@@ -53,7 +53,7 @@ const FounderDashboard = () => {
       date: "2025-05-09",
       prayer: "Fajr",
       time: "4:30 AM",
-      location: "123 Main St, Cityville",
+      location: "123 Main St, Dehiwala",
       status: "pending"
     },
     {
@@ -62,7 +62,7 @@ const FounderDashboard = () => {
       date: "2025-05-09",
       prayer: "Jumu'ah",
       time: "12:45 PM",
-      location: "456 Oak Ave, Townsburg",
+      location: "456 Park Lane, Wellawate",
       status: "pending"
     },
     {
@@ -71,7 +71,7 @@ const FounderDashboard = () => {
       date: "2025-05-10",
       prayer: "Fajr",
       time: "4:30 AM",
-      location: "789 Pine Rd, Villageton",
+      location: "789 Kawdana Rd, Dehiwala",
       status: "pending"
     }
   ]);
@@ -107,7 +107,7 @@ const FounderDashboard = () => {
   });
   
   useEffect(() => {
-    // In a real app, you would fetch this data from your API
+    // In a real app, fetch this data from your API
     // For now, we'll use the static data defined above
   }, []);
   
@@ -123,7 +123,7 @@ const FounderDashboard = () => {
   const handleDeleteAnnouncement = (id) => {
     setAnnouncements(prev => prev.filter(announcement => announcement.id !== id));
     
-    // In a real app, you would send a delete request to your API
+    // In a real app, send a delete request to the API
     console.log(`Announcement ${id} deleted`);
   };
 

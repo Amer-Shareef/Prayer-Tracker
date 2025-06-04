@@ -1,4 +1,3 @@
-// filepath: c:\Users\Dr_Shareef\Desktop\Prayer-Tracker\frontend\src\components\layouts\FounderLayout.jsx
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';

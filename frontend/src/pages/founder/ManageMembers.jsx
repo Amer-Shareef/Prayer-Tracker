@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import FounderLayout from '../../components/layouts/FounderLayout';
+import memberService from '../../services/memberService';
 
 const ManageMembers = () => {  const [members, setMembers] = useState([
     {
       id: 1,
       name: 'Mohamed Rizwan',
-      email: 'rizwan@example.com',
+      email: 'rizwan@gmail.com',
       phone: '+94 77 123 4567',
       joinDate: '2024-12-15',
       status: 'active',
@@ -15,7 +16,7 @@ const ManageMembers = () => {  const [members, setMembers] = useState([
     {
       id: 2,
       name: 'Ahmed Fazil',
-      email: 'fazil@example.com',
+      email: 'fazil@yahoo.com',
       phone: '+94 76 234 5678',
       joinDate: '2025-01-10',
       status: 'active',
@@ -25,7 +26,7 @@ const ManageMembers = () => {  const [members, setMembers] = useState([
     {
       id: 3,
       name: 'Mohammed Farook',
-      email: 'farook@example.com',
+      email: 'farook@hotmail.com',
       phone: '+94 71 345 6789',
       joinDate: '2025-02-05',
       status: 'active',
@@ -35,7 +36,7 @@ const ManageMembers = () => {  const [members, setMembers] = useState([
     {
       id: 4,
       name: 'Hussain Ismail',
-      email: 'hussain@example.com',
+      email: 'hussain@outlook.com',
       phone: '+94 75 456 7890',
       joinDate: '2025-03-20',
       status: 'inactive',
@@ -45,7 +46,7 @@ const ManageMembers = () => {  const [members, setMembers] = useState([
     {
       id: 5,
       name: 'Abdul Hameed',
-      email: 'abdul@example.com',
+      email: 'abdul@gmail.com',
       phone: '+94 70 567 8901',
       joinDate: '2025-01-25',
       status: 'active',
@@ -59,11 +60,29 @@ const ManageMembers = () => {  const [members, setMembers] = useState([
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'ascending' });
   const [showAddMemberForm, setShowAddMemberForm] = useState(false);
   const [newMember, setNewMember] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
+    username: '',
     email: '',
     phone: '',
+    address: '',
     status: 'active'
   });
+  
+  // Fetch members when the component mounts
+useEffect(() => {
+  const fetchMembers = async () => {
+    try {
+      const data = await memberService.getMembers();
+      setMembers(data);
+    } catch (error) {
+      console.error('Failed to fetch members:', error);
+      // Handle error - show an error message to the user
+    }
+  };
+  
+  fetchMembers();
+}, []);
   
   // Filter members based on search term and status filter
   const filteredMembers = members.filter(member => {
@@ -98,40 +117,77 @@ const ManageMembers = () => {  const [members, setMembers] = useState([
   };
   
   // Handle adding a new member
-  const handleAddMember = (e) => {
+  const handleAddMember = async (e) => {
     e.preventDefault();
-    const newId = Math.max(...members.map(m => m.id)) + 1;
     
-    const memberToAdd = {
-      ...newMember,
-      id: newId,
-      joinDate: new Date().toISOString().split('T')[0],
-      prayerAttendance: 0,
-      lastPrayer: 'N/A'
-    };
-    
-    setMembers([...members, memberToAdd]);
-    setNewMember({
-      name: '',
-      email: '',
-      phone: '',
-      status: 'active'
-    });
-    setShowAddMemberForm(false);
+    try {
+      console.log('Submitting member data:', newMember);
+      
+      // Ensure we have all required fields
+      if (!newMember.firstName || !newMember.lastName || !newMember.email) {
+        alert('Please fill in all required fields');
+        return;
+      }
+      
+      // If username is not provided, generate one from email
+      if (!newMember.username) {
+        newMember.username = newMember.email.split('@')[0];
+      }
+      
+      // Add default password
+      const memberData = {
+        ...newMember,
+        password: 'password123' // Default password
+      };
+      
+      // Make API call
+      await memberService.addMember(memberData);
+      
+      // Refresh the members list
+      const updatedMembers = await memberService.getMembers();
+      setMembers(updatedMembers);
+      
+      // Reset form and close it
+      setNewMember({
+        firstName: '',
+        lastName: '',
+        username: '',
+        email: '',
+        phone: '',
+        address: '',
+        status: 'active'
+      });
+      setShowAddMemberForm(false);
+    } catch (error) {
+      console.error('Error adding member:', error);
+      alert(`Failed to add member: ${error.response?.data?.message || error.message || 'Please try again.'}`);
+    }
   };
   
   // Handle member deletion
-  const handleDeleteMember = (id) => {
+  const handleDeleteMember = async (id) => {
     if (window.confirm('Are you sure you want to delete this member?')) {
-      setMembers(members.filter(member => member.id !== id));
+      try {
+        await memberService.deleteMember(id);
+        setMembers(members.filter(member => member.id !== id));
+      } catch (error) {
+        console.error('Error deleting member:', error);
+        alert('Failed to delete member. Please try again.');
+      }
     }
   };
   
   // Handle status change
-  const handleStatusChange = (id, newStatus) => {
-    setMembers(members.map(member => 
-      member.id === id ? { ...member, status: newStatus } : member
-    ));
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      await memberService.changeStatus(id, newStatus);
+      setMembers(members.map(member => 
+        member.id === id ? { ...member, status: newStatus } : member
+      ));
+    } catch (error) {
+      console.error('Error changing member status:', error);
+      alert('Failed to update member status. Please try again.');
+    }
   };
   
   return (
@@ -156,12 +212,32 @@ const ManageMembers = () => {  const [members, setMembers] = useState([
             <form onSubmit={handleAddMember}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
                   <input
                     type="text"
                     className="w-full p-2 border border-gray-300 rounded-md"
-                    value={newMember.name}
-                    onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
+                    value={newMember.firstName}
+                    onChange={(e) => setNewMember({ ...newMember, firstName: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    value={newMember.lastName}
+                    onChange={(e) => setNewMember({ ...newMember, lastName: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    value={newMember.username}
+                    onChange={(e) => setNewMember({ ...newMember, username: e.target.value })}
                     required
                   />
                 </div>
@@ -195,6 +271,15 @@ const ManageMembers = () => {  const [members, setMembers] = useState([
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                   </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    value={newMember.address}
+                    onChange={(e) => setNewMember({ ...newMember, address: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="flex justify-end space-x-2">

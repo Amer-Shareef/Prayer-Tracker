@@ -1,24 +1,33 @@
 const express = require("express");
+const cors = require("cors");
 const dotenv = require("dotenv");
-const cors = require("cors"); // Import CORS package
-const authRoutes = require("./routes/authRoutes");
 
+// Import routes
+const authRoutes = require("./routes/authRoutes");
+const memberRoutes = require("./routes/memberRoutes");
+
+// Load environment variables
 dotenv.config();
+
 const app = express();
 
 // Middleware
+app.use(cors());
 app.use(express.json());
-app.use(cors()); // Enable CORS for all routes
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/members", memberRoutes);
+
+// Test route
+app.get("/api/test", (req, res) => {
+  res.json({ message: "API is working!" });
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res
-    .status(500)
-    .json({ message: "Internal Server Error", error: err.message });
+  res.status(500).json({ message: "Internal Server Error", error: err.message });
 });
 
 // Start server

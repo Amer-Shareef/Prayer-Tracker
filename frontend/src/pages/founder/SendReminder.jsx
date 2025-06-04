@@ -11,7 +11,7 @@ const SendReminder = () => {
   
   const handleSubmit = (e) => {
     e.preventDefault();
-    // In a real app, API call would go here
+    // In the app, API call would go here
     console.log({ selectedPrayer, reminderType, message });
     setSubmitted(true);
     
