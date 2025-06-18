@@ -1,17 +1,17 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
 async function generateApiDocs() {
-  console.log('📚 Generating Prayer Tracker API Documentation');
-  console.log('===============================================');
-  
+  console.log("📚 Generating Prayer Tracker API Documentation");
+  console.log("===============================================");
+
   try {
-    const docsDir = path.join(__dirname, '..', '..', 'docs');
-    
+    const docsDir = path.join(__dirname, "..", "..", "docs");
+
     // Create docs directory if it doesn't exist
     if (!fs.existsSync(docsDir)) {
       fs.mkdirSync(docsDir, { recursive: true });
-      console.log('✅ Created docs directory');
+      console.log("✅ Created docs directory");
     }
 
     // API Endpoints Summary
@@ -20,7 +20,7 @@ async function generateApiDocs() {
 
 ## Base URL
 \`\`\`
-http://localhost:5000/api
+http://13.60.193.171:5000/api
 \`\`\`
 
 ## Authentication
@@ -82,15 +82,15 @@ Authorization: Bearer <token>
 `;
 
     // Write API summary
-    fs.writeFileSync(path.join(docsDir, 'API-Summary.md'), apiSummary);
-    console.log('✅ Generated API-Summary.md');
+    fs.writeFileSync(path.join(docsDir, "API-Summary.md"), apiSummary);
+    console.log("✅ Generated API-Summary.md");
 
     // Copy pickup requests documentation if it exists
-    const pickupApiFile = path.join(docsDir, 'Pickup-Requests-API.md');
+    const pickupApiFile = path.join(docsDir, "Pickup-Requests-API.md");
     if (fs.existsSync(pickupApiFile)) {
-      console.log('✅ Pickup-Requests-API.md already exists');
+      console.log("✅ Pickup-Requests-API.md already exists");
     } else {
-      console.log('📝 Pickup-Requests-API.md should be created manually');
+      console.log("📝 Pickup-Requests-API.md should be created manually");
     }
 
     // Generate Postman collection
@@ -98,7 +98,7 @@ Authorization: Bearer <token>
       info: {
         name: "Prayer Tracker API",
         description: "Complete API collection for Prayer Tracker application",
-        version: "1.0.0"
+        version: "1.0.0",
       },
       auth: {
         type: "bearer",
@@ -106,16 +106,16 @@ Authorization: Bearer <token>
           {
             key: "token",
             value: "{{token}}",
-            type: "string"
-          }
-        ]
+            type: "string",
+          },
+        ],
       },
       variable: [
         {
           key: "base_url",
-          value: "http://localhost:5000/api",
-          type: "string"
-        }
+          value: "http://13.60.193.171:5000/api",
+          type: "string",
+        },
       ],
       item: [
         {
@@ -128,24 +128,24 @@ Authorization: Bearer <token>
                 header: [
                   {
                     key: "Content-Type",
-                    value: "application/json"
-                  }
+                    value: "application/json",
+                  },
                 ],
                 body: {
                   mode: "raw",
                   raw: JSON.stringify({
                     username: "abdullah",
-                    password: "abc123"
-                  })
+                    password: "abc123",
+                  }),
                 },
                 url: {
                   raw: "{{base_url}}/auth/login",
                   host: ["{{base_url}}"],
-                  path: ["auth", "login"]
-                }
-              }
-            }
-          ]
+                  path: ["auth", "login"],
+                },
+              },
+            },
+          ],
         },
         {
           name: "Pickup Requests",
@@ -161,11 +161,11 @@ Authorization: Bearer <token>
                   query: [
                     {
                       key: "limit",
-                      value: "10"
-                    }
-                  ]
-                }
-              }
+                      value: "10",
+                    },
+                  ],
+                },
+              },
             },
             {
               name: "Create Request",
@@ -174,22 +174,22 @@ Authorization: Bearer <token>
                 header: [
                   {
                     key: "Content-Type",
-                    value: "application/json"
-                  }
+                    value: "application/json",
+                  },
                 ],
                 body: {
                   mode: "raw",
                   raw: JSON.stringify({
                     request_date: "2025-06-25",
-                    pickup_location: "House #123, Main Street, near ABC Shop"
-                  })
+                    pickup_location: "House #123, Main Street, near ABC Shop",
+                  }),
                 },
                 url: {
                   raw: "{{base_url}}/pickup-requests",
                   host: ["{{base_url}}"],
-                  path: ["pickup-requests"]
-                }
-              }
+                  path: ["pickup-requests"],
+                },
+              },
             },
             {
               name: "Cancel Request",
@@ -198,11 +198,11 @@ Authorization: Bearer <token>
                 url: {
                   raw: "{{base_url}}/pickup-requests/1",
                   host: ["{{base_url}}"],
-                  path: ["pickup-requests", "1"]
-                }
-              }
-            }
-          ]
+                  path: ["pickup-requests", "1"],
+                },
+              },
+            },
+          ],
         },
         {
           name: "Prayers",
@@ -218,11 +218,11 @@ Authorization: Bearer <token>
                   query: [
                     {
                       key: "date",
-                      value: "{{today}}"
-                    }
-                  ]
-                }
-              }
+                      value: "{{today}}",
+                    },
+                  ],
+                },
+              },
             },
             {
               name: "Record Prayer",
@@ -231,8 +231,8 @@ Authorization: Bearer <token>
                 header: [
                   {
                     key: "Content-Type",
-                    value: "application/json"
-                  }
+                    value: "application/json",
+                  },
                 ],
                 body: {
                   mode: "raw",
@@ -240,27 +240,27 @@ Authorization: Bearer <token>
                     prayer_type: "Fajr",
                     prayer_date: "2025-06-18",
                     status: "prayed",
-                    location: "mosque"
-                  })
+                    location: "mosque",
+                  }),
                 },
                 url: {
                   raw: "{{base_url}}/prayers",
                   host: ["{{base_url}}"],
-                  path: ["prayers"]
-                }
-              }
-            }
-          ]
-        }
-      ]
+                  path: ["prayers"],
+                },
+              },
+            },
+          ],
+        },
+      ],
     };
 
     // Write Postman collection
     fs.writeFileSync(
-      path.join(docsDir, 'Prayer-Tracker-Postman-Collection.json'), 
+      path.join(docsDir, "Prayer-Tracker-Postman-Collection.json"),
       JSON.stringify(postmanCollection, null, 2)
     );
-    console.log('✅ Generated Postman collection');
+    console.log("✅ Generated Postman collection");
 
     // Generate README for docs folder
     const docsReadme = `
@@ -328,22 +328,21 @@ Generated on: ${new Date().toLocaleString()}
 Version: 1.0.0
 `;
 
-    fs.writeFileSync(path.join(docsDir, 'README.md'), docsReadme);
-    console.log('✅ Generated docs README.md');
+    fs.writeFileSync(path.join(docsDir, "README.md"), docsReadme);
+    console.log("✅ Generated docs README.md");
 
-    console.log('\n🎉 API documentation generation completed!');
-    console.log('\n📁 Generated files:');
-    console.log('  ✅ docs/API-Summary.md');
-    console.log('  ✅ docs/Prayer-Tracker-Postman-Collection.json');
-    console.log('  ✅ docs/README.md');
-    console.log('\n📋 Next steps:');
-    console.log('  1. Review the API documentation');
-    console.log('  2. Import Postman collection for testing');
-    console.log('  3. Share with frontend developers');
-    console.log('  4. Update documentation as needed');
-
+    console.log("\n🎉 API documentation generation completed!");
+    console.log("\n📁 Generated files:");
+    console.log("  ✅ docs/API-Summary.md");
+    console.log("  ✅ docs/Prayer-Tracker-Postman-Collection.json");
+    console.log("  ✅ docs/README.md");
+    console.log("\n📋 Next steps:");
+    console.log("  1. Review the API documentation");
+    console.log("  2. Import Postman collection for testing");
+    console.log("  3. Share with frontend developers");
+    console.log("  4. Update documentation as needed");
   } catch (error) {
-    console.error('❌ Documentation generation failed:', error.message);
+    console.error("❌ Documentation generation failed:", error.message);
   }
 }
 

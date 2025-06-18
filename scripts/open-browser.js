@@ -20,6 +20,6 @@ function openBrowser(url) {
   }
 }
 
-// Get URL from command line argument or use default
-const url = process.argv[2] || 'http://localhost:3000';
+// Get URL from command line argument or use EC2 default
+const url = process.argv[2] || 'http://13.60.193.171:3000';
 openBrowser(url);

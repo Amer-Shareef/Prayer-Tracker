@@ -1,10 +1,13 @@
-const express = require('express');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
-const crypto = require('crypto'); // Add crypto for enhanced token generation
-const { pool } = require('../config/database'); // Use same config
-const { authenticateToken } = require('../middleware/auth'); // Add this import
-const { sendOtpEmail, sendPasswordResetEmail } = require('../services/emailService');
+const express = require("express");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
+const crypto = require("crypto"); // Add crypto for enhanced token generation
+const { pool } = require("../config/database"); // Use same config
+const { authenticateToken } = require("../middleware/auth"); // Add this import
+const {
+  sendOtpEmail,
+  sendPasswordResetEmail,
+} = require("../services/emailService");
 
 const router = express.Router();
 
@@ -25,38 +28,42 @@ const isAccountLocked = (user) => {
 const lockAccount = async (userId) => {
   const lockUntil = new Date();
   lockUntil.setMinutes(lockUntil.getMinutes() + 30); // Lock for 30 minutes
-  
+
   await pool.execute(
-    'UPDATE users SET account_locked_until = ?, login_attempts = 0 WHERE id = ?',
+    "UPDATE users SET account_locked_until = ?, login_attempts = 0 WHERE id = ?",
     [lockUntil, userId]
   );
 };
 
 // ENHANCED LOGIN ROUTE WITH OTP
-router.post('/login', async (req, res) => {
+router.post("/login", async (req, res) => {
   try {
     const { username, password, otpCode } = req.body;
 
-    console.log('🔐 Login attempt:', { username, hasPassword: !!password, hasOtp: !!otpCode });
+    console.log("🔐 Login attempt:", {
+      username,
+      hasPassword: !!password,
+      hasOtp: !!otpCode,
+    });
 
     if (!username || !password) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Username and password are required' 
+        message: "Username and password are required",
       });
     }
 
     // Query user from database
     const [rows] = await pool.execute(
-      'SELECT * FROM users WHERE username = ?',
+      "SELECT * FROM users WHERE username = ?",
       [username]
     );
 
     if (rows.length === 0) {
-      console.log('❌ User not found:', username);
-      return res.status(401).json({ 
+      console.log("❌ User not found:", username);
+      return res.status(401).json({
         success: false,
-        message: 'Invalid credentials' 
+        message: "Invalid credentials",
       });
     }
 
@@ -64,166 +71,167 @@ router.post('/login', async (req, res) => {
 
     // Check if account is locked
     if (isAccountLocked(user)) {
-      console.log('🔒 Account locked:', username);
+      console.log("🔒 Account locked:", username);
       return res.status(423).json({
         success: false,
-        message: 'Account is temporarily locked due to multiple failed attempts. Please try again later.',
-        accountLocked: true
+        message:
+          "Account is temporarily locked due to multiple failed attempts. Please try again later.",
+        accountLocked: true,
       });
     }
 
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password);
-    
+
     if (!isValidPassword) {
-      console.log('❌ Invalid password for user:', username);
-      
+      console.log("❌ Invalid password for user:", username);
+
       // Increment login attempts
       const newAttempts = (user.login_attempts || 0) + 1;
-      await pool.execute(
-        'UPDATE users SET login_attempts = ? WHERE id = ?',
-        [newAttempts, user.id]
-      );
-      
+      await pool.execute("UPDATE users SET login_attempts = ? WHERE id = ?", [
+        newAttempts,
+        user.id,
+      ]);
+
       // Lock account after 5 failed attempts
       if (newAttempts >= 5) {
         await lockAccount(user.id);
         return res.status(423).json({
           success: false,
-          message: 'Account locked due to multiple failed attempts. Please try again in 30 minutes.',
-          accountLocked: true
+          message:
+            "Account locked due to multiple failed attempts. Please try again in 30 minutes.",
+          accountLocked: true,
         });
       }
-      
-      return res.status(401).json({ 
+
+      return res.status(401).json({
         success: false,
-        message: `Invalid credentials. ${5 - newAttempts} attempts remaining.`
+        message: `Invalid credentials. ${5 - newAttempts} attempts remaining.`,
       });
     }
 
     // If OTP is provided, verify it
     if (otpCode) {
-      console.log('🔐 Verifying OTP...');
-      
+      console.log("🔐 Verifying OTP...");
+
       // Check if OTP is valid and not expired
       if (!user.otp_code || user.otp_code !== otpCode) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid OTP code'
+          message: "Invalid OTP code",
         });
       }
-      
+
       if (!user.otp_expires || new Date() > new Date(user.otp_expires)) {
         return res.status(400).json({
           success: false,
-          message: 'OTP code has expired. Please request a new login.'
+          message: "OTP code has expired. Please request a new login.",
         });
       }
-      
+
       // Clear OTP and reset login attempts
       await pool.execute(
-        'UPDATE users SET otp_code = NULL, otp_expires = NULL, otp_verified = TRUE, login_attempts = 0, last_login = CURRENT_TIMESTAMP WHERE id = ?',
+        "UPDATE users SET otp_code = NULL, otp_expires = NULL, otp_verified = TRUE, login_attempts = 0, last_login = CURRENT_TIMESTAMP WHERE id = ?",
         [user.id]
       );
-      
+
       // Generate JWT token
       const token = jwt.sign(
-        { 
+        {
           userId: user.id,
-          username: user.username, 
-          role: user.role 
+          username: user.username,
+          role: user.role,
         },
         process.env.JWT_SECRET,
-        { expiresIn: '24h' }
+        { expiresIn: "24h" }
       );
 
-      console.log('✅ Login successful with OTP for user:', username);
+      console.log("✅ Login successful with OTP for user:", username);
 
       return res.json({
         success: true,
-        message: 'Login successful',
+        message: "Login successful",
         token,
         user: {
           id: user.id,
           username: user.username,
           email: user.email,
-          role: user.role
-        }
+          role: user.role,
+        },
       });
     }
 
     // If no OTP provided, send OTP to email
-    console.log('📧 Sending OTP to email:', user.email);
-    
+    console.log("📧 Sending OTP to email:", user.email);
+
     const otp = generateOtp();
     const otpExpires = new Date();
     otpExpires.setMinutes(otpExpires.getMinutes() + 10); // OTP valid for 10 minutes
-    
+
     // Store OTP in database
     await pool.execute(
-      'UPDATE users SET otp_code = ?, otp_expires = ?, otp_verified = FALSE WHERE id = ?',
+      "UPDATE users SET otp_code = ?, otp_expires = ?, otp_verified = FALSE WHERE id = ?",
       [otp, otpExpires, user.id]
     );
-    
+
     // Send OTP email
     const emailResult = await sendOtpEmail(user.email, user.username, otp);
-    
+
     if (!emailResult.success) {
-      console.error('❌ Failed to send OTP email:', emailResult.error);
+      console.error("❌ Failed to send OTP email:", emailResult.error);
       return res.status(500).json({
         success: false,
-        message: 'Failed to send verification code. Please try again.'
+        message: "Failed to send verification code. Please try again.",
       });
     }
-    
-    console.log('✅ OTP sent to email for user:', username);
-    
+
+    console.log("✅ OTP sent to email for user:", username);
+
     const response = {
       success: true,
-      message: 'Verification code sent to your email. Please check your inbox.',
+      message: "Verification code sent to your email. Please check your inbox.",
       requiresOtp: true,
-      email: user.email.replace(/(.{2})(.*)(@.*)/, '$1***$3') // Mask email for security
+      email: user.email.replace(/(.{2})(.*)(@.*)/, "$1***$3"), // Mask email for security
     };
 
     // In development/test mode, include the OTP for easy testing
-    if (process.env.NODE_ENV === 'development' || emailResult.testMode) {
+    if (process.env.NODE_ENV === "development" || emailResult.testMode) {
       response.testOtp = otp;
       response.testMessage = `For testing: Your OTP is ${otp}`;
     }
 
     res.json(response);
-
   } catch (error) {
-    console.error('❌ Login error:', error);
-    res.status(500).json({ 
+    console.error("❌ Login error:", error);
+    res.status(500).json({
       success: false,
-      message: 'Server error', 
-      error: error.message 
+      message: "Server error",
+      error: error.message,
     });
   }
 });
 
 // Resend OTP route
-router.post('/resend-otp', async (req, res) => {
+router.post("/resend-otp", async (req, res) => {
   try {
     const { username } = req.body;
 
     if (!username) {
       return res.status(400).json({
         success: false,
-        message: 'Username is required'
+        message: "Username is required",
       });
     }
 
     const [users] = await pool.execute(
-      'SELECT * FROM users WHERE username = ?',
+      "SELECT * FROM users WHERE username = ?",
       [username]
     );
 
     if (users.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: "User not found",
       });
     }
 
@@ -231,11 +239,13 @@ router.post('/resend-otp', async (req, res) => {
 
     // Check if user has a pending OTP request (within last 2 minutes)
     if (user.otp_expires) {
-      const timeSinceLastOtp = Date.now() - new Date(user.otp_expires).getTime() + (10 * 60 * 1000);
-      if (timeSinceLastOtp < 2 * 60 * 1000) { // 2 minutes
+      const timeSinceLastOtp =
+        Date.now() - new Date(user.otp_expires).getTime() + 10 * 60 * 1000;
+      if (timeSinceLastOtp < 2 * 60 * 1000) {
+        // 2 minutes
         return res.status(429).json({
           success: false,
-          message: 'Please wait before requesting a new verification code.'
+          message: "Please wait before requesting a new verification code.",
         });
       }
     }
@@ -247,7 +257,7 @@ router.post('/resend-otp', async (req, res) => {
 
     // Update OTP in database
     await pool.execute(
-      'UPDATE users SET otp_code = ?, otp_expires = ? WHERE id = ?',
+      "UPDATE users SET otp_code = ?, otp_expires = ? WHERE id = ?",
       [otp, otpExpires, user.id]
     );
 
@@ -257,54 +267,53 @@ router.post('/resend-otp', async (req, res) => {
     if (!emailResult.success) {
       return res.status(500).json({
         success: false,
-        message: 'Failed to send verification code. Please try again.'
+        message: "Failed to send verification code. Please try again.",
       });
     }
 
     const response = {
       success: true,
-      message: 'New verification code sent to your email.'
+      message: "New verification code sent to your email.",
     };
 
     // In development/test mode, include the OTP
-    if (process.env.NODE_ENV === 'development' || emailResult.testMode) {
+    if (process.env.NODE_ENV === "development" || emailResult.testMode) {
       response.testOtp = otp;
     }
 
     res.json(response);
-
   } catch (error) {
-    console.error('❌ Resend OTP error:', error);
+    console.error("❌ Resend OTP error:", error);
     res.status(500).json({
       success: false,
-      message: 'Server error',
-      error: error.message
+      message: "Server error",
+      error: error.message,
     });
   }
 });
 
 // Register route
-router.post('/register', async (req, res) => {
+router.post("/register", async (req, res) => {
   try {
-    const { username, email, password, role = 'Member' } = req.body;
+    const { username, email, password, role = "Member" } = req.body;
 
     if (!username || !email || !password) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Username, email and password are required' 
+        message: "Username, email and password are required",
       });
     }
 
     // Check if user already exists
     const [existingUsers] = await pool.execute(
-      'SELECT * FROM users WHERE username = ? OR email = ?',
+      "SELECT * FROM users WHERE username = ? OR email = ?",
       [username, email]
     );
 
     if (existingUsers.length > 0) {
-      return res.status(409).json({ 
+      return res.status(409).json({
         success: false,
-        message: 'Username or email already exists' 
+        message: "Username or email already exists",
       });
     }
 
@@ -314,33 +323,32 @@ router.post('/register', async (req, res) => {
 
     // Insert new user
     const [result] = await pool.execute(
-      'INSERT INTO users (username, email, password, role, status, joined_date) VALUES (?, ?, ?, ?, ?, CURDATE())',
-      [username, email, hashedPassword, role, 'active']
+      "INSERT INTO users (username, email, password, role, status, joined_date) VALUES (?, ?, ?, ?, ?, CURDATE())",
+      [username, email, hashedPassword, role, "active"]
     );
 
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
+      message: "User registered successfully",
       user: {
         id: result.insertId,
         username,
         email,
-        role
-      }
+        role,
+      },
     });
-
   } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ 
+    console.error("Register error:", error);
+    res.status(500).json({
       success: false,
-      message: 'Server error', 
-      error: error.message 
+      message: "Server error",
+      error: error.message,
     });
   }
 });
 
 // Change password route
-router.post('/change-password', authenticateToken, async (req, res) => {
+router.post("/change-password", authenticateToken, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const { user } = req;
@@ -348,30 +356,33 @@ router.post('/change-password', authenticateToken, async (req, res) => {
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: 'Current password and new password are required'
+        message: "Current password and new password are required",
       });
     }
 
     // Get user's current password hash
     const [userRows] = await pool.execute(
-      'SELECT password FROM users WHERE id = ?',
+      "SELECT password FROM users WHERE id = ?",
       [user.id]
     );
 
     if (userRows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: "User not found",
       });
     }
 
     // Verify current password
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, userRows[0].password);
-    
+    const isCurrentPasswordValid = await bcrypt.compare(
+      currentPassword,
+      userRows[0].password
+    );
+
     if (!isCurrentPasswordValid) {
       return res.status(400).json({
         success: false,
-        message: 'Current password is incorrect'
+        message: "Current password is incorrect",
       });
     }
 
@@ -381,40 +392,39 @@ router.post('/change-password', authenticateToken, async (req, res) => {
 
     // Update password
     await pool.execute(
-      'UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      "UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
       [hashedNewPassword, user.id]
     );
 
     res.json({
       success: true,
-      message: 'Password changed successfully'
+      message: "Password changed successfully",
     });
-
   } catch (error) {
-    console.error('Change password error:', error);
+    console.error("Change password error:", error);
     res.status(500).json({
       success: false,
-      message: 'Server error',
-      error: error.message
+      message: "Server error",
+      error: error.message,
     });
   }
 });
 
 // Forgot password route - ENHANCED to actually send Gmail
-router.post('/forgot-password', async (req, res) => {
+router.post("/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
-    
+
     if (!email) {
       return res.status(400).json({
         success: false,
-        message: 'Email is required'
+        message: "Email is required",
       });
     }
 
     // Check if user exists
     const [users] = await pool.execute(
-      'SELECT id, username, email FROM users WHERE email = ?',
+      "SELECT id, username, email FROM users WHERE email = ?",
       [email]
     );
 
@@ -422,94 +432,105 @@ router.post('/forgot-password', async (req, res) => {
       // Don't reveal if email exists for security
       return res.json({
         success: true,
-        message: 'If this email exists in our system, you will receive password reset instructions.'
+        message:
+          "If this email exists in our system, you will receive password reset instructions.",
       });
     }
 
     const user = users[0];
-    
+
     // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetToken = crypto.randomBytes(32).toString("hex");
     const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
     // Save reset token to database
     await pool.execute(
-      'UPDATE users SET reset_token = ?, reset_expires = ? WHERE id = ?',
+      "UPDATE users SET reset_token = ?, reset_expires = ? WHERE id = ?",
       [resetToken, resetExpires, user.id]
     );
 
     // Create reset link
-    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+    const resetLink = `${
+      process.env.FRONTEND_URL || "http://13.60.193.171:3000"
+    }/reset-password?token=${resetToken}`;
 
     // Send reset email via Gmail
     console.log(`📧 Sending password reset email to: ${email}`);
-    const emailResult = await sendPasswordResetEmail(email, user.username, resetLink);
-    
+    const emailResult = await sendPasswordResetEmail(
+      email,
+      user.username,
+      resetLink
+    );
+
     if (emailResult.success && emailResult.realEmail) {
-      console.log('✅ Password reset email sent successfully via Gmail');
+      console.log("✅ Password reset email sent successfully via Gmail");
       res.json({
         success: true,
-        message: 'Password reset instructions have been sent to your email address.'
+        message:
+          "Password reset instructions have been sent to your email address.",
       });
     } else if (emailResult.fallbackMode) {
-      console.log('⚠️  Gmail failed, but reset link generated');
+      console.log("⚠️  Gmail failed, but reset link generated");
       // In development, include the reset link for testing
       const response = {
         success: true,
-        message: 'If this email exists in our system, you will receive password reset instructions.'
+        message:
+          "If this email exists in our system, you will receive password reset instructions.",
       };
-      
+
       // Include reset link in development mode for testing
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === "development") {
         response.resetLink = resetLink;
         response.developmentMode = true;
       }
-      
+
       res.json(response);
     } else {
-      throw new Error('Failed to send reset email');
+      throw new Error("Failed to send reset email");
     }
-
   } catch (error) {
-    console.error('Forgot password error:', error);
+    console.error("Forgot password error:", error);
     res.status(500).json({
       success: false,
-      message: 'Error processing password reset request'
+      message: "Error processing password reset request",
     });
   }
 });
 
 // Reset password route
-router.post('/reset-password', async (req, res) => {
+router.post("/reset-password", async (req, res) => {
   try {
     const { token, newPassword } = req.body;
 
-    console.log('🔄 Password reset attempt with token:', token?.substring(0, 10) + '...');
+    console.log(
+      "🔄 Password reset attempt with token:",
+      token?.substring(0, 10) + "..."
+    );
 
     if (!token || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: 'Token and new password are required'
+        message: "Token and new password are required",
       });
     }
 
     if (newPassword.length < 6) {
       return res.status(400).json({
         success: false,
-        message: 'Password must be at least 6 characters long'
+        message: "Password must be at least 6 characters long",
       });
     }
 
     // Find user with valid reset token
     const [users] = await pool.execute(
-      'SELECT id, username, email FROM users WHERE reset_token = ? AND reset_expires > NOW()',
+      "SELECT id, username, email FROM users WHERE reset_token = ? AND reset_expires > NOW()",
       [token]
     );
 
     if (users.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid or expired reset token'
+        message: "Invalid or expired reset token",
       });
     }
 
@@ -521,7 +542,7 @@ router.post('/reset-password', async (req, res) => {
 
     // Update password and clear reset token
     await pool.execute(
-      'UPDATE users SET password = ?, reset_token = NULL, reset_expires = NULL WHERE id = ?',
+      "UPDATE users SET password = ?, reset_token = NULL, reset_expires = NULL WHERE id = ?",
       [hashedPassword, user.id]
     );
 
@@ -529,15 +550,15 @@ router.post('/reset-password', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Password has been reset successfully. You can now login with your new password.'
+      message:
+        "Password has been reset successfully. You can now login with your new password.",
     });
-
   } catch (error) {
-    console.error('❌ Password reset error:', error);
+    console.error("❌ Password reset error:", error);
     res.status(500).json({
       success: false,
-      message: 'Server error',
-      error: error.message
+      message: "Server error",
+      error: error.message,
     });
   }
 });
