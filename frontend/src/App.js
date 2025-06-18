@@ -7,6 +7,8 @@ import {
 } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import LoginPage from "./pages/auth/LoginPage";
+import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import ProtectedRoute from "./utils/ProtectedRoute";
 
 // Member Pages
@@ -16,7 +18,8 @@ import MyPrayers from "./pages/member/MyPrayers";
 import MyStats from "./pages/member/MyStats";
 import Profile from "./pages/member/Profile";
 import RequestPickup from "./pages/member/RequestPickup";
-import WakeupCall from "./pages/member/WakeupCall";
+import DailyActivities from "./pages/member/DailyActivities";
+import ChangePassword from "./pages/member/ChangePassword"; // NEW IMPORT
 
 // Founder Pages
 import FounderDashboard from "./components/dashboard/FounderDashboard";
@@ -25,12 +28,16 @@ import PostAnnouncement from "./pages/founder/PostAnnouncement";
 import ViewAttendance from "./pages/founder/ViewAttendance";
 import ManageMembers from "./pages/founder/ManageMembers";
 import SendReminder from "./pages/founder/SendReminder";
+import AddMember from "./pages/founder/AddMember";
 
 // SuperAdmin Pages
 import SuperAdminDashboard from "./components/dashboard/SuperAdminDashboard";
 import AssignFounder from "./pages/superadmin/AssignFounder";
 import PromoteUser from "./pages/superadmin/PromoteUser";
 import ViewMosques from "./pages/superadmin/ViewMosques";
+
+// Test Page
+import TestPage from './pages/TestPage';
 
 function App() {
   return (
@@ -39,6 +46,8 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/" element={<Navigate to="/login" replace />} />
 
           {/* Member Routes */}
@@ -99,10 +108,18 @@ function App() {
             }
           />
           <Route
-            path="/member/wakeup"
+            path="/member/daily-activities"
             element={
               <ProtectedRoute role="Member">
-                <WakeupCall />
+                <DailyActivities />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/member/change-password"
+            element={
+              <ProtectedRoute role="Member">
+                <ChangePassword />
               </ProtectedRoute>
             }
           />
@@ -157,6 +174,14 @@ function App() {
             }
           />
           <Route
+            path="/founder/add-member"
+            element={
+              <ProtectedRoute role="Founder">
+                <AddMember />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/founder/send-reminder"
             element={
               <ProtectedRoute role="Founder">
@@ -165,7 +190,7 @@ function App() {
             }
           />
 
-          {/* SuperAdmin Routes */}
+          {/* SuperAdmin Routes - Use "SuperAdmin" to match database */}
           <Route
             path="/superadmin"
             element={
@@ -206,6 +231,9 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Test Page for debugging */}
+          <Route path="/test" element={<TestPage />} />
 
           {/* 404 Route */}
           <Route path="*" element={<Navigate to="/login" replace />} />

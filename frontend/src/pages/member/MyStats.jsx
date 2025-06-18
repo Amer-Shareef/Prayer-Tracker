@@ -1,348 +1,315 @@
 import React, { useState, useEffect } from 'react';
 import MemberLayout from '../../components/layouts/MemberLayout';
+import { prayerService } from '../../services/api';
 
 const MyStats = () => {
-  const [statistics, setStatistics] = useState({
-    weeklyStats: {
-      total: 35,
-      performed: 30,
-      percentage: 85.71
-    },
-    monthlyStats: {
-      total: 150,
-      performed: 138,
-      percentage: 92.0
-    },
-    consecutiveDays: 23,
-    prayerStats: {
-      Fajr: { performed: 19, total: 30, percentage: 63.33 },
-      Dhuhr: { performed: 28, total: 30, percentage: 93.33 },
-      Asr: { performed: 27, total: 30, percentage: 90.00 },
-      Maghrib: { performed: 30, total: 30, percentage: 100.00 },
-      Isha: { performed: 26, total: 30, percentage: 86.67 }
-    },
-    locationStats: {
-      mosque: 65,
-      home: 73
-    },
-    monthlyHistory: [
-      { month: 'Jan', percentage: 78 },
-      { month: 'Feb', percentage: 82 },
-      { month: 'Mar', percentage: 90 },
-      { month: 'Apr', percentage: 88 },
-      { month: 'May', percentage: 92 }
-    ],
-    achievements: [
-      { name: '7 Day Streak', completed: true, progress: 100 },
-      { name: '30 Day Streak', completed: false, progress: 76.67 },
-      { name: '40 Day Streak', completed: false, progress: 57.50 },
-      { name: 'Perfect Week', completed: false, progress: 85.71 },
-      { name: 'All Prayers at Mosque', completed: false, progress: 47.10 }
-    ]
-  });
-  
-  const [timeframe, setTimeframe] = useState('month');
-  
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [period, setPeriod] = useState('30');
+
   useEffect(() => {
-    // In a real app, you would fetch this data from your API
-    // For now, we'll use the static data defined above
-  }, []);
-  
-  // Helper function to generate chart data for the heatmap
-  const generateHeatmapData = () => {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-    
-    // Create an array of the last 4 weeks (28 days)
-    const heatmapData = [];
-    
-    for (let week = 0; week < 4; week++) {
-      const weekData = {
-        weekNum: 4 - week,
-        days: []
-      };
+    fetchStats();
+  }, [period]);
+
+  const fetchStats = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const response = await prayerService.getStats(period);
       
-      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-        const dayData = {
-          day: days[dayIndex],
-          prayers: {}
-        };
-        
-        for (let prayer of prayers) {
-          // Generate random prayer attendance (0-2)
-          // 0 = missed, 1 = prayed at home, 2 = prayed at mosque
-          const random = Math.random();
-          let status;
-          
-          if (random < 0.15) {
-            status = 0; // missed
-          } else if (random < 0.55) {
-            status = 1; // home
-          } else {
-            status = 2; // mosque
-          }
-          
-          dayData.prayers[prayer] = status;
-        }
-        
-        weekData.days.push(dayData);
+      if (response.data.success) {
+        setStats(response.data.data);
+      } else {
+        setError(response.data.message || 'Failed to fetch statistics');
       }
-      
-      heatmapData.push(weekData);
-    }
-    
-    return heatmapData;
-  };
-  
-  const getHeatmapCellColor = (status) => {
-    switch(status) {
-      case 0: return 'bg-red-200';
-      case 1: return 'bg-blue-200';
-      case 2: return 'bg-green-200';
-      default: return 'bg-gray-100';
-    }
-  };
-  
-  const getHeatmapCellText = (status) => {
-    switch(status) {
-      case 0: return '✗';
-      case 1: return 'H';
-      case 2: return 'M';
-      default: return '';
+    } catch (err) {
+      console.error('Error fetching stats:', err);
+      setError('Error connecting to server');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const heatmapData = generateHeatmapData();
+  if (loading) {
+    return (
+      <MemberLayout>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="ml-4 text-lg">Loading statistics...</div>
+        </div>
+      </MemberLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <MemberLayout>
+        <div className="max-w-4xl mx-auto p-6">
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
+            <div className="flex">
+              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              {error}
+            </div>
+          </div>
+          <button 
+            onClick={fetchStats}
+            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            Try Again
+          </button>
+        </div>
+      </MemberLayout>
+    );
+  }
+
+  const getPrayerColor = (prayerType) => {
+    const colors = {
+      'Fajr': 'bg-purple-500',
+      'Dhuhr': 'bg-yellow-500',
+      'Asr': 'bg-orange-500',
+      'Maghrib': 'bg-red-500',
+      'Isha': 'bg-indigo-500'
+    };
+    return colors[prayerType] || 'bg-gray-500';
+  };
+
+  const getPeriodText = () => {
+    switch (period) {
+      case '7': return 'Last 7 days';
+      case '30': return 'Last 30 days';
+      case '90': return 'Last 90 days';
+      case '365': return 'Last year';
+      default: return `Last ${period} days`;
+    }
+  };
 
   return (
     <MemberLayout>
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">My Prayer Statistics</h1>
-        
-        {/* Key Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          {/* Weekly Performance */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-bold mb-2">Weekly Performance</h2>
-            <div className="flex items-center mb-2">
-              <div className="w-full bg-gray-200 rounded-full h-4 mr-4">
-                <div 
-                  className="bg-green-600 h-4 rounded-full" 
-                  style={{ width: `${statistics.weeklyStats.percentage}%` }}
-                ></div>
-              </div>
-              <span className="text-lg font-bold">
-                {statistics.weeklyStats.percentage}%
-              </span>
-            </div>
-            <p className="text-gray-600">
-              {statistics.weeklyStats.performed} of {statistics.weeklyStats.total} prayers
-            </p>
-          </div>
-          
-          {/* Monthly Performance */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-bold mb-2">Monthly Performance</h2>
-            <div className="flex items-center mb-2">
-              <div className="w-full bg-gray-200 rounded-full h-4 mr-4">
-                <div 
-                  className="bg-green-600 h-4 rounded-full" 
-                  style={{ width: `${statistics.monthlyStats.percentage}%` }}
-                ></div>
-              </div>
-              <span className="text-lg font-bold">
-                {statistics.monthlyStats.percentage}%
-              </span>
-            </div>
-            <p className="text-gray-600">
-              {statistics.monthlyStats.performed} of {statistics.monthlyStats.total} prayers
-            </p>
-          </div>
-          
-          {/* Consecutive Days */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-bold mb-2">Consecutive Days</h2>
-            <div className="flex items-center mb-2">
-              <div className="w-full bg-gray-200 rounded-full h-4 mr-4">
-                <div 
-                  className="bg-green-600 h-4 rounded-full" 
-                  style={{ width: `${(statistics.consecutiveDays / 40) * 100}%` }}
-                ></div>
-              </div>
-              <span className="text-lg font-bold">
-                {statistics.consecutiveDays}
-              </span>
-            </div>
-            <p className="text-gray-600">
-              Goal: 40 consecutive days
-            </p>
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-800">My Prayer Statistics</h1>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Time Period</label>
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="365">Last year</option>
+            </select>
           </div>
         </div>
-        
-        {/* Prayer Type Distribution */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">Prayer Performance by Type</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            {Object.entries(statistics.prayerStats).map(([prayer, stats]) => (
-              <div key={prayer} className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-bold text-lg mb-2">{prayer}</h3>
-                
-                <div className="flex items-center mb-2">
-                  <div className="w-full bg-gray-200 rounded-full h-4 mr-2">
-                    <div 
-                      className="bg-green-600 h-4 rounded-full" 
-                      style={{ width: `${stats.percentage}%` }}
-                    ></div>
+
+        {stats && (
+          <>
+            {/* Overall Statistics */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex items-center">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
                   </div>
-                  <span className="text-sm font-bold">
-                    {stats.percentage}%
-                  </span>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-500">Total Prayers</p>
+                    <p className="text-2xl font-semibold text-gray-900">{stats.overall.total_prayers || 0}</p>
+                  </div>
                 </div>
-                
-                <p className="text-sm text-gray-600">
-                  {stats.performed} of {stats.total}
-                </p>
               </div>
-            ))}
-          </div>
-        </div>
-        
-        {/* Location Distribution */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {/* Location Stats */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold mb-4">Prayer Location</h2>
-            
-            <div className="flex items-center mb-4">
-              <div className="w-full bg-blue-200 rounded-full h-6">
-                <div 
-                  className="bg-green-500 h-6 rounded-l-full" 
-                  style={{ width: `${(statistics.locationStats.mosque / (statistics.locationStats.mosque + statistics.locationStats.home)) * 100}%` }}
-                ></div>
+
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex items-center">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-500">Completed</p>
+                    <p className="text-2xl font-semibold text-gray-900">{stats.overall.prayed_count || 0}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex items-center">
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-500">Missed</p>
+                    <p className="text-2xl font-semibold text-gray-900">{stats.overall.missed_count || 0}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex items-center">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-500">Attendance Rate</p>
+                    <p className="text-2xl font-semibold text-gray-900">{stats.overall.attendance_rate || 0}%</p>
+                  </div>
+                </div>
               </div>
             </div>
-            
-            <div className="flex justify-between text-sm">
+
+            {/* Current Streak */}
+            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Current Streak</h3>
               <div className="flex items-center">
-                <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-                <span>Mosque: {statistics.locationStats.mosque} prayers</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-blue-200 rounded-full mr-2"></div>
-                <span>Home: {statistics.locationStats.home} prayers</span>
-              </div>
-            </div>
-          </div>
-          
-          {/* Monthly Trends */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold mb-4">Monthly Trends</h2>
-            
-            <div className="flex h-40 items-end justify-between">
-              {statistics.monthlyHistory.map((month, index) => (
-                <div key={index} className="flex flex-col items-center">
-                  <div 
-                    className="bg-green-500 w-10 rounded-t"
-                    style={{ height: `${month.percentage}%` }}
-                  ></div>
-                  <div className="mt-2 text-xs">{month.month}</div>
+                <div className="p-3 bg-yellow-100 rounded-lg">
+                  <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
+                  </svg>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-        
-        {/* Attendance Heatmap */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">Prayer Attendance Heatmap</h2>
-          
-          <div className="mb-4">
-            <div className="flex justify-between mb-2">
-              <div className="text-sm text-gray-500">Last 4 weeks</div>
-              <div className="flex space-x-4 text-xs">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-green-200 mr-1"></div>
-                  <span>Mosque</span>
+                <div className="ml-4">
+                  <p className="text-3xl font-bold text-gray-900">{stats.currentStreak}</p>
+                  <p className="text-gray-600">consecutive prayers completed</p>
                 </div>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-blue-200 mr-1"></div>
-                  <span>Home</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-red-200 mr-1"></div>
-                  <span>Missed</span>
-                </div>
+                {stats.currentStreak > 0 && (
+                  <div className="ml-auto">
+                    <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                      🔥 On Fire!
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr className="text-left text-xs">
-                  <th className="pb-2 w-16">Week</th>
-                  <th className="pb-2 w-16">Day</th>
-                  <th className="pb-2 w-20 text-center">Fajr</th>
-                  <th className="pb-2 w-20 text-center">Dhuhr</th>
-                  <th className="pb-2 w-20 text-center">Asr</th>
-                  <th className="pb-2 w-20 text-center">Maghrib</th>
-                  <th className="pb-2 w-20 text-center">Isha</th>
-                </tr>
-              </thead>
+
+            {/* Prayer Type Breakdown */}
+            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+              <h3 className="text-lg font-semibold text-gray-800 mb-6">Prayer Performance by Type ({getPeriodText()})</h3>
               
-              <tbody>
-                {heatmapData.map((week) => (
-                  week.days.map((day, dayIndex) => (
-                    <tr key={`${week.weekNum}-${dayIndex}`}>
-                      {dayIndex === 0 && (
-                        <td 
-                          rowSpan={7}
-                          className="text-xs font-medium text-gray-500 align-top pt-2"
-                        >
-                          Week {week.weekNum}
-                        </td>
-                      )}
-                      <td className="py-1 text-xs text-gray-500">{day.day}</td>
-                      {Object.entries(day.prayers).map(([prayer, status], i) => (
-                        <td key={`${prayer}-${i}`} className="py-1">
-                          <div className={`w-8 h-8 mx-auto rounded-md flex items-center justify-center text-xs ${getHeatmapCellColor(status)}`}>
-                            {getHeatmapCellText(status)}
-                          </div>
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        
-        {/* Achievements */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-bold mb-4">Prayer Achievements</h2>
-          
-          <div className="space-y-4">
-            {statistics.achievements.map((achievement, index) => (
-              <div key={index} className="border-b pb-4 last:border-0 last:pb-0">
-                <div className="flex justify-between mb-1">
-                  <h3 className="font-medium">{achievement.name}</h3>
-                  <span className={`font-medium ${achievement.completed ? 'text-green-600' : 'text-gray-500'}`}>
-                    {achievement.completed ? 'Completed!' : `${achievement.progress}%`}
-                  </span>
+              {stats.byPrayerType && stats.byPrayerType.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                  {stats.byPrayerType.map((prayer) => (
+                    <div key={prayer.prayer_type} className="text-center">
+                      <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center text-white font-bold text-lg mb-2 ${getPrayerColor(prayer.prayer_type)}`}>
+                        {Math.round(prayer.rate || 0)}%
+                      </div>
+                      <h4 className="font-semibold text-gray-800">{prayer.prayer_type}</h4>
+                      <p className="text-sm text-gray-600">{prayer.prayed}/{prayer.total}</p>
+                      
+                      {/* Progress bar */}
+                      <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                        <div 
+                          className={`h-2 rounded-full ${getPrayerColor(prayer.prayer_type)}`}
+                          style={{ width: `${prayer.rate || 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className={`${achievement.completed ? 'bg-green-600' : 'bg-blue-500'} h-2 rounded-full`}
-                    style={{ width: `${achievement.progress}%` }}
-                  ></div>
+              ) : (
+                <div className="text-center py-8">
+                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">No prayer data</h3>
+                  <p className="mt-1 text-sm text-gray-500">Start recording your prayers to see statistics here.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Performance Insights */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Performance Insights</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Attendance Rate Card */}
+                <div className="border rounded-lg p-4">
+                  <div className="flex items-center mb-3">
+                    <div className={`w-3 h-3 rounded-full mr-2 ${
+                      (stats.overall.attendance_rate || 0) >= 80 ? 'bg-green-500' :
+                      (stats.overall.attendance_rate || 0) >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                    }`}></div>
+                    <h4 className="font-semibold">Overall Performance</h4>
+                  </div>
+                  <p className="text-2xl font-bold mb-2">{stats.overall.attendance_rate || 0}%</p>
+                  <p className="text-sm text-gray-600">
+                    {(stats.overall.attendance_rate || 0) >= 80 ? '🎉 Excellent! Keep up the great work!' :
+                     (stats.overall.attendance_rate || 0) >= 60 ? '👍 Good progress! Try to be more consistent.' :
+                     '💪 There\'s room for improvement. You can do it!'}
+                  </p>
+                </div>
+
+                {/* Best Prayer Time */}
+                <div className="border rounded-lg p-4">
+                  <div className="flex items-center mb-3">
+                    <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                    <h4 className="font-semibold">Best Prayer Time</h4>
+                  </div>
+                  {stats.byPrayerType && stats.byPrayerType.length > 0 ? (
+                    (() => {
+                      const bestPrayer = stats.byPrayerType.reduce((best, current) => 
+                        (current.rate || 0) > (best.rate || 0) ? current : best
+                      );
+                      return (
+                        <>
+                          <p className="text-2xl font-bold mb-2">{bestPrayer.prayer_type}</p>
+                          <p className="text-sm text-gray-600">
+                            {Math.round(bestPrayer.rate || 0)}% attendance rate
+                          </p>
+                        </>
+                      );
+                    })()
+                  ) : (
+                    <p className="text-sm text-gray-600">No data available</p>
+                  )}
+                </div>
+
+                {/* Prayer Count */}
+                <div className="border rounded-lg p-4">
+                  <div className="flex items-center mb-3">
+                    <div className="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
+                    <h4 className="font-semibold">Prayer Count</h4>
+                  </div>
+                  <p className="text-2xl font-bold mb-2">{stats.overall.total_prayers || 0}</p>
+                  <p className="text-sm text-gray-600">
+                    Total prayers in {getPeriodText().toLowerCase()}
+                  </p>
+                </div>
+
+                {/* Consistency Score */}
+                <div className="border rounded-lg p-4">
+                  <div className="flex items-center mb-3">
+                    <div className="w-3 h-3 rounded-full bg-orange-500 mr-2"></div>
+                    <h4 className="font-semibold">Consistency</h4>
+                  </div>
+                  <p className="text-2xl font-bold mb-2">{stats.currentStreak}</p>
+                  <p className="text-sm text-gray-600">
+                    Current streak of completed prayers
+                  </p>
                 </div>
               </div>
-            ))}
+            </div>
+          </>
+        )}
+
+        {!stats && !loading && !error && (
+          <div className="text-center py-8">
+            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No statistics available</h3>
+            <p className="mt-1 text-sm text-gray-500">Start recording your prayers to see your statistics.</p>
           </div>
-        </div>
+        )}
       </div>
     </MemberLayout>
   );

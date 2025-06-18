@@ -14,9 +14,16 @@ const ProtectedRoute = ({ children, role }) => {
     );
   }
 
-  // Check if user is authenticated and has the correct role
-  if (!user || user.role !== role) {
+  // Check if user is authenticated
+  if (!user) {
     return <Navigate to="/login" />;
+  }
+
+  // Check role - SIMPLIFIED
+  if (role) {
+    if (user.role !== role) {
+      return <Navigate to="/login" />;
+    }
   }
 
   return children;

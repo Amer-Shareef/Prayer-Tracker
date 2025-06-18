@@ -6,17 +6,47 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "setup-db": "node scripts/setupDb.js"
+    "dev": "nodemon server.js",
+    "setup-db": "node scripts/setupDatabase.js",
+    "upgrade-db": "node scripts/upgradeDatabaseToV2.js",
+    "seed-users": "node scripts/seedUsers.js",
+    "test-db": "node scripts/testConnection.js",
+    "test-prayers": "node scripts/testPrayerRecording.js",
+    "test-member": "node scripts/testMemberFunctions.js",
+    "clean-db": "node scripts/cleanDatabase.js",
+    "test-env": "node scripts/testEnv.js",
+    "inspect-db": "node scripts/inspectDatabase.js",
+    "monitor": "node scripts/monitorConnections.js",
+    "backup-db": "node scripts/backupDatabase.js",
+    "restore-db": "node scripts/restoreDatabase.js",
+    "list-backups": "node scripts/listBackups.js",
+    "clean-backups": "node scripts/cleanBackups.js",
+    "auto-backup": "node scripts/autoBackup.js",
+    "backup-daily": "node scripts/autoBackup.js daily",
+    "backup-weekly": "node scripts/autoBackup.js weekly",
+    "backup-monthly": "node scripts/autoBackup.js monthly",
+    "add-reset-fields": "node scripts/addResetTokenFields.js",
+    "add-otp-fields": "node scripts/addOtpFields.js",
+    "test-gmail-otp": "node scripts/testGmailOtp.js",
+    "create-abdullah": "node scripts/createAbdullahUser.js",
+    "verify-gmail": "node scripts/verifyGmailSetup.js",
+    "remove-notes": "node scripts/removeNotesColumn.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "axios": "^1.9.0",
     "bcrypt": "^5.1.0",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.0",
-    "mysql2": "^3.2.0"
+    "express-rate-limit": "^7.1.5",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.14.1",
+    "nodemailer": "^6.10.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
   }
 }

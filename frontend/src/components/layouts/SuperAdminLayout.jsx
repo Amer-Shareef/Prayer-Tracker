@@ -79,7 +79,7 @@ const SuperAdminLayout = ({ children }) => {
           </button>
         </div>
         <div className="p-4 text-sm text-purple-200">
-          {sidebarOpen ? 'Super Admin' : 'SA'}
+          {sidebarOpen ? 'Admin Panel' : 'AP'}
         </div>
         
         <nav className="mt-2">

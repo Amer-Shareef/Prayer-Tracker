@@ -1,337 +1,379 @@
 import React, { useState, useEffect } from 'react';
 import MemberLayout from '../../components/layouts/MemberLayout';
+import { prayerService, mosqueService } from '../../services/api';
 
 const MyPrayers = () => {
   const [prayers, setPrayers] = useState([]);
-  const [filter, setFilter] = useState('all');
-  const [dateRange, setDateRange] = useState('week');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [currentDate, setCurrentDate] = useState(new Date());
   
+  const getTodayDate = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const [selectedDate, setSelectedDate] = useState(getTodayDate());
+  const [recordingPrayer, setRecordingPrayer] = useState(null);
+  const [mosque, setMosque] = useState(null);
+
+  const prayerTypes = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+
   useEffect(() => {
-    // In a real app, you would fetch the user's prayers from your API based on filter
-    // For now, we'll create some mock data
-    setLoading(true);
-    
-    const mockPrayers = generateMockPrayers();
-    
-    // Filter by status if needed
-    let filteredPrayers = mockPrayers;
-    if (filter !== 'all') {
-      filteredPrayers = mockPrayers.filter(prayer => prayer.status === filter);
-    }
-    
-    // Filter by date range
-    const today = new Date();
-    let startDate;
-    
-    if (dateRange === 'today') {
-      startDate = new Date(today);
-      startDate.setHours(0, 0, 0, 0);
-    } else if (dateRange === 'week') {
-      startDate = new Date(today);
-      startDate.setDate(today.getDate() - 7);
-    } else if (dateRange === 'month') {
-      startDate = new Date(today);
-      startDate.setDate(today.getDate() - 30);
-    }
-    
-    if (startDate) {
-      filteredPrayers = filteredPrayers.filter(prayer => new Date(prayer.date) >= startDate);
-    }
-    
-    // Sort by date (newest first)
-    filteredPrayers.sort((a, b) => new Date(b.date) - new Date(a.date));
-    
-    setPrayers(filteredPrayers);
-    setLoading(false);
-  }, [filter, dateRange]);
-  
-  const generateMockPrayers = () => {
-    const prayers = [];
-    const prayerTypes = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-    const today = new Date();
-    
-    for (let i = 0; i < 30; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
+    fetchPrayers();
+    fetchMosqueData();
+
+    const dateInterval = setInterval(() => {
+      setCurrentDate(new Date());
+      const newToday = getTodayDate();
+      if (selectedDate === getTodayDate() && newToday !== selectedDate) {
+        setSelectedDate(newToday);
+      }
+    }, 60000);
+
+    return () => clearInterval(dateInterval);
+  }, [selectedDate]);
+
+  const fetchPrayers = async () => {
+    try {
+      setLoading(true);
+      setError('');
       
-      for (const type of prayerTypes) {
-        // Randomly generate prayer status
-        const random = Math.random();
-        let status, location;
-        
-        if (random < 0.1) {
-          status = 'missed';
-          location = null;
-        } else if (random < 0.6) {
-          status = 'prayed';
-          location = 'home';
-        } else {
-          status = 'prayed';
-          location = 'mosque';
-        }
-        
-        // Create prayer time
-        let time;
-        switch(type) {
-          case 'Fajr':
-            time = '05:30 AM';
-            break;
-          case 'Dhuhr':
-            time = '12:30 PM';
-            break;
-          case 'Asr':
-            time = '03:45 PM';
-            break;
-          case 'Maghrib':
-            time = '07:15 PM';
-            break;
-          case 'Isha':
-            time = '08:45 PM';
-            break;
-        }
-        
-        prayers.push({
-          id: `prayer-${i}-${type}`,
-          type,
-          date: date.toISOString().split('T')[0],
-          time,
-          status,
-          location,
-          notes: ""
-        });
+      const response = await prayerService.getPrayers({ date: selectedDate });
+      
+      if (response.data.success) {
+        setPrayers(response.data.data);
+      } else {
+        setError(response.data.message || 'Failed to fetch prayers');
       }
-    }
-    
-    return prayers;
-  };
-  
-  const getStatusBadgeClass = (status) => {
-    switch(status) {
-      case 'prayed': return 'bg-green-100 text-green-800';
-      case 'missed': return 'bg-red-100 text-red-800';
-      case 'upcoming': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-  
-  const getLocationIcon = (location) => {
-    switch(location) {
-      case 'mosque': return '🕌';
-      case 'home': return '🏠';
-      default: return '';
-    }
-  };
-  
-  const handlePrayerStatusUpdate = (prayerId, newStatus, location) => {
-    setPrayers(prevPrayers => 
-      prevPrayers.map(prayer => {
-        if (prayer.id === prayerId) {
-          return {
-            ...prayer,
-            status: newStatus,
-            location: location || prayer.location
-          };
-        }
-        return prayer;
-      })
-    );
-  };
-  
-  const groupPrayersByDate = (prayers) => {
-    const grouped = {};
-    
-    for (const prayer of prayers) {
-      if (!grouped[prayer.date]) {
-        grouped[prayer.date] = [];
-      }
-      grouped[prayer.date].push(prayer);
-    }
-    
-    return grouped;
-  };
-  
-  const formatDate = (dateStr) => {
-    const date = new Date(dateStr);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    if (date.getTime() === today.getTime()) {
-      return 'Today';
-    } else if (date.getTime() === yesterday.getTime()) {
-      return 'Yesterday';
-    } else {
-      return date.toLocaleDateString('en-US', {
-        weekday: 'long',
-        month: 'short',
-        day: 'numeric'
-      });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error connecting to server');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const groupedPrayers = groupPrayersByDate(prayers);
+  const fetchMosqueData = async () => {
+    try {
+      const response = await mosqueService.getMosques();
+      
+      if (response.data.success && response.data.data.length > 0) {
+        setMosque(response.data.data[0]);
+      }
+    } catch (err) {
+      console.error('Error fetching mosque data:', err);
+    }
+  };
+
+  const recordPrayer = async (prayerType, status, location = 'mosque', notes = '') => {
+    try {
+      setRecordingPrayer(prayerType);
+      setError('');
+
+      const response = await prayerService.recordPrayer({
+        prayer_type: prayerType,
+        prayer_date: selectedDate,
+        status: status,
+        location: location,
+        notes: notes
+      });
+
+      if (response.data.success) {
+        setPrayers(prevPrayers => {
+          const filtered = prevPrayers.filter(p => {
+            const prayerDate = p.prayer_date;
+            return !(p.prayer_type === prayerType && prayerDate === selectedDate);
+          });
+          return [...filtered, response.data.data];
+        });
+        setError('');
+      } else {
+        setError(response.data.message || 'Failed to record prayer');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error recording prayer');
+    } finally {
+      setRecordingPrayer(null);
+    }
+  };
+
+  const getPrayerStatus = (prayerType) => {
+    const prayer = prayers.find(p => {
+      const prayerDate = p.prayer_date;
+      return p.prayer_type === prayerType && prayerDate === selectedDate;
+    });
+    return prayer ? prayer.status : 'upcoming';
+  };
+
+  const getPrayerLocation = (prayerType) => {
+    const prayer = prayers.find(p => {
+      const prayerDate = p.prayer_date;
+      return p.prayer_type === prayerType && prayerDate === selectedDate;
+    });
+    return prayer ? prayer.location : 'mosque';
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'prayed': return 'bg-green-100 text-green-800 border-green-200';
+      case 'missed': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'prayed':
+        return (
+          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        );
+      case 'missed':
+        return (
+          <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        );
+      default:
+        return (
+          <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        );
+    }
+  };
+
+  const formatPrayerTime = (prayerType) => {
+    if (!mosque?.today_prayer_times?.[prayerType]) return null;
+    
+    try {
+      const time = mosque.today_prayer_times[prayerType];
+      return new Date(`2000-01-01T${time}`).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (e) {
+      return null;
+    }
+  };
+
+  if (loading) {
+    return (
+      <MemberLayout>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="ml-4 text-lg">Loading prayers...</div>
+        </div>
+      </MemberLayout>
+    );
+  }
 
   return (
     <MemberLayout>
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">My Prayers</h1>
-        
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-            <div className="flex space-x-4 mb-4 md:mb-0">
-              <div>
-                <label htmlFor="filter" className="block text-sm font-medium text-gray-700 mb-1">
-                  Status Filter
-                </label>
-                <select
-                  id="filter"
-                  className="border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                >
-                  <option value="all">All Prayers</option>
-                  <option value="prayed">Completed</option>
-                  <option value="missed">Missed</option>
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="dateRange" className="block text-sm font-medium text-gray-700 mb-1">
-                  Date Range
-                </label>
-                <select
-                  id="dateRange"
-                  className="border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                  value={dateRange}
-                  onChange={(e) => setDateRange(e.target.value)}
-                >
-                  <option value="today">Today</option>
-                  <option value="week">Last 7 days</option>
-                  <option value="month">Last 30 days</option>
-                  <option value="all">All Time</option>
-                </select>
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">My Prayers</h1>
+            <p className="text-gray-600">
+              Today is {currentDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-gray-500">Current Time</p>
+            <p className="text-lg font-semibold text-blue-600">
+              {currentDate.toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              })}
+            </p>
+          </div>
+        </div>
+
+        {error && (
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6">
+            <div className="flex">
+              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              {error}
+            </div>
+          </div>
+        )}
+
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Select Date</h2>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <div className="text-sm text-gray-600">
+                {selectedDate === getTodayDate() 
+                  ? '📅 Today (Current)' 
+                  : `📅 ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric'
+                    })}`
+                }
               </div>
             </div>
             
-            <div>
+            <div className="flex space-x-2">
               <button
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md"
+                onClick={() => setSelectedDate(getTodayDate())}
+                className={`px-3 py-1 rounded text-sm ${
+                  selectedDate === getTodayDate()
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
               >
-                Download Report
+                Today
+              </button>
+              <button
+                onClick={() => {
+                  const yesterday = new Date();
+                  yesterday.setDate(yesterday.getDate() - 1);
+                  const year = yesterday.getFullYear();
+                  const month = String(yesterday.getMonth() + 1).padStart(2, '0');
+                  const day = String(yesterday.getDate()).padStart(2, '0');
+                  const yesterdayStr = `${year}-${month}-${day}`;
+                  setSelectedDate(yesterdayStr);
+                }}
+                className="px-3 py-1 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded text-sm"
+              >
+                Yesterday
               </button>
             </div>
           </div>
         </div>
-        
-        {/* Prayer List */}
-        {loading ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <div className="inline-block animate-spin rounded-full border-4 border-gray-300 border-t-green-600 h-10 w-10 mb-4"></div>
-            <p className="text-gray-500">Loading prayers...</p>
-          </div>
-        ) : prayers.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <div className="text-gray-400 text-4xl mb-4">📝</div>
-            <h3 className="text-lg font-medium text-gray-900 mb-1">No prayers found</h3>
-            <p className="text-gray-500">
-              No prayers match your current filters. Try changing your filters or date range.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {Object.keys(groupedPrayers).map(date => (
-              <div key={date} className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="bg-gray-50 px-6 py-3 border-b">
-                  <h3 className="text-lg font-medium text-gray-900">
-                    {formatDate(date)}
-                  </h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {prayerTypes.map((prayerType) => {
+            const status = getPrayerStatus(prayerType);
+            const location = getPrayerLocation(prayerType);
+            const isRecording = recordingPrayer === prayerType;
+            const prayerTime = formatPrayerTime(prayerType);
+
+            return (
+              <div key={prayerType} className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800">{prayerType}</h3>
+                    {prayerTime && (
+                      <p className="text-sm font-medium text-blue-600">{prayerTime}</p>
+                    )}
+                  </div>
+                  {getStatusIcon(status)}
                 </div>
-                
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Prayer
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Time
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Location
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {groupedPrayers[date].map(prayer => (
-                      <tr key={prayer.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="font-medium text-gray-900">{prayer.type}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-gray-500">{prayer.time}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(prayer.status)}`}>
-                            {prayer.status === 'prayed' ? 'Completed' : prayer.status.charAt(0).toUpperCase() + prayer.status.slice(1)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-gray-500">
-                            {prayer.location && (
-                              <span>
-                                {getLocationIcon(prayer.location)} {prayer.location.charAt(0).toUpperCase() + prayer.location.slice(1)}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          {prayer.status === 'missed' ? (
-                            <div className="space-x-2">
-                              <button
-                                onClick={() => handlePrayerStatusUpdate(prayer.id, 'prayed', 'home')}
-                                className="text-green-600 hover:text-green-900"
-                              >
-                                Mark as prayed
-                              </button>
-                            </div>
-                          ) : prayer.status === 'prayed' ? (
-                            <div className="space-x-2">
-                              <button
-                                onClick={() => handlePrayerStatusUpdate(prayer.id, 'missed', null)}
-                                className="text-red-600 hover:text-red-900"
-                              >
-                                Mark as missed
-                              </button>
-                              
-                              <span className="text-gray-300">|</span>
-                              
-                              <button
-                                onClick={() => handlePrayerStatusUpdate(prayer.id, 'prayed', prayer.location === 'home' ? 'mosque' : 'home')}
-                                className="text-indigo-600 hover:text-indigo-900"
-                              >
-                                {prayer.location === 'home' ? 'At mosque' : 'At home'}
-                              </button>
-                            </div>
-                          ) : null}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+
+                <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border mb-4 ${getStatusColor(status)}`}>
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                </div>
+
+                {status !== 'upcoming' && (
+                  <div className="mb-4">
+                    <span className="text-sm text-gray-600">Location: </span>
+                    <span className="text-sm font-medium capitalize">{location}</span>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  {status === 'upcoming' && (
+                    <>
+                      <button
+                        onClick={() => recordPrayer(prayerType, 'prayed', 'mosque')}
+                        disabled={isRecording}
+                        className={`w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                          isRecording ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                      >
+                        {isRecording ? 'Recording...' : 'Mark as Prayed (Mosque)'}
+                      </button>
+                      <button
+                        onClick={() => recordPrayer(prayerType, 'prayed', 'home')}
+                        disabled={isRecording}
+                        className={`w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          isRecording ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                      >
+                        {isRecording ? 'Recording...' : 'Mark as Prayed (Home)'}
+                      </button>
+                      <button
+                        onClick={() => recordPrayer(prayerType, 'missed')}
+                        disabled={isRecording}
+                        className={`w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                          isRecording ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                      >
+                        {isRecording ? 'Recording...' : 'Mark as Missed'}
+                      </button>
+                    </>
+                  )}
+
+                  {status !== 'upcoming' && (
+                    <button
+                      onClick={() => recordPrayer(prayerType, 'upcoming')}
+                      disabled={isRecording}
+                      className={`w-full bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 ${
+                        isRecording ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      {isRecording ? 'Updating...' : 'Reset Status'}
+                    </button>
+                  )}
+                </div>
               </div>
-            ))}
+            );
+          })}
+        </div>
+
+        <div className="mt-8 bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Prayer Summary for {selectedDate}</h3>
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <div className="text-2xl font-bold text-green-600">
+                {prayers.filter(p => {
+                  const prayerDate = p.prayer_date;
+                  return prayerDate === selectedDate && p.status === 'prayed';
+                }).length}
+              </div>
+              <div className="text-sm text-gray-600">Completed</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-red-600">
+                {prayers.filter(p => {
+                  const prayerDate = p.prayer_date;
+                  return prayerDate === selectedDate && p.status === 'missed';
+                }).length}
+              </div>
+              <div className="text-sm text-gray-600">Missed</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-yellow-600">
+                {prayerTypes.length - prayers.filter(p => {
+                  const prayerDate = p.prayer_date;
+                  return prayerDate === selectedDate && p.status !== 'upcoming';
+                }).length}
+              </div>
+              <div className="text-sm text-gray-600">Pending</div>
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </MemberLayout>
   );

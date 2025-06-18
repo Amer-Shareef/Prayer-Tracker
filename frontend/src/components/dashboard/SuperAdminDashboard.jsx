@@ -47,7 +47,7 @@ const SuperAdminDashboard = () => {
   return (
     <SuperAdminLayout>
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">Super Admin Dashboard</h1>
+        <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
         
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">

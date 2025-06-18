@@ -7,82 +7,92 @@ const memberService = {
   // Add a new member
   addMember: async (memberData) => {
     try {
-      console.log("Sending member data to API:", memberData);
+      // Add default password for new members
+      const dataToSend = {
+        ...memberData,
+        password: "password123", // Default password for new members
+        role: "member", // Default role
+      };
 
-      const token = localStorage.getItem("token");
-      const response = await axios.post(`${API_BASE_URL}/members`, memberData, {
+      // Log the data being sent for debugging
+      console.log("Sending member data:", dataToSend);
+
+      const response = await axios.post(`${API_BASE_URL}/members`, dataToSend, {
         headers: {
           "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
 
       return response.data;
     } catch (error) {
       console.error("Add member error:", error);
-      throw error.response?.data || {
-        message: "An error occurred while adding the member",
-      };
+      throw (
+        error.response?.data || {
+          message: "An error occurred while adding the member",
+        }
+      );
     }
   },
 
-  // Get all members
+  // Get all members for a mosque
   getMembers: async () => {
     try {
-      const token = localStorage.getItem("token");
       const response = await axios.get(`${API_BASE_URL}/members`, {
         headers: {
-          Authorization: token ? `Bearer ${token}` : "",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
 
       return response.data;
     } catch (error) {
-      console.error("Get members error:", error);
-      throw error.response?.data || {
-        message: "An error occurred while fetching members",
-      };
+      throw (
+        error.response?.data || {
+          message: "An error occurred while fetching members",
+        }
+      );
     }
   },
 
   // Delete a member
   deleteMember: async (id) => {
     try {
-      const token = localStorage.getItem("token");
       const response = await axios.delete(`${API_BASE_URL}/members/${id}`, {
         headers: {
-          Authorization: token ? `Bearer ${token}` : "",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
 
       return response.data;
     } catch (error) {
-      throw error.response?.data || {
-        message: "An error occurred while deleting the member",
-      };
+      throw (
+        error.response?.data || {
+          message: "An error occurred while deleting the member",
+        }
+      );
     }
   },
 
   // Change member status
   changeStatus: async (id, status) => {
     try {
-      const token = localStorage.getItem("token");
       const response = await axios.patch(
         `${API_BASE_URL}/members/${id}/status`,
         { status },
         {
           headers: {
-            "Content-Type": "application/json",
-            Authorization: token ? `Bearer ${token}` : "",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         }
       );
 
       return response.data;
     } catch (error) {
-      throw error.response?.data || {
-        message: "An error occurred while changing member status",
-      };
+      throw (
+        error.response?.data || {
+          message: "An error occurred while changing member status",
+        }
+      );
     }
   },
 };

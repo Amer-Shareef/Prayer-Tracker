@@ -1,38 +1,37 @@
-import React from "react";
-import { Navigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import React from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const ProtectedRoute = ({ children, role }) => {
-  const { user, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        Loading...
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
-  if (!user) {
-    // User is not logged in, redirect to login
-    return <Navigate to="/login" replace />;
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Check role authorization
   if (role && user.role !== role) {
-    // User doesn't have the required role
-    if (user.role === "Member") {
+    // Redirect to appropriate dashboard based on user's actual role
+    if (user.role === 'Member') {
       return <Navigate to="/member/dashboard" replace />;
-    } else if (user.role === "Founder") {
+    } else if (user.role === 'Founder') {
       return <Navigate to="/founder/dashboard" replace />;
-    } else if (user.role === "SuperAdmin") {
+    } else if (user.role === 'SuperAdmin') {
       return <Navigate to="/superadmin/dashboard" replace />;
     } else {
-      // Unknown role, redirect to login
       return <Navigate to="/login" replace />;
     }
   }
 
-  // User is logged in and has the required role
   return children;
 };
 

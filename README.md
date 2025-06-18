@@ -62,12 +62,14 @@ Prayer Tracker is a full-stack application designed to help Muslim communities k
    Create a `.env` file in the backend directory with the following variables:
 
    ```
-    DB_HOST=localhost
-    DB_USER=root
-    DB_PASSWORD=your_local_password
-    DB_NAME=prayer_tracker
-    PORT=5000
-    JWT_SECRET=supersecretkey
+DB_HOST=database-1.c74ma2eaeuks.eu-north-1.rds.amazonaws.com
+DB_USER=admin
+DB_PASSWORD=FaJR#ppD#t3U53r
+DB_NAME=db_fajr_app
+DB_PORT=3306
+PORT=5000
+JWT_SECRET=supersecretkey
+
    ```
 
 3. **Frontend Setup**
@@ -98,7 +100,7 @@ Prayer Tracker is a full-stack application designed to help Muslim communities k
 
    ```
    cd backend
-   node server.js
+   npm start
    ```
 
    In a separate terminal, start the frontend development server:
