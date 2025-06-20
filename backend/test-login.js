@@ -35,10 +35,13 @@ async function testWrongLogin() {
   console.log("\n🧪 Testing Wrong Credentials...");
 
   try {
-    const response = await axios.post("http://localhost:5000/api/auth/login", {
-      username: "wrong",
-      password: "wrong",
-    });
+    const response = await axios.post(
+      "http://13.60.193.171:5000/api/auth/login",
+      {
+        username: "wrong",
+        password: "wrong",
+      }
+    );
 
     console.log("❌ This should have failed!");
   } catch (error) {

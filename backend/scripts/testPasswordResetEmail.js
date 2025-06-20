@@ -52,7 +52,7 @@ async function testPasswordResetEmail() {
       console.log("4. Should redirect to reset password page");
       console.log("");
       console.log("🚀 Test the full flow:");
-      console.log("1. Go to http://localhost:3000/forgot-password");
+      console.log("1. Go to http://13.60.193.171:3000/forgot-password");
       console.log("2. Enter: inshaf4online@gmail.com");
       console.log("3. Check Gmail for reset email");
       console.log("4. Click reset link to test the flow");

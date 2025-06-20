@@ -283,14 +283,14 @@ This directory contains comprehensive API documentation for the Prayer Tracker a
 
 2. **Login to get token**:
    \`\`\`bash
-   curl -X POST "http://localhost:5000/api/auth/login" \\
+   curl -X POST "http://13.60.193.171:5000/api/auth/login" \\
      -H "Content-Type: application/json" \\
      -d '{"username": "abdullah", "password": "abc123"}'
    \`\`\`
 
 3. **Use token for authenticated requests**:
    \`\`\`bash
-   curl -X GET "http://localhost:5000/api/pickup-requests" \\
+   curl -X GET "http://13.60.193.171:5000/api/pickup-requests" \\
      -H "Authorization: Bearer your-token-here"
    \`\`\`
 
@@ -298,7 +298,7 @@ This directory contains comprehensive API documentation for the Prayer Tracker a
 
 ### Using Postman
 1. Import \`Prayer-Tracker-Postman-Collection.json\`
-2. Set environment variable \`base_url\` to \`http://localhost:5000/api\`
+2. Set environment variable \`base_url\` to \`http://13.60.193.171:5000/api\`
 3. Login to get token
 4. Test all endpoints
 

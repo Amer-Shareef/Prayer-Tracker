@@ -14,7 +14,14 @@ const AddMember = () => {
     phone: '',
     password: '',
     confirmPassword: '',
-    role: 'Member'
+    role: 'Member',
+    age: '',
+    location: '',
+    onRent: false,
+    zakathEligible: false,
+    differentlyAbled: false,
+    mobility: '',
+    MuallafathilQuloob: false
   });
   
   // Handle form input changes
@@ -52,6 +59,11 @@ const AddMember = () => {
       return false;
     }
 
+    if (formData.age && (formData.age < 1 || formData.age > 120)) {
+      setError('Please enter a valid age between 1 and 120');
+      return false;
+    }
+
     return true;
   };
 
@@ -70,7 +82,14 @@ const AddMember = () => {
         email: formData.email,
         phone: formData.phone,
         password: formData.password,
-        role: formData.role
+        role: formData.role,
+        age: formData.age ? parseInt(formData.age) : null,
+        location: formData.location,
+        onRent: formData.onRent,
+        zakathEligible: formData.zakathEligible,
+        differentlyAbled: formData.differentlyAbled,
+        mobility: formData.mobility,
+        MuallafathilQuloob: formData.MuallafathilQuloob
       };
 
       const response = await memberAPI.addMember(memberData);
@@ -128,106 +147,249 @@ const AddMember = () => {
         
         <div className="bg-white rounded-lg shadow p-6">
           <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              {/* Username */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="username">
-                  Username *
-                </label>
-                <input
-                  type="text"
-                  id="username"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter username"
-                  required
-                />
-              </div>
+            {/* Basic Information Section */}
+            <div className="mb-8">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Username */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="username">
+                    Username *
+                  </label>
+                  <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    value={formData.username}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter username"
+                    required
+                  />
+                </div>
 
-              {/* Email */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="email">
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter email address"
-                  required
-                />
-              </div>
+                {/* Email */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="email">
+                    Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter email address"
+                    required
+                  />
+                </div>
 
-              {/* Phone */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="phone">
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  id="phone"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter phone number"
-                />
-              </div>
+                {/* Phone */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="phone">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter phone number"
+                  />
+                </div>
 
-              {/* Role */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="role">
-                  Role
-                </label>
-                <select
-                  id="role"
-                  name="role"
-                  value={formData.role}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="Member">Member</option>
-                  <option value="Founder">Founder</option>
-                </select>
-              </div>
+                {/* Age */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="age">
+                    Age
+                  </label>
+                  <input
+                    type="number"
+                    id="age"
+                    name="age"
+                    value={formData.age}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter age"
+                    min="1"
+                    max="120"
+                  />
+                </div>
 
-              {/* Password */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="password">
-                  Password *
-                </label>
-                <input
-                  type="password"
-                  id="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter password (min 6 characters)"
-                  required
-                />
-              </div>
+                {/* Location */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="location">
+                    Location
+                  </label>
+                  <input
+                    type="text"
+                    id="location"
+                    name="location"
+                    value={formData.location}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter location/address"
+                  />
+                </div>
 
-              {/* Confirm Password */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="confirmPassword">
-                  Confirm Password *
-                </label>
-                <input
-                  type="password"
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Confirm password"
-                  required
-                />
+                {/* Mobility */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="mobility">
+                    Mobility (How they travel to mosque)
+                  </label>
+                  <select
+                    id="mobility"
+                    name="mobility"
+                    value={formData.mobility}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select mobility option</option>
+                    <option value="Walking">Walking</option>
+                    <option value="Bicycle">Bicycle</option>
+                    <option value="Motorbike">Motorbike</option>
+                    <option value="Car">Car</option>
+                    <option value="Public Transport">Public Transport</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                {/* If "Other", please specify */}
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="otherSpecify">
+    If Other, please specify
+  </label>
+  <input
+    type="text"
+    id="otherSpecify"
+    name="otherSpecify"
+    value={formData.otherSpecify}
+    onChange={handleInputChange}
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+    placeholder="Please specify"
+    required={formData.selectedOption === 'Other'} // Optional logic
+  />
+</div>
+
+                {/* Role */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="role">
+                    Role
+                  </label>
+                  <select
+                    id="role"
+                    name="role"
+                    value={formData.role}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="Member">Member</option>
+                    <option value="Founder">Working Commitee Member</option>
+                  </select>
+                </div>
+
+                {/* Password */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="password">
+                    Password *
+                  </label>
+                  <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter password (min 6 characters)"
+                    required
+                  />
+                </div>
+
+                {/* Confirm Password */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="confirmPassword">
+                    Confirm Password *
+                  </label>
+                  <input
+                    type="password"
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Confirm password"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Additional Information Section */}
+            <div className="mb-8">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* On Rent */}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="onRent"
+                    name="onRent"
+                    checked={formData.onRent}
+                    onChange={(e) => setFormData({ ...formData, onRent: e.target.checked })}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="onRent" className="ml-2 block text-sm text-gray-900">
+                    Living on Rent
+                  </label>
+                </div>
+
+                {/* Zakath Eligible */}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="zakathEligible"
+                    name="zakathEligible"
+                    checked={formData.zakathEligible}
+                    onChange={(e) => setFormData({ ...formData, zakathEligible: e.target.checked })}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="zakathEligible" className="ml-2 block text-sm text-gray-900">
+                    Zakath Eligible
+                  </label>
+                </div>
+
+                {/* Differently Abled */}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="differentlyAbled"
+                    name="differentlyAbled"
+                    checked={formData.differentlyAbled}
+                    onChange={(e) => setFormData({ ...formData, differentlyAbled: e.target.checked })}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="differentlyAbled" className="ml-2 block text-sm text-gray-900">
+                    Differently Abled
+                  </label>
+                </div>
+
+                {/* Mulaffathil Quloob */}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="MuallafathilQuloob"
+                    name="MuallafathilQuloob"
+                    checked={formData.MuallafathilQuloob}
+                    onChange={(e) => setFormData({ ...formData, MuallafathilQuloob: e.target.checked })}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="MuallafathilQuloob" className="ml-2 block text-sm text-gray-900">
+                    Muallafathil Quloob (Convert)
+                  </label>
+                </div>
               </div>
             </div>
 

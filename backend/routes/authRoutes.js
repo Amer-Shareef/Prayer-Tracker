@@ -143,7 +143,7 @@ router.post("/login", async (req, res) => {
           role: user.role,
         },
         process.env.JWT_SECRET,
-        { expiresIn: "24h" }
+        { expiresIn: "30d" }
       );
 
       console.log("✅ Login successful with OTP for user:", username);
