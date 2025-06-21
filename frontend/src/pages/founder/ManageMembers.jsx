@@ -237,40 +237,21 @@ function ManageMembers() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end space-x-2">
-                      {/* Download PDF Report Button */}
                       <button 
-                        className="text-green-600 hover:text-green-900"
-                        onClick={() => {
-                          // Handle PDF download logic here
-                          console.log(`Downloading PDF report for ${member.username}`);
-                        }}
-                        title="Download PDF Report"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </button>
-                      
-                      {/* Activate/Deactivate Button with Tick/Cross */}
-                      <button 
-                        className={`${member.status === 'active' ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}`}
+                        className="text-blue-600 hover:text-blue-900"
                         onClick={() => handleUpdateStatus(member.id, member.status === 'active' ? 'inactive' : 'active')}
-                        title={member.status === 'active' ? 'Deactivate Member' : 'Activate Member'}
+                        title={member.status === 'active' ? 'Deactivate' : 'Activate'}
                       >
                         {member.status === 'active' ? (
-                          // Cross/X icon for deactivate
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
                           </svg>
                         ) : (
-                          // Tick/Check icon for activate
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                         )}
                       </button>
-                      
-                      {/* Delete Button */}
                       <button 
                         className="text-red-600 hover:text-red-900"
                         onClick={() => handleDeleteMember(member.id)}

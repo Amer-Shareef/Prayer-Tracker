@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "http://13.60.193.171:5000/api";
+  process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
 const memberService = {
   // Add a new member
