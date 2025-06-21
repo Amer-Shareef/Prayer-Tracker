@@ -24,11 +24,18 @@ import ChangePassword from "./pages/member/ChangePassword"; // NEW IMPORT
 // Founder Pages
 import FounderDashboard from "./components/dashboard/FounderDashboard";
 import ApprovePickup from "./pages/founder/ApprovePickup";
-import PostAnnouncement from "./pages/founder/PostAnnouncement";
+import PostFeeds from "./pages/founder/PostFeeds";
 import ViewAttendance from "./pages/founder/ViewAttendance";
 import ManageMembers from "./pages/founder/ManageMembers";
 import SendReminder from "./pages/founder/SendReminder";
 import AddMember from "./pages/founder/AddMember";
+import ReminderPage from "./pages/founder/ReminderPage";
+import MeetingsPage from "./pages/founder/MeetingsPage";
+import WakeUpCallPage from "./pages/founder/WakeUpCallPage";
+import TransportPage from "./pages/founder/TransportPage";
+import MosqueWorkPage from "./pages/founder/MosqueWorkPage";
+import KnowledgeProgramPage from "./pages/founder/KnowledgeProgramPage";
+import ScheduleMeeting from "./pages/founder/ScheduleMeeting";
 
 // SuperAdmin Pages
 import SuperAdminDashboard from "./components/dashboard/SuperAdminDashboard";
@@ -37,7 +44,7 @@ import PromoteUser from "./pages/superadmin/PromoteUser";
 import ViewMosques from "./pages/superadmin/ViewMosques";
 
 // Test Page
-import TestPage from './pages/TestPage';
+import TestPage from "./pages/TestPage";
 
 function App() {
   return (
@@ -150,10 +157,18 @@ function App() {
             }
           />
           <Route
-            path="/founder/post-announcement"
+            path="/founder/schedule-meeting"
             element={
               <ProtectedRoute role="Founder">
-                <PostAnnouncement />
+                <ScheduleMeeting />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/founder/post-feeds"
+            element={
+              <ProtectedRoute role="Founder">
+                <PostFeeds />
               </ProtectedRoute>
             }
           />
@@ -186,6 +201,54 @@ function App() {
             element={
               <ProtectedRoute role="Founder">
                 <SendReminder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/founder/reminder"
+            element={
+              <ProtectedRoute role="Founder">
+                <ReminderPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/founder/meetings"
+            element={
+              <ProtectedRoute role="Founder">
+                <MeetingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/founder/wake-up-call"
+            element={
+              <ProtectedRoute role="Founder">
+                <WakeUpCallPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/founder/transport"
+            element={
+              <ProtectedRoute role="Founder">
+                <TransportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/founder/mosque-work"
+            element={
+              <ProtectedRoute role="Founder">
+                <MosqueWorkPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/founder/knowledge-program"
+            element={
+              <ProtectedRoute role="Founder">
+                <KnowledgeProgramPage />
               </ProtectedRoute>
             }
           />
