@@ -8,10 +8,10 @@ const FounderDashboard = () => {
   
   // Mosque information state
   const [mosque, setMosque] = useState({
-    name: "Masjid Al-Taqwa",
-    address: "123 Faith Avenue, Cityville, CA 90210",
+    name: "Masjid Ul Jabbar Jumma Masjid",
+    address: "123 Mosque Road, Gothatuwa, 10101",
     prayerTimes: {
-      fajr: '5:03 AM',
+      fajr: '4:43 AM',
       dhuhr: '12:15 PM',
       asr: '3:45 PM',
       maghrib: '6:23 PM',
@@ -44,37 +44,6 @@ const FounderDashboard = () => {
       trend: 'up'
     }
   });
-  
-  // Pending pickup requests
-  const [pickupRequests, setPickupRequests] = useState([
-    {
-      id: 1,
-      memberName: "Ahmed Khan",
-      date: "2025-05-09",
-      prayer: "Fajr",
-      time: "4:30 AM",
-      location: "123 Main St, Dehiwala",
-      status: "pending"
-    },
-    {
-      id: 2,
-      memberName: "Yusuf Ali",
-      date: "2025-05-09",
-      prayer: "Jumu'ah",
-      time: "12:45 PM",
-      location: "456 Park Lane, Wellawate",
-      status: "pending"
-    },
-    {
-      id: 3,
-      memberName: "Ibrahim Hassan",
-      date: "2025-05-10",
-      prayer: "Fajr",
-      time: "4:30 AM",
-      location: "789 Kawdana Rd, Dehiwala",
-      status: "pending"
-    }
-  ]);
   
   // Announcements
   const [announcements, setAnnouncements] = useState([
@@ -111,14 +80,6 @@ const FounderDashboard = () => {
     // For now, we'll use the static data defined above
   }, []);
   
-  // Handler for approving/rejecting pickup requests
-  const handlePickupRequest = (id, action) => {
-    setPickupRequests(prev => prev.filter(request => request.id !== id));
-    
-    // In a real app, you would send the action to your API
-    console.log(`Pickup request ${id} ${action}`);
-  };
-  
   // Handler for deleting announcements
   const handleDeleteAnnouncement = (id) => {
     setAnnouncements(prev => prev.filter(announcement => announcement.id !== id));
@@ -132,50 +93,10 @@ const FounderDashboard = () => {
       <div className="p-4 sm:p-6 md:p-8">
         {/* Page Title */}
         <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Founder Dashboard</h1>
-          <p className="text-gray-600 mt-1">Welcome back, {user?.name || "Mosque Leader"}! Here's an overview of your mosque.</p>
-        </div>
-        
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Mosque Dashboard</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              {mosque.name} • {currentDate.gregorian} • {currentDate.hijri}
-            </p>
-          </div>
-            <div className="mt-4 md:mt-0">
-            <Link 
-              to="/founder/post-announcement" 
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-              </svg>
-              Post New Announcement
-            </Link>
-          </div>
-        </div>
-        
-        {/* Prayer Times Card */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Today's Prayer Times</h2>
-            <span className="text-sm text-gray-500">Auto-updated from local calculation</span>
-          </div>
-          
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
-            {Object.entries(mosque.prayerTimes).map(([prayer, time]) => (
-              <div 
-                key={prayer}
-                className={`px-4 py-3 rounded-lg text-center ${
-                  prayer === 'jumuah' ? 'bg-yellow-50 col-span-2' : 'bg-green-50'
-                }`}
-              >
-                <h3 className="font-bold capitalize">{prayer}</h3>
-                <p className="text-green-600 font-medium">{time}</p>
-              </div>
-            ))}
-          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Working Committee Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-600">
+            {mosque.name} • {currentDate.gregorian} • {currentDate.hijri}
+          </p>
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -270,35 +191,29 @@ const FounderDashboard = () => {
                   </svg>
                   <span>Isha attendance dropped by 8% this week</span>
                 </li>
-                <li className="flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>28 members haven't prayed at the mosque this month</span>
-                </li>
               </ul>
             </div>
           </div>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
           {/* Announcements Card */}
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Recent Announcements</h2>
-              <Link to="/founder/post-announcement" className="text-green-600 hover:text-green-800 text-sm font-medium">
+              <h2 className="text-xl font-bold">Recent Feeds</h2>
+              <Link to="/founder/post-feeds" className="text-green-600 hover:text-green-800 text-sm font-medium">
                 Manage All
               </Link>
             </div>
             
             {announcements.length === 0 ? (
               <div className="bg-gray-50 rounded-lg p-8 text-center">
-                <p className="text-gray-500">No recent announcements</p>
+                <p className="text-gray-500">No recent feeds</p>
                 <Link 
-                  to="/founder/post-announcement"
+                  to="/founder/post-feeds"
                   className="mt-2 inline-block text-green-600 hover:text-green-800 font-medium"
                 >
-                  Create an announcement
+                  Create a feed
                 </Link>
               </div>
             ) : (
@@ -318,11 +233,11 @@ const FounderDashboard = () => {
                         onClick={() => handleDeleteAnnouncement(announcement.id)}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
                       <Link 
-                        to={`/founder/post-announcement?edit=${announcement.id}`}
+                        to={`/founder/post-feeds?edit=${announcement.id}`}
                         className="text-gray-400 hover:text-gray-600"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -334,128 +249,71 @@ const FounderDashboard = () => {
                 ))}
               </div>
             )}
-            
-            <div className="mt-4">
-              <Link 
-                to="/founder/post-announcement"
-                className="inline-flex items-center py-2 text-sm text-green-600 hover:text-green-800 font-medium"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                New Announcement
-              </Link>
-            </div>
-          </div>
-          
-          {/* Pickup Requests Card */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Pending Pickup Requests</h2>
-              <Link to="/founder/approve-pickup" className="text-green-600 hover:text-green-800 text-sm font-medium">
-                View All
-              </Link>
-            </div>
-            
-            {pickupRequests.length === 0 ? (
-              <div className="bg-gray-50 rounded-lg p-8 text-center">
-                <p className="text-gray-500">No pending pickup requests</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead>
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Prayer</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {pickupRequests.slice(0, 3).map(request => (
-                      <tr key={request.id}>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="font-medium text-gray-900">{request.memberName}</div>
-                          <div className="text-sm text-gray-500">{request.location}</div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{request.date}</div>
-                          <div className="text-sm text-gray-500">{request.prayer} • {request.time}</div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">                          <button
-                            onClick={() => handlePickupRequest(request.id, 'approve')}
-                            className="text-blue-600 hover:text-blue-900 mr-3"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handlePickupRequest(request.id, 'reject')}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Reject
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                
-                {pickupRequests.length > 3 && (
-                  <div className="mt-4 text-center">
-                    <Link 
-                      to="/founder/approve-pickup" 
-                      className="text-sm text-gray-500 hover:text-gray-700"
-                    >
-                      + {pickupRequests.length - 3} more request(s)
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
         
-        {/* Quick Actions */}
-        <div className="bg-white rounded-lg shadow p-6 mt-6">
+        {/* Quick Actions - Updated to match sidebar */}
+        <div className="bg-gray-200 rounded-lg shadow p-6 mt-6">
           <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <Link 
-              to="/founder/post-announcement" 
-              className="flex flex-col items-center justify-center p-4 bg-green-50 rounded-lg hover:bg-green-100"
+              to="/founder/reminder" 
+              className="flex flex-col items-center justify-center p-4 bg-green-600 rounded-lg hover:bg-green-500"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
-              <span className="mt-2 text-sm font-medium">Post Announcement</span>
+              <span className="mt-2 text-xs font-medium text-center text-green-100">Daily Reminders</span>
             </Link>
             
             <Link 
-              to="/founder/send-reminder" 
-              className="flex flex-col items-center justify-center p-4 bg-green-50 rounded-lg hover:bg-green-100"
+              to="/founder/meetings" 
+              className="flex flex-col items-center justify-center p-4 bg-green-500 rounded-lg hover:bg-green-400"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
-              <span className="mt-2 text-sm font-medium">Send Reminders</span>
+              <span className="mt-2 text-xs font-medium text-center text-green-100">Meetings & Counselling</span>
             </Link>
             
             <Link 
-              to="/founder/view-attendance" 
-              className="flex flex-col items-center justify-center p-4 bg-green-50 rounded-lg hover:bg-green-100"
+              to="/founder/wake-up-call" 
+              className="flex flex-col items-center justify-center p-4 bg-green-400 rounded-lg hover:bg-green-300"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-100" fill="currentColor" viewBox="0 0 48 48">
+                <path class="cls-1" d="M10 21H9a4 4 0 0 0-4 4v6a4 4 0 0 0 4 4h1a1 1 0 0 0 1-1V22a1 1 0 0 0-1-1zM7 31v-6a2 2 0 0 1 2-2v10a2 2 0 0 1-2-2z"/><path class="cls-2" d="M9 23v10a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2z"/><path class="cls-1" d="M12 19a3 3 0 0 0-2.82 2A2.77 2.77 0 0 0 9 22v12a2.77 2.77 0 0 0 .18 1A3 3 0 0 0 15 34V22a3 3 0 0 0-3-3zm1 15a1 1 0 0 1-2 0V22a1 1 0 0 1 2 0z"/><path class="cls-3" d="M13 22v12a1 1 0 0 1-2 0V22a1 1 0 0 1 2 0z"/><path class="cls-1" d="M39 21h-1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h1a4 4 0 0 0 4-4v-6a4 4 0 0 0-4-4zm2 10a2 2 0 0 1-2 2V23a2 2 0 0 1 2 2z"/><path class="cls-2" d="M41 25v6a2 2 0 0 1-2 2V23a2 2 0 0 1 2 2z"/><path class="cls-1" d="M38.82 21A3 3 0 0 0 33 22v12a3 3 0 0 0 5.82 1 2.77 2.77 0 0 0 .18-1V22a2.77 2.77 0 0 0-.18-1zM36 35a1 1 0 0 1-1-1V22a1 1 0 0 1 2 0v12a1 1 0 0 1-1 1z"/><path class="cls-3" d="M37 22v12a1 1 0 0 1-2 0V22a1 1 0 0 1 2 0z"/><path class="cls-1" d="M38 32a1 1 0 0 1-1-1V20a13 13 0 0 0-26 0v11a1 1 0 0 1-2 0V20a15 15 0 0 1 30 0v11a1 1 0 0 1-1 1zM30 43h-6a1 1 0 0 1 0-2h6a7 7 0 0 0 7-7 1 1 0 0 1 2 0 9 9 0 0 1-9 9z"/><path class="cls-1" d="M24 37a3 3 0 0 0 0 6h2a1 1 0 0 0 1-1v-2a3 3 0 0 0-3-3zm1 4h-1a1 1 0 1 1 1-1z"/><circle cx="12" cy="12" r="2" fill="currentColor"/>
               </svg>
-              <span className="mt-2 text-sm font-medium">View Reports</span>
+              <span className="mt-2 text-xs font-medium text-center text-green-100">Call Center</span>
+            </Link>
+            
+            <Link 
+              to="/founder/transport" 
+              className="flex flex-col items-center justify-center p-4 bg-green-300 rounded-lg hover:bg-green-200"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-800" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5H16V4C16 2.9 15.1 2 14 2H10C8.9 2 8 2.9 8 4V5H6.5C5.84 5 5.28 5.42 5.08 6.01L3 12V20C3 20.55 3.45 21 4 21H5C5.55 21 6 20.55 6 20V19H18V20C18 20.55 18.45 21 19 21H20C20.55 21 21 20.55 21 20V12L18.92 6.01ZM10 4H14V5H10V4ZM6.5 16C5.67 16 5 15.33 5 14.5C5 13.67 5.67 13 6.5 13C7.33 13 8 13.67 8 14.5C8 15.33 7.33 16 6.5 16ZM17.5 16C16.67 16 16 15.33 16 14.5C16 13.67 16.67 13 17.5 13C18.33 13 19 13.67 19 14.5C19 15.33 18.33 16 17.5 16ZM5 11L6.5 7H17.5L19 11H5Z"/>
+              </svg>
+              <span className="mt-2 text-xs font-medium text-center text-green-800">Transport & Mobility</span>
+            </Link>
+            
+            <Link 
+              to="/founder/knowledge-program" 
+              className="flex flex-col items-center justify-center p-4 bg-green-200 rounded-lg hover:bg-green-100"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="mt-2 text-xs font-medium text-center text-green-800">Knowledge Program</span>
             </Link>
             
             <Link 
               to="/founder/manage-members" 
-              className="flex flex-col items-center justify-center p-4 bg-green-50 rounded-lg hover:bg-green-100"
+              className="flex flex-col items-center justify-center p-4 bg-green-100 rounded-lg hover:bg-green-50"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />            </svg>
-              <span className="mt-2 text-sm font-medium">Manage Members</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <span className="mt-2 text-xs font-medium text-center text-green-800">Members</span>
             </Link>
           </div>
         </div>
