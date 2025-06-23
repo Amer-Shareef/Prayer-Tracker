@@ -1,10 +1,10 @@
 import axios from "axios";
-import { ENV_CONFIG, getFullUrl } from '../config/environment';
+import { ENV_CONFIG, getFullUrl } from "../config/environment";
 
 // Use environment-based configuration instead of hardcoded URL
 const API_URL = ENV_CONFIG.API_URL;
 
-console.log('🌐 API Base URL:', API_URL); // Debug log
+console.log("🌐 API Base URL:", API_URL); // Debug log
 
 const api = axios.create({
   baseURL: API_URL,
@@ -31,10 +31,10 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    
+
     // Log error for debugging
-    console.error('API Error:', error.response?.data || error.message);
-    
+    console.error("API Error:", error.response?.data || error.message);
+
     if (error.response?.status === 401) {
       // Token expired or invalid
       localStorage.removeItem("token");
@@ -42,66 +42,80 @@ api.interceptors.response.use(
       window.location.href = "/login";
       return Promise.reject(error);
     }
-    
+
     // Handle database connection errors with automatic retry
-    const isRetryableError = (
-      error.response?.status === 503 || 
-      error.response?.data?.error === 'DATABASE_CONNECTION_FAILED' ||
-      error.response?.data?.error === 'CONNECTION_LOST' ||
-      error.response?.data?.error === 'CONNECTION_TIMEOUT' ||
+    const isRetryableError =
+      error.response?.status === 503 ||
+      error.response?.data?.error === "DATABASE_CONNECTION_FAILED" ||
+      error.response?.data?.error === "CONNECTION_LOST" ||
+      error.response?.data?.error === "CONNECTION_TIMEOUT" ||
       error.response?.data?.isRetryable === true ||
-      error.code === 'ECONNABORTED' || // Timeout
-      error.code === 'NETWORK_ERROR'
-    );
-    
+      error.code === "ECONNABORTED" || // Timeout
+      error.code === "NETWORK_ERROR";
+
     if (isRetryableError && !originalRequest._retry) {
       originalRequest._retry = true;
       originalRequest._retryCount = (originalRequest._retryCount || 0) + 1;
-      
-      if (originalRequest._retryCount <= 3) { // Max 3 retries
-        const delay = Math.min(1000 * Math.pow(2, originalRequest._retryCount - 1), 5000); // Exponential backoff, max 5 seconds
-        
-        console.warn(`🔄 Retrying request in ${delay}ms (attempt ${originalRequest._retryCount}/3)...`);
-        
-        await new Promise(resolve => setTimeout(resolve, delay));
-        
+
+      if (originalRequest._retryCount <= 3) {
+        // Max 3 retries
+        const delay = Math.min(
+          1000 * Math.pow(2, originalRequest._retryCount - 1),
+          5000
+        ); // Exponential backoff, max 5 seconds
+
+        console.warn(
+          `🔄 Retrying request in ${delay}ms (attempt ${originalRequest._retryCount}/3)...`
+        );
+
+        await new Promise((resolve) => setTimeout(resolve, delay));
+
         try {
           return await api(originalRequest);
         } catch (retryError) {
-          console.error(`❌ Retry ${originalRequest._retryCount} failed:`, retryError.message);
-          
+          console.error(
+            `❌ Retry ${originalRequest._retryCount} failed:`,
+            retryError.message
+          );
+
           if (originalRequest._retryCount === 3) {
             // Final retry failed
-            const finalError = new Error('Unable to connect to server after multiple attempts. Please check your connection and try again.');
+            const finalError = new Error(
+              "Unable to connect to server after multiple attempts. Please check your connection and try again."
+            );
             finalError.response = {
               data: {
                 success: false,
-                message: 'Connection failed after multiple retries. Please refresh the page.',
+                message:
+                  "Connection failed after multiple retries. Please refresh the page.",
                 isRetryable: true,
-                retryCount: originalRequest._retryCount
-              }
+                retryCount: originalRequest._retryCount,
+              },
             };
             return Promise.reject(finalError);
           }
-          
+
           // Continue to next retry
           return Promise.reject(retryError);
         }
       }
     }
-    
+
     // Return a more structured error for non-retryable errors
     if (error.response?.data) {
       return Promise.reject(error);
     } else {
       // Network or other errors
-      const networkError = new Error('Unable to connect to server. Please check your internet connection.');
+      const networkError = new Error(
+        "Unable to connect to server. Please check your internet connection."
+      );
       networkError.response = {
         data: {
           success: false,
-          message: 'Network connection issue. Please check your internet connection and try again.',
-          isRetryable: true
-        }
+          message:
+            "Network connection issue. Please check your internet connection and try again.",
+          isRetryable: true,
+        },
       };
       return Promise.reject(networkError);
     }
@@ -111,90 +125,112 @@ api.interceptors.response.use(
 // Auth service - ENHANCED with OTP
 export const authService = {
   login: (username, password, otpCode = null) => {
-    console.log('🔐 Attempting login for:', username, { hasOtp: !!otpCode });
-    console.log('🌐 Login URL:', `${API_URL}/login`);
-    
+    console.log("🔐 Attempting login for:", username, { hasOtp: !!otpCode });
+    console.log("🌐 Login URL:", `${API_URL}/login`);
+
     const requestData = { username, password };
     if (otpCode) {
       requestData.otpCode = otpCode;
     }
-    
-    return api.post("/login", requestData).then(response => {
-      console.log('✅ Login response received:', response.data);
-      return response;
-    }).catch(error => {
-      console.error('❌ Login failed:', error);
-      throw error;
-    });
+
+    return api
+      .post("/login", requestData)
+      .then((response) => {
+        console.log("✅ Login response received:", {
+          success: response.data.success,
+          hasToken: !!response.data.token,
+          userReceived: !!response.data.user,
+          requiresOtp: response.data.requiresOtp,
+        });
+
+        // For debugging, log complete user field list (excluding sensitive data)
+        if (response.data.user) {
+          console.log(
+            "📋 User fields received:",
+            Object.keys(response.data.user).filter(
+              (key) => !["password", "otp_code", "reset_token"].includes(key)
+            )
+          );
+        }
+
+        return response;
+      })
+      .catch((error) => {
+        console.error("❌ Login failed:", error);
+        throw error;
+      });
   },
 
   // NEW: Resend OTP
   resendOtp: async (username) => {
-    console.log('📧 Resending OTP for:', username);
-    
+    console.log("📧 Resending OTP for:", username);
+
     try {
       const response = await api.post("/resend-otp", { username });
-      console.log('✅ Resend OTP response:', response.data);
+      console.log("✅ Resend OTP response:", response.data);
       return response;
     } catch (error) {
-      console.error('❌ Resend OTP failed:', error);
+      console.error("❌ Resend OTP failed:", error);
       throw error;
     }
   },
 
   changePassword: async (currentPassword, newPassword) => {
-    console.log('🔐 Attempting password change...');
-    console.log('🌐 Change password URL:', `${API_URL}/change-password`);
-    
+    console.log("🔐 Attempting password change...");
+    console.log("🌐 Change password URL:", `${API_URL}/change-password`);
+
     try {
       const response = await api.post("/change-password", {
         currentPassword,
-        newPassword
+        newPassword,
       });
-      
-      console.log('✅ Password change response:', response.data);
+
+      console.log("✅ Password change response:", response.data);
       return response;
     } catch (error) {
-      console.error('❌ Password change failed:', error);
-      console.error('Error details:', {
+      console.error("❌ Password change failed:", error);
+      console.error("Error details:", {
         message: error.message,
         status: error.response?.status,
         data: error.response?.data,
-        url: error.config?.url
+        url: error.config?.url,
       });
       throw error;
     }
   },
 
   forgotPassword: async (email) => {
-    console.log('📧 Attempting forgot password for:', email);
-    
+    console.log("📧 Attempting forgot password for:", email);
+
     try {
       const response = await api.post("/forgot-password", { email });
-      console.log('✅ Forgot password response:', response.data);
+      console.log("✅ Forgot password response:", response.data);
       return response;
     } catch (error) {
-      console.error('❌ Forgot password failed:', error);
+      console.error("❌ Forgot password failed:", error);
       throw error;
     }
   },
 
   resetPassword: async (token, newPassword) => {
-    console.log('🔄 Attempting password reset...');
-    
+    console.log("🔄 Attempting password reset...");
+
     try {
-      const response = await api.post("/reset-password", { token, newPassword });
-      console.log('✅ Password reset response:', response.data);
+      const response = await api.post("/reset-password", {
+        token,
+        newPassword,
+      });
+      console.log("✅ Password reset response:", response.data);
       return response;
     } catch (error) {
-      console.error('❌ Password reset failed:', error);
+      console.error("❌ Password reset failed:", error);
       throw error;
     }
   },
 
   logout: () => {
     return Promise.resolve();
-  }
+  },
 };
 
 // User service
@@ -206,67 +242,75 @@ export const userService = {
 // Enhanced prayer service with connection monitoring
 export const prayerService = {
   getPrayers: (params = {}) => {
-    console.log('🌐 API: Getting prayers with params:', params);
-    
+    console.log("🌐 API: Getting prayers with params:", params);
+
     if (params.date) {
-      console.log('🗓️ Requesting prayers for specific date:', params.date);
+      console.log("🗓️ Requesting prayers for specific date:", params.date);
     }
-    
+
     const request = api.get("/prayers", { params });
-    
-    console.log('📡 Request URL:', `${API_URL}/prayers${params.date ? `?date=${params.date}` : ''}`);
-    
-    return request.then(response => {
-      console.log('📥 API Response received:', {
-        success: response.data.success,
-        dataCount: response.data.data?.length || 0,
-        sampleData: response.data.data?.[0] || null
+
+    console.log(
+      "📡 Request URL:",
+      `${API_URL}/prayers${params.date ? `?date=${params.date}` : ""}`
+    );
+
+    return request
+      .then((response) => {
+        console.log("📥 API Response received:", {
+          success: response.data.success,
+          dataCount: response.data.data?.length || 0,
+          sampleData: response.data.data?.[0] || null,
+        });
+        return response;
+      })
+      .catch((error) => {
+        console.error("❌ Prayer API Error:", error.message);
+        throw error;
       });
-      return response;
-    }).catch(error => {
-      console.error('❌ Prayer API Error:', error.message);
-      throw error;
-    });
   },
-  
+
   recordPrayer: (data) => {
-    console.log('🌐 API: Recording prayer:', data);
-    
+    console.log("🌐 API: Recording prayer:", data);
+
     // Enhanced validation
     if (!data.prayer_type || !data.prayer_date || !data.status) {
-      console.error('❌ API: Missing required fields:', {
+      console.error("❌ API: Missing required fields:", {
         prayer_type: !!data.prayer_type,
         prayer_date: !!data.prayer_date,
-        status: !!data.status
+        status: !!data.status,
       });
-      
+
       return Promise.reject({
         response: {
           data: {
             success: false,
-            message: 'Prayer type, date, and status are required'
-          }
-        }
+            message: "Prayer type, date, and status are required",
+          },
+        },
       });
     }
-    
-    console.log('✅ API: Prayer data validation passed');
-    return api.post("/prayers", data).then(response => {
-      console.log('📥 Record Prayer Response:', response.data);
-      return response;
-    }).catch(error => {
-      console.error('❌ Record Prayer Error:', error.message);
+
+    console.log("✅ API: Prayer data validation passed");
+    return api
+      .post("/prayers", data)
+      .then((response) => {
+        console.log("📥 Record Prayer Response:", response.data);
+        return response;
+      })
+      .catch((error) => {
+        console.error("❌ Record Prayer Error:", error.message);
+        throw error;
+      });
+  },
+
+  getStats: (period = 30) => {
+    console.log("🌐 API: Getting stats for period:", period);
+    return api.get("/prayers/stats", { params: { period } }).catch((error) => {
+      console.error("❌ Stats API Error:", error.message);
       throw error;
     });
   },
-  
-  getStats: (period = 30) => {
-    console.log('🌐 API: Getting stats for period:', period);
-    return api.get("/prayers/stats", { params: { period } }).catch(error => {
-      console.error('❌ Stats API Error:', error.message);
-      throw error;
-    });
-  }
 };
 
 // Mosque service
@@ -280,11 +324,11 @@ export const mosqueService = {
 // Member Management APIs
 export const memberAPI = {
   getMembers: async () => {
-    const response = await api.get('/members');
+    const response = await api.get("/members");
     return response.data;
   },
   addMember: async (memberData) => {
-    const response = await api.post('/members', memberData);
+    const response = await api.post("/members", memberData);
     return response.data;
   },
   updateMember: async (id, memberData) => {
@@ -294,7 +338,7 @@ export const memberAPI = {
   deleteMember: async (id) => {
     const response = await api.delete(`/members/${id}`);
     return response.data;
-  }
+  },
 };
 
 // Announcement service
@@ -309,17 +353,17 @@ export const announcementService = {
 export const pickupService = {
   // Create Fajr pickup request - SIMPLIFIED
   createPickupRequest: async (requestData) => {
-    console.log('📋 Creating Fajr pickup request:', requestData);
-    
+    console.log("📋 Creating Fajr pickup request:", requestData);
+
     try {
-      const response = await api.post('/pickup-requests', {
+      const response = await api.post("/pickup-requests", {
         ...requestData,
-        prayer_type: 'Fajr' // Always Fajr
+        prayer_type: "Fajr", // Always Fajr
       });
-      console.log('✅ Fajr pickup request created:', response.data);
+      console.log("✅ Fajr pickup request created:", response.data);
       return response;
     } catch (error) {
-      console.error('❌ Fajr pickup request creation failed:', error);
+      console.error("❌ Fajr pickup request creation failed:", error);
       throw error;
     }
   },
@@ -327,21 +371,23 @@ export const pickupService = {
   // Get pickup requests - FIXED to ensure proper parameter types
   getPickupRequests: async (params = {}) => {
     try {
-      console.log('📤 Fetching pickup requests with params:', params);
-      
+      console.log("📤 Fetching pickup requests with params:", params);
+
       // Ensure limit is a number when passed
       const cleanParams = { ...params };
       if (cleanParams.limit) {
         cleanParams.limit = parseInt(cleanParams.limit, 10);
-        console.log('🔧 Converted limit to integer:', cleanParams.limit);
+        console.log("🔧 Converted limit to integer:", cleanParams.limit);
       }
-      
-      const response = await api.get('/pickup-requests', { params: cleanParams });
-      console.log('✅ Pickup requests response:', response.data);
+
+      const response = await api.get("/pickup-requests", {
+        params: cleanParams,
+      });
+      console.log("✅ Pickup requests response:", response.data);
       return response;
     } catch (error) {
-      console.error('❌ Failed to fetch pickup requests:', error);
-      console.error('Request config:', error.config);
+      console.error("❌ Failed to fetch pickup requests:", error);
+      console.error("Request config:", error.config);
       throw error;
     }
   },
@@ -349,10 +395,13 @@ export const pickupService = {
   // Update pickup request status (for members to cancel)
   updatePickupRequest: async (requestId, updateData) => {
     try {
-      const response = await api.put(`/pickup-requests/${requestId}`, updateData);
+      const response = await api.put(
+        `/pickup-requests/${requestId}`,
+        updateData
+      );
       return response;
     } catch (error) {
-      console.error('❌ Failed to update pickup request:', error);
+      console.error("❌ Failed to update pickup request:", error);
       throw error;
     }
   },
@@ -361,101 +410,128 @@ export const pickupService = {
   cancelPickupRequest: async (requestId) => {
     try {
       console.log(`📤 Cancelling pickup request ID: ${requestId}`);
-      
+
       const response = await api.delete(`/pickup-requests/${requestId}`);
-      
-      console.log('✅ Cancel request response:', response.data);
-      
+
+      console.log("✅ Cancel request response:", response.data);
+
       if (response.data.success) {
         console.log(`✅ Request ${requestId} cancelled successfully`);
       } else {
         console.log(`❌ Cancel failed: ${response.data.message}`);
       }
-      
+
       return response;
     } catch (error) {
-      console.error('❌ Failed to cancel pickup request:', error);
-      console.error('Request config:', error.config);
+      console.error("❌ Failed to cancel pickup request:", error);
+      console.error("Request config:", error.config);
       throw error;
     }
-  }
+  },
 };
 
 // Daily Activities service - UPDATED
 export const dailyActivitiesService = {
   // Get activities for a specific date or date range
   getActivities: (params = {}) => {
-    console.log('📊 Getting daily activities:', params);
-    return api.get('/daily-activities', { params }).then(response => {
-      console.log('✅ Daily activities response:', response.data);
-      return response;
-    }).catch(error => {
-      console.error('❌ Daily activities failed:', error);
-      throw error;
-    });
+    console.log("📊 Getting daily activities:", params);
+    return api
+      .get("/daily-activities", { params })
+      .then((response) => {
+        console.log("✅ Daily activities response:", response.data);
+        return response;
+      })
+      .catch((error) => {
+        console.error("❌ Daily activities failed:", error);
+        throw error;
+      });
   },
 
   // Record activity for any date - UPDATED (removed notes parameter)
-  recordActivity: async (activityDate, activityType, value, isMinutes = false) => {
-    console.log('📝 Recording activity:', { activityDate, activityType, value, isMinutes });
-    
+  recordActivity: async (
+    activityDate,
+    activityType,
+    value,
+    isMinutes = false
+  ) => {
+    console.log("📝 Recording activity:", {
+      activityDate,
+      activityType,
+      value,
+      isMinutes,
+    });
+
     const requestData = {
       activity_date: activityDate,
       activity_type: activityType,
-      [isMinutes ? 'minutes_value' : 'count_value']: value
+      [isMinutes ? "minutes_value" : "count_value"]: value,
     };
-    
+
     try {
-      const response = await api.post('/daily-activities', requestData);
-      console.log('✅ Activity recorded:', response.data);
+      const response = await api.post("/daily-activities", requestData);
+      console.log("✅ Activity recorded:", response.data);
       return response;
     } catch (error) {
-      console.error('❌ Activity recording failed:', error);
+      console.error("❌ Activity recording failed:", error);
       throw error;
     }
   },
 
   // Record activity for today - UPDATED (removed notes parameter)
   recordToday: async (activityType, value, isMinutes = false) => {
-    const today = new Date().toISOString().split('T')[0];
-    return dailyActivitiesService.recordActivity(today, activityType, value, isMinutes);
+    const today = new Date().toISOString().split("T")[0];
+    return dailyActivitiesService.recordActivity(
+      today,
+      activityType,
+      value,
+      isMinutes
+    );
   },
 
   // Get activity statistics
   getStats: (days = 7) => {
-    console.log('📈 Getting activity stats for', days, 'days');
-    return api.get(`/daily-activities/stats?days=${days}`).then(response => {
-      console.log('✅ Activity stats response:', response.data);
-      return response;
-    }).catch(error => {
-      console.error('❌ Activity stats failed:', error);
-      throw error;
-    });
+    console.log("📈 Getting activity stats for", days, "days");
+    return api
+      .get(`/daily-activities/stats?days=${days}`)
+      .then((response) => {
+        console.log("✅ Activity stats response:", response.data);
+        return response;
+      })
+      .catch((error) => {
+        console.error("❌ Activity stats failed:", error);
+        throw error;
+      });
   },
 
   // Update existing activity
   updateActivity: (activityId, updateData) => {
-    console.log('🔄 Updating activity:', activityId, updateData);
-    return api.put(`/daily-activities/${activityId}`, updateData).then(response => {
-      console.log('✅ Activity updated:', response.data);
-      return response;
-    }).catch(error => {
-      console.error('❌ Activity update failed:', error);
-      throw error;
-    });
+    console.log("🔄 Updating activity:", activityId, updateData);
+    return api
+      .put(`/daily-activities/${activityId}`, updateData)
+      .then((response) => {
+        console.log("✅ Activity updated:", response.data);
+        return response;
+      })
+      .catch((error) => {
+        console.error("❌ Activity update failed:", error);
+        throw error;
+      });
   },
 
   // Delete activity
   deleteActivity: (activityId) => {
-    console.log('🗑️ Deleting activity:', activityId);
-    return api.delete(`/daily-activities/${activityId}`).then(response => {
-      console.log('✅ Activity deleted:', response.data);
-      return response;
-    }).catch(error => {
-      console.error('❌ Activity deletion failed:', error);
-      throw error;
-    });
-  }
+    console.log("🗑️ Deleting activity:", activityId);
+    return api
+      .delete(`/daily-activities/${activityId}`)
+      .then((response) => {
+        console.log("✅ Activity deleted:", response.data);
+        return response;
+      })
+      .catch((error) => {
+        console.error("❌ Activity deletion failed:", error);
+        throw error;
+      });
+  },
 };
 
 export default api;

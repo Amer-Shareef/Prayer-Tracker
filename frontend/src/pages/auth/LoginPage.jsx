@@ -61,10 +61,17 @@ const LoginPage = () => {
             console.log('🧪 Test OTP:', response.data.testOtp);
           }
         } else {
-          // Complete login
+          // Complete login with comprehensive user data
           localStorage.setItem('token', response.data.token);
           localStorage.setItem('user', JSON.stringify(response.data.user));
           login(response.data.user, response.data.token);
+          
+          // Log the full user data received (except sensitive info)
+          console.log('✅ Login successful, user data received:', {
+            ...response.data.user,
+            // Don't log sensitive information
+            password: undefined
+          });
           
           // Redirect based on role
           const { role } = response.data.user;
@@ -337,7 +344,7 @@ const LoginPage = () => {
             </div>
             <div className="flex items-center">
               <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
               Account protection against unauthorized access
             </div>

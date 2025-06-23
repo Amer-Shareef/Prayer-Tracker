@@ -53,9 +53,14 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    // Query user from database
+    // Query user from database - ENHANCED to fetch all user information
     const [rows] = await pool.execute(
-      "SELECT * FROM users WHERE username = ?",
+      `SELECT u.*, 
+              m.name as mosque_name,
+              CONCAT(UPPER(LEFT(COALESCE(u.area, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId
+       FROM users u
+       LEFT JOIN mosques m ON u.mosque_id = m.id
+       WHERE u.username = ?`,
       [username]
     );
 
@@ -135,7 +140,7 @@ router.post("/login", async (req, res) => {
         [user.id]
       );
 
-      // Generate JWT token
+      // Generate JWT token with all user info
       const token = jwt.sign(
         {
           userId: user.id,
@@ -148,16 +153,35 @@ router.post("/login", async (req, res) => {
 
       console.log("✅ Login successful with OTP for user:", username);
 
+      // Transform snake_case fields to camelCase for frontend consistency
+      const userData = {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        fullName: user.full_name,
+        phone: user.phone,
+        status: user.status,
+        dateOfBirth: user.date_of_birth,
+        address: user.address,
+        area: user.area,
+        mobility: user.mobility,
+        onRent: user.living_on_rent === 1,
+        zakathEligible: user.zakath_eligible === 1,
+        differentlyAbled: user.differently_abled === 1,
+        MuallafathilQuloob: user.muallafathil_quloob === 1,
+        joinedDate: user.joined_date,
+        lastLogin: user.last_login,
+        mosqueId: user.mosque_id,
+        mosqueName: user.mosque_name,
+        memberId: user.memberId,
+      };
+
       return res.json({
         success: true,
         message: "Login successful",
         token,
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-        },
+        user: userData,
       });
     }
 
