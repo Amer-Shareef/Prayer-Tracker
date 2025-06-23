@@ -52,7 +52,8 @@ const mosqueRoutes = require("./routes/mosqueRoutes");
 const announcementRoutes = require("./routes/announcementRoutes");
 const pickupRoutes = require("./routes/pickupRoutes");
 const adminRoutes = require("./routes/adminRoutes");
-const dailyActivitiesRoutes = require("./routes/dailyActivitiesRoutes"); // NEW
+const dailyActivitiesRoutes = require("./routes/dailyActivitiesRoutes");
+const feedsRoutes = require("./routes/feedsRoutes"); // Import the new feeds routes
 
 // Use routes
 app.use("/api", authRoutes);
@@ -63,7 +64,8 @@ app.use("/api", announcementRoutes);
 app.use("/api", pickupRoutes);
 app.use("/api", memberRoutes);
 app.use("/api", adminRoutes);
-app.use("/api/daily-activities", dailyActivitiesRoutes); // NEW
+app.use("/api/daily-activities", dailyActivitiesRoutes);
+app.use("/api/feeds", feedsRoutes); // Register the feeds routes
 
 // Enhanced health endpoint
 app.get("/api/health", async (req, res) => {

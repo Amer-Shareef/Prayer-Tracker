@@ -23,7 +23,8 @@
     "add-otp-fields": "node scripts/addOtpFields.js",
     "create-abdullah": "node scripts/createAbdullahUser.js",
     "remove-notes": "node scripts/removeNotesColumn.js",
-    "update-member-schema": "node scripts/updateMemberSchema.js"
+    "update-member-schema": "node scripts/updateMemberSchema.js",
+    "create-feeds-table": "node scripts/createFeedsTable.js"
   },
   "keywords": [],
   "author": "",
