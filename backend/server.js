@@ -11,7 +11,7 @@ const app = express();
 const getAllowedOrigins = () => {
   const origins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(",")
-    : ["http://13.60.193.171:3000", "http://13.60.193.171:3000"];
+    : ["http://13.60.193.171:3000", "http://localhost:3000"];
 
   console.log("🌐 Allowed CORS origins:", origins);
   return origins;
