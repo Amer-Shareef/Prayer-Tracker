@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import FounderLayout from '../../components/layouts/FounderLayout';
+import feedsService from '../../services/feedsService';
 
 const ReminderPage = () => {
   const location = useLocation();
@@ -21,68 +22,51 @@ const ReminderPage = () => {
   const [success, setSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [activeTab, setActiveTab] = useState('editor');
-    // All feeds
-  const [feeds, setFeeds] = useState([
-    {
-      id: 1,
-      title: "Ramadan Preparation Workshop",
-      content: "Join us for a special workshop to prepare for the upcoming Ramadan. Topics include spiritual preparation, meal planning, and maintaining health during fasting. The workshop will be held in the main hall after Isha prayer next Tuesday.",
-      createdAt: "2025-05-05T14:30:00",
-      expiresAt: "2025-05-12",
-      priority: "high",
-      author: "Mohamed Imthiaz",
-      views: 78
-    },
-    {
-      id: 2,
-      title: "Community Iftar Planning",
-      content: "We are organizing community iftars for the coming Ramadan. Please register to volunteer or sponsor meals. We need volunteers for setup, cooking, serving, and cleanup. Please sign up at the reception desk or contact Br. Rizwan.",
-      createdAt: "2025-05-05T16:45:00",
-      expiresAt: "2025-05-15",
-      priority: "normal",
-      author: "Ahmed Fazil",
-      views: 65
-    },
-    {
-      id: 3,
-      title: "Mosque Cleaning Day",
-      content: "Please join us for our monthly mosque cleaning day. Bring your family and earn rewards while helping maintain our beautiful mosque. Cleaning supplies will be provided. Lunch will be served for all volunteers.",
-      createdAt: "2025-05-06T09:15:00",
-      expiresAt: "2025-05-10",
-      priority: "normal",
-      author: "Abdullah Rahman",
-      views: 42
-    },
-    {
-      id: 4,
-      title: "Schedule Change for Isha Prayer",
-      content: "Please note that starting next week, the Isha prayer will be held at 9:15 PM instead of 9:00 PM to accommodate the changing sunset times. Please update your schedules accordingly.",
-      createdAt: "2025-05-07T11:20:00",
-      expiresAt: "2025-05-14",
-      priority: "urgent",
-      author: "Abdullah Rahman",
-      views: 95
-    }
-  ]);
+  const [feeds, setFeeds] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // In the app, fetch feeds from your API
-    // For now, we'll use the static data defined above
+    // Fetch feeds from API
+    const fetchFeeds = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await feedsService.getAllFeeds();
+        setFeeds(response.data || []);
+      } catch (err) {
+        console.error("Error fetching feeds:", err);
+        setError("Failed to load feeds. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchFeeds();
     
     // Check if we're in edit mode
     if (editId) {
-      const feedToEdit = feeds.find(a => a.id === editId);
-      if (feedToEdit) {
-        setFormData({
-          title: feedToEdit.title,
-          image: feedToEdit.image,
-          content: feedToEdit.content,
-          sendNotification: false
-        });
-        setIsEditing(true);
-      }
+      const fetchFeed = async () => {
+        try {
+          const response = await feedsService.getFeedById(editId);
+          if (response.data) {
+            setFormData({
+              title: response.data.title,
+              image: response.data.image_url,
+              content: response.data.content,
+              sendNotification: response.data.send_notification
+            });
+            setIsEditing(true);
+          }
+        } catch (err) {
+          console.error("Error fetching feed for editing:", err);
+          setError("Failed to load feed for editing.");
+        }
+      };
+      
+      fetchFeed();
     }
-  }, [editId, feeds]);
+  }, [editId]);
   
   // Form validation
   const validateForm = () => {
@@ -110,92 +94,95 @@ const ReminderPage = () => {
   };
   
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!validateForm()) {
       return;
     }
     
-    if (isEditing) {
-      // Update feed
-      setFeeds(prev => prev.map(feed => {
-        if (feed.id === editId) {
-          return {
-            ...feed,
-            title: formData.title,
-            image: formData.image,
-            content: formData.content,
-            updatedAt: new Date().toISOString()
-          };
-        }
-        return feed;
-      }));
+    try {
+      setIsLoading(true);
       
-      setSuccessMessage("Feed updated successfully!");
-    } else {
-      // Create new feed
-      const newFeed = {
-        id: Date.now(),
+      const feedData = {
         title: formData.title,
-        image: formData.image,
         content: formData.content,
-        createdAt: new Date().toISOString(),
-        author: "Abdullah Rahman",
-        views: 0
+        send_notification: formData.sendNotification,
+        image_url: formData.image
       };
       
-      setFeeds(prev => [newFeed, ...prev]);
-      setSuccessMessage("Feed created successfully!");
-    }
-    
-    // Reset form
-    setFormData({
-      title: '',
-      image: null,
-      content: '',
-      sendNotification: false
-    });
-    
-    setIsEditing(false);
-    setSuccess(true);
-    setActiveTab('list');
-    
-    // Reset URL parameter if we were editing
-    if (editId) {
-      navigate('/founder/reminder');
-    }
-    
-    // Hide success message after 3 seconds
-    setTimeout(() => {
-      setSuccess(false);
-    }, 3000);
-  };
-  
-  // Handle feed deletion
-  const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this feed?")) {
-      setFeeds(prev => prev.filter(feed => feed.id !== id));
+      let response;
       
-      if (editId === id) {
-        // Reset form and navigate back if we were editing the deleted feed
-        setFormData({
-          title: '',
-          image: null,
-          content: '',
-          sendNotification: false
-        });
-        setIsEditing(false);
-        navigate('/founder/reminder');
+      if (isEditing) {
+        // Update feed
+        response = await feedsService.updateFeed(editId, feedData);
+        setSuccessMessage("Feed updated successfully!");
+        
+        // Update the state with the edited feed
+        setFeeds(prev => prev.map(feed => {
+          if (feed.id === editId) {
+            return response.data;
+          }
+          return feed;
+        }));
+      } else {
+        // Create new feed
+        response = await feedsService.createFeed(feedData);
+        setSuccessMessage("Feed created successfully!");
+        
+        // Add the new feed to the state
+        setFeeds(prev => [response.data, ...prev]);
       }
       
-      setSuccessMessage("Feed deleted successfully!");
+      // Reset form
+      setFormData({
+        title: '',
+        image: null,
+        content: '',
+        sendNotification: false
+      });
+      
+      setIsEditing(false);
       setSuccess(true);
+      setActiveTab('list');
+      
+      // Reset URL parameter if we were editing
+      if (editId) {
+        navigate('/founder/reminder');
+      }
       
       // Hide success message after 3 seconds
       setTimeout(() => {
         setSuccess(false);
       }, 3000);
+    } catch (err) {
+      console.error("Error submitting feed:", err);
+      setError(err.message || "Failed to save feed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Handle feed deletion
+  const handleDelete = async (id) => {
+    if (window.confirm("Are you sure you want to delete this feed?")) {
+      try {
+        setIsLoading(true);
+        await feedsService.deleteFeed(id);
+        setFeeds(prev => prev.filter(feed => feed.id !== id));
+        setSuccessMessage("Feed deleted successfully!");
+        setSuccess(true);
+        
+        // Hide success message after 3 seconds
+        setTimeout(() => {
+          setSuccess(false);
+        }, 3000);
+      } catch (err) {
+        console.error("Error deleting feed:", err);
+        setError("Failed to delete feed. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
   

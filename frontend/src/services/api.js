@@ -136,23 +136,7 @@ export const authService = {
     return api
       .post("/login", requestData)
       .then((response) => {
-        console.log("✅ Login response received:", {
-          success: response.data.success,
-          hasToken: !!response.data.token,
-          userReceived: !!response.data.user,
-          requiresOtp: response.data.requiresOtp,
-        });
-
-        // For debugging, log complete user field list (excluding sensitive data)
-        if (response.data.user) {
-          console.log(
-            "📋 User fields received:",
-            Object.keys(response.data.user).filter(
-              (key) => !["password", "otp_code", "reset_token"].includes(key)
-            )
-          );
-        }
-
+        console.log("✅ Login response received:", response.data);
         return response;
       })
       .catch((error) => {
@@ -349,21 +333,46 @@ export const announcementService = {
   deleteAnnouncement: (id) => api.delete(`/announcements/${id}`),
 };
 
-// Pickup service with better error handling
+// Enhanced pickup service for mobile-first workflow
 export const pickupService = {
-  // Create Fajr pickup request - SIMPLIFIED
+  // Create pickup request with enhanced mobile data
   createPickupRequest: async (requestData) => {
-    console.log("📋 Creating Fajr pickup request:", requestData);
-
     try {
-      const response = await api.post("/pickup-requests", {
-        ...requestData,
-        prayer_type: "Fajr", // Always Fajr
+      // Create enhanced data with the original request data
+      const enhancedData = { ...requestData };
+
+      // Remove undefined fields to keep request clean
+      Object.keys(enhancedData).forEach((key) => {
+        if (enhancedData[key] === undefined) {
+          delete enhancedData[key];
+        }
       });
-      console.log("✅ Fajr pickup request created:", response.data);
+
+      // Add location coordinates if geolocation is available
+      if (navigator.geolocation) {
+        try {
+          const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              timeout: 5000,
+              enableHighAccuracy: true,
+            });
+          });
+
+          enhancedData.location_coordinates = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+          };
+        } catch (geoError) {
+          console.log("⚠️ Geolocation not available:", geoError.message);
+        }
+      }
+
+      const response = await api.post("/pickup-requests", enhancedData);
+      console.log("✅ Enhanced pickup request created:", response.data);
       return response;
     } catch (error) {
-      console.error("❌ Fajr pickup request creation failed:", error);
+      console.error("❌ Enhanced pickup request creation failed:", error);
       throw error;
     }
   },
@@ -395,9 +404,24 @@ export const pickupService = {
   // Update pickup request status (for members to cancel)
   updatePickupRequest: async (requestId, updateData) => {
     try {
+      // Handle optional days and prayers in updates
+      const cleanUpdateData = { ...updateData };
+
+      if (cleanUpdateData.days && Array.isArray(cleanUpdateData.days)) {
+        cleanUpdateData.days = cleanUpdateData.days.map((day) =>
+          day.toLowerCase()
+        );
+      }
+
+      if (cleanUpdateData.prayers && Array.isArray(cleanUpdateData.prayers)) {
+        cleanUpdateData.prayers = cleanUpdateData.prayers.map((prayer) =>
+          prayer.toLowerCase()
+        );
+      }
+
       const response = await api.put(
         `/pickup-requests/${requestId}`,
-        updateData
+        cleanUpdateData
       );
       return response;
     } catch (error) {

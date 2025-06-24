@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import FounderLayout from "../layouts/FounderLayout";
+import feedService from "../../services/feedService"; // Import feed service
 
 const FounderDashboard = () => {
   const { user } = useAuth();
@@ -45,21 +46,10 @@ const FounderDashboard = () => {
     }
   });
   
-  // Announcements
-  const [announcements, setAnnouncements] = useState([
-    {
-      id: 1,
-      title: "Ramadan Preparation Workshop",
-      date: "2025-05-12",
-      content: "Join us for a special workshop to prepare for the upcoming Ramadan."
-    },
-    {
-      id: 2,
-      title: "Community Iftar Planning",
-      date: "2025-05-15",
-      content: "We are organizing community iftars for the coming Ramadan."
-    }
-  ]);
+  // Feeds state with loading and error handling
+  const [feeds, setFeeds] = useState([]);
+  const [feedsLoading, setFeedsLoading] = useState(true);
+  const [feedsError, setFeedsError] = useState(null);
   
   // Member engagement stats
   const [memberStats, setMemberStats] = useState({
@@ -75,17 +65,43 @@ const FounderDashboard = () => {
     hijri: '15 Shawwal 1447'
   });
   
+  // Fetch latest feeds from the API
   useEffect(() => {
-    // In a real app, fetch this data from your API
-    // For now, we'll use the static data defined above
+    const fetchFeeds = async () => {
+      setFeedsLoading(true);
+      setFeedsError(null);
+      try {
+        // Fetch feeds with limit param = 3 for latest 3 feeds only
+        const response = await feedService.getAllFeeds({ limit: 3 });
+        
+        if (response && response.data) {
+          setFeeds(response.data);
+          console.log('✅ Feeds loaded successfully:', response.data.length);
+        } else {
+          console.error('❌ Invalid feeds data structure:', response);
+          setFeedsError('Failed to load feeds data');
+        }
+      } catch (error) {
+        console.error('❌ Error fetching feeds:', error);
+        setFeedsError(error.message || 'Failed to load feeds');
+      } finally {
+        setFeedsLoading(false);
+      }
+    };
+    
+    fetchFeeds();
   }, []);
   
-  // Handler for deleting announcements
-  const handleDeleteAnnouncement = (id) => {
-    setAnnouncements(prev => prev.filter(announcement => announcement.id !== id));
-    
-    // In a real app, send a delete request to the API
-    console.log(`Announcement ${id} deleted`);
+  // Handler for deleting a feed
+  const handleDeleteFeed = async (id) => {
+    try {
+      await feedService.deleteFeed(id);
+      // Update feeds state to remove the deleted feed
+      setFeeds(prevFeeds => prevFeeds.filter(feed => feed.id !== id));
+      console.log(`✅ Feed ${id} deleted successfully`);
+    } catch (error) {
+      console.error(`❌ Failed to delete feed ${id}:`, error);
+    }
   };
 
   return (
@@ -197,7 +213,7 @@ const FounderDashboard = () => {
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-          {/* Announcements Card */}
+          {/* Feeds Card - Updated with real data */}
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Recent Feeds</h2>
@@ -206,7 +222,24 @@ const FounderDashboard = () => {
               </Link>
             </div>
             
-            {announcements.length === 0 ? (
+            {feedsLoading ? (
+              <div className="flex items-center justify-center p-6">
+                <svg className="animate-spin h-8 w-8 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+            ) : feedsError ? (
+              <div className="bg-red-50 text-red-600 p-4 rounded-md">
+                <p>Error loading feeds: {feedsError}</p>
+                <button 
+                  className="text-red-700 font-medium underline mt-2"
+                  onClick={() => window.location.reload()}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : feeds.length === 0 ? (
               <div className="bg-gray-50 rounded-lg p-8 text-center">
                 <p className="text-gray-500">No recent feeds</p>
                 <Link 
@@ -218,26 +251,28 @@ const FounderDashboard = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {announcements.map(announcement => (
-                  <div key={announcement.id} className="border-l-4 border-green-500 pl-4 py-2 flex justify-between">
+                {feeds.map(feed => (
+                  <div key={feed.id} className="border-l-4 border-green-500 pl-4 py-2 flex justify-between">
                     <div>
-                      <h3 className="font-bold">{announcement.title}</h3>
+                      <h3 className="font-bold">{feed.title}</h3>
                       <p className="text-sm text-gray-600 line-clamp-1 mb-1">
-                        {announcement.content}
+                        {feed.content}
                       </p>
-                      <p className="text-xs text-gray-500">{announcement.date}</p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(feed.created_at).toLocaleDateString()}
+                      </p>
                     </div>
                     <div className="flex items-start space-x-2">
                       <button 
                         className="text-gray-400 hover:text-gray-600"
-                        onClick={() => handleDeleteAnnouncement(announcement.id)}
+                        onClick={() => handleDeleteFeed(feed.id)}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
                       <Link 
-                        to={`/founder/post-feeds?edit=${announcement.id}`}
+                        to={`/founder/post-feeds?edit=${feed.id}`}
                         className="text-gray-400 hover:text-gray-600"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

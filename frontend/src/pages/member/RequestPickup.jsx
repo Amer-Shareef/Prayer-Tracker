@@ -10,8 +10,11 @@ const RequestPickup = () => {
   const [myRequests, setMyRequests] = useState([]);
   
   const [formData, setFormData] = useState({
-    request_date: new Date().toISOString().split('T')[0],
-    pickup_location: ''
+    pickup_location: '',
+    contact_number: '',
+    special_instructions: '',
+    days: [],
+    prayers: []
   });
 
   useEffect(() => {
@@ -56,8 +59,8 @@ const RequestPickup = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.request_date || !formData.pickup_location) {
-      setError('Date and pickup location are required');
+    if (!formData.pickup_location || formData.days.length === 0 || formData.prayers.length === 0) {
+      setError('Pickup location, days, and prayers are required');
       return;
     }
 
@@ -65,14 +68,17 @@ const RequestPickup = () => {
     setError('');
 
     try {
-      console.log('📤 Submitting Fajr pickup request:', formData);
+      console.log('📤 Submitting pickup request:', formData);
       const response = await pickupService.createPickupRequest(formData);
       
       if (response.data.success) {
-        setSuccess('Fajr pickup request submitted successfully!');
+        setSuccess('Pickup request submitted successfully!');
         setFormData({
-          request_date: new Date().toISOString().split('T')[0],
-          pickup_location: ''
+          pickup_location: '',
+          contact_number: '',
+          special_instructions: '',
+          days: [],
+          prayers: []
         });
         
         // Refresh the requests list
@@ -90,6 +96,24 @@ const RequestPickup = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDayChange = (day) => {
+    setFormData(prev => ({
+      ...prev,
+      days: prev.days.includes(day) 
+        ? prev.days.filter(d => d !== day)
+        : [...prev.days, day]
+    }));
+  };
+
+  const handlePrayerChange = (prayer) => {
+    setFormData(prev => ({
+      ...prev,
+      prayers: prev.prayers.includes(prayer) 
+        ? prev.prayers.filter(p => p !== prayer)
+        : [...prev.prayers, prayer]
+    }));
   };
 
   const handleCancelRequest = async (requestId) => {
@@ -152,11 +176,11 @@ const RequestPickup = () => {
       <div className="max-w-4xl mx-auto p-6">
         <h1 className="text-2xl font-bold text-gray-800 mb-6">Request Fajr Pickup</h1>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Request Form */}
+          {/* Enhanced Request Form */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="mb-6">
-              <h2 className="text-lg font-semibold text-gray-800">🌅 Fajr Transportation Request</h2>
-              <p className="text-gray-600 mt-1">Request transportation to the mosque for Fajr prayer</p>
+              <h2 className="text-lg font-semibold text-gray-800">🌅 Enhanced Fajr Transportation Request</h2>
+              <p className="text-gray-600 mt-1">Request transportation to the mosque for Fajr prayer with detailed information</p>
             </div>
             {error && (
               <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6">
@@ -179,73 +203,120 @@ const RequestPickup = () => {
               </div>
             )}
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  📅 Request Date *
-                </label>
-                <input
-                  type="date"
-                  name="request_date"
-                  value={formData.request_date}
-                  onChange={handleInputChange}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">Select the date you need pickup for Fajr prayer</p>
-              </div>
+              {/* Pickup location */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   📍 Pickup Location *
                 </label>
-                <textarea
+                <input
+                  type="text"
                   name="pickup_location"
                   value={formData.pickup_location}
                   onChange={handleInputChange}
-                  rows="3"
-                  placeholder="Enter your pickup address with landmarks (e.g., House #123, Main Street, near ABC Shop)"
+                  placeholder="Enter your pickup location"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">Please provide detailed address with landmarks</p>
               </div>
-              <div className="flex space-x-3">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className={`flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    loading ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                >
-                  {loading ? 'Submitting...' : '🚗 Submit Fajr Pickup Request'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFormData({
-                      request_date: new Date().toISOString().split('T')[0],
-                      pickup_location: ''
-                    });
-                    setError('');
-                    setSuccess('');
-                  }}
-                  className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700"
-                >
-                  Clear Form
-                </button>
+
+              {/* Days selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  📅 Select Days *
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
+                    <label key={day} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={formData.days.includes(day)}
+                        onChange={() => handleDayChange(day)}
+                        className="mr-2"
+                      />
+                      <span className="capitalize">{day}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
+
+              {/* Prayers selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  🕌 Select Prayers *
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'].map(prayer => (
+                    <label key={prayer} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={formData.prayers.includes(prayer)}
+                        onChange={() => handlePrayerChange(prayer)}
+                        className="mr-2"
+                      />
+                      <span className="capitalize">{prayer}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Contact number */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  📞 Contact Number
+                </label>
+                <input
+                  type="tel"
+                  name="contact_number"
+                  value={formData.contact_number}
+                  onChange={handleInputChange}
+                  placeholder="Your phone number"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Special instructions */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  📝 Special Instructions
+                </label>
+                <textarea
+                  name="special_instructions"
+                  value={formData.special_instructions}
+                  onChange={handleInputChange}
+                  rows="2"
+                  placeholder="Any special instructions for pickup"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Submit button */}
+              <button
+                type="submit"
+                disabled={loading}
+                className={`w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  loading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                {loading ? 'Submitting...' : '🚗 Submit Pickup Request'}
+              </button>
             </form>
+
+            {/* Enhanced info section */}
             <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <h3 className="text-sm font-medium text-blue-800 mb-2">📋 Information:</h3>
+              <h3 className="text-sm font-medium text-blue-800 mb-2">📋 Enhanced Features:</h3>
               <ul className="text-sm text-blue-700 space-y-1">
-                <li>• 🌅 Only Fajr prayer pickup requests are accepted</li>
-                <li>• ⏰ Submit requests at least 12 hours in advance</li>
-                <li>• ✅ You'll be notified once approved with driver details</li>
-                <li>• 📞 Driver will contact you before pickup time</li>
+                <li>• 🌅 Fajr prayer pickup requests only</li>
+                <li>• 📍 GPS location tracking (if enabled)</li>
+                <li>• 🏠 Detailed address with landmarks</li>
+                <li>• 📝 Special instructions for drivers</li>
+                <li>• 📞 Alternative contact options</li>
+                <li>• ⏰ Submit at least 12 hours in advance</li>
+                <li>• 📱 Mobile-optimized workflow</li>
               </ul>
             </div>
           </div>
-          {/* My Requests */}
+          
+          {/* My Requests section remains the same */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold text-gray-800">🌅 My Fajr Pickup Requests</h2>

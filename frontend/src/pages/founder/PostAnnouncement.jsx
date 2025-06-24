@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import FounderLayout from '../../components/layouts/FounderLayout';
+import announcementService from '../../services/announcementService';
 
 const PostAnnouncement = () => {
   const location = useLocation();
@@ -22,70 +23,53 @@ const PostAnnouncement = () => {
   const [success, setSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [activeTab, setActiveTab] = useState('editor');
-    // All announcements
-  const [announcements, setAnnouncements] = useState([
-    {
-      id: 1,
-      title: "Ramadan Preparation Workshop",
-      content: "Join us for a special workshop to prepare for the upcoming Ramadan. Topics include spiritual preparation, meal planning, and maintaining health during fasting. The workshop will be held in the main hall after Isha prayer next Tuesday.",
-      createdAt: "2025-05-05T14:30:00",
-      expiresAt: "2025-05-12",
-      priority: "high",
-      author: "Mohamed Imthiaz",
-      views: 78
-    },
-    {
-      id: 2,
-      title: "Community Iftar Planning",
-      content: "We are organizing community iftars for the coming Ramadan. Please register to volunteer or sponsor meals. We need volunteers for setup, cooking, serving, and cleanup. Please sign up at the reception desk or contact Br. Rizwan.",
-      createdAt: "2025-05-05T16:45:00",
-      expiresAt: "2025-05-15",
-      priority: "normal",
-      author: "Ahmed Fazil",
-      views: 65
-    },
-    {
-      id: 3,
-      title: "Mosque Cleaning Day",
-      content: "Please join us for our monthly mosque cleaning day. Bring your family and earn rewards while helping maintain our beautiful mosque. Cleaning supplies will be provided. Lunch will be served for all volunteers.",
-      createdAt: "2025-05-06T09:15:00",
-      expiresAt: "2025-05-10",
-      priority: "normal",
-      author: "Abdullah Rahman",
-      views: 42
-    },
-    {
-      id: 4,
-      title: "Schedule Change for Isha Prayer",
-      content: "Please note that starting next week, the Isha prayer will be held at 9:15 PM instead of 9:00 PM to accommodate the changing sunset times. Please update your schedules accordingly.",
-      createdAt: "2025-05-07T11:20:00",
-      expiresAt: "2025-05-14",
-      priority: "urgent",
-      author: "Abdullah Rahman",
-      views: 95
-    }
-  ]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // In the app, fetch announcements from your API
-    // For now, we'll use the static data defined above
+    // Fetch announcements from API
+    const fetchAnnouncements = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await announcementService.getAllAnnouncements();
+        setAnnouncements(response.data || []);
+      } catch (err) {
+        console.error("Error fetching announcements:", err);
+        setError("Failed to load announcements. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchAnnouncements();
     
     // Check if we're in edit mode
     if (editId) {
-      const announcementToEdit = announcements.find(a => a.id === editId);
-      if (announcementToEdit) {
-        setFormData({
-          title: announcementToEdit.title,
-          content: announcementToEdit.content,
-          expiry: announcementToEdit.expiresAt,
-          priority: announcementToEdit.priority,
-          sendNotification: false
-        });
-        setIsEditing(true);
-      }
+      const fetchAnnouncement = async () => {
+        try {
+          const response = await announcementService.getAnnouncementById(editId);
+          if (response.data) {
+            setFormData({
+              title: response.data.title,
+              content: response.data.content,
+              expiry: response.data.expires_at ? response.data.expires_at.split('T')[0] : '',
+              priority: response.data.priority,
+              sendNotification: false
+            });
+            setIsEditing(true);
+          }
+        } catch (err) {
+          console.error("Error fetching announcement for editing:", err);
+          setError("Failed to load announcement for editing.");
+        }
+      };
+      
+      fetchAnnouncement();
     }
-  }, [editId, announcements]);
-  
+  }, [editId]);
+
   // Form validation
   const validateForm = () => {
     const newErrors = {};
@@ -116,96 +100,114 @@ const PostAnnouncement = () => {
   };
   
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!validateForm()) {
       return;
     }
     
-    if (isEditing) {
-      // Update announcement
-      setAnnouncements(prev => prev.map(announcement => {
-        if (announcement.id === editId) {
-          return {
-            ...announcement,
-            title: formData.title,
-            content: formData.content,
-            expiresAt: formData.expiry,
-            priority: formData.priority,
-            updatedAt: new Date().toISOString()
-          };
-        }
-        return announcement;
-      }));
-      
-      setSuccessMessage("Announcement updated successfully!");
-    } else {
-      // Create new announcement
-      const newAnnouncement = {
-        id: Date.now(),
-        title: formData.title,
-        content: formData.content,
-        createdAt: new Date().toISOString(),
-        expiresAt: formData.expiry,
-        priority: formData.priority,
-        author: "Abdullah Rahman", // In a real app, this would be the current user
-        views: 0
-      };
-      
-      setAnnouncements(prev => [newAnnouncement, ...prev]);
-      setSuccessMessage("Announcement created successfully!");
-    }
-    
-    // Reset form
-    setFormData({
-      title: '',
-      content: '',
-      expiry: '',
-      priority: 'normal',
-      sendNotification: false
-    });
-    
-    setIsEditing(false);
-    setSuccess(true);
-    setActiveTab('list');
-    
-    // Reset URL parameter if we were editing
-    if (editId) {
-      navigate('/founder/post-announcement');
-    }
-    
-    // Hide success message after 3 seconds
-    setTimeout(() => {
-      setSuccess(false);
-    }, 3000);
-  };
-  
-  // Handle announcement deletion
-  const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this announcement?")) {
-      setAnnouncements(prev => prev.filter(announcement => announcement.id !== id));
-      
-      if (editId === id) {
-        // Reset form and navigate back if we were editing the deleted announcement
-        setFormData({
-          title: '',
-          content: '',
-          expiry: '',
-          priority: 'normal',
-          sendNotification: false
+    try {
+      if (isEditing) {
+        // Update announcement
+        await announcementService.updateAnnouncement(editId, {
+          title: formData.title,
+          content: formData.content,
+          expires_at: formData.expiry,
+          priority: formData.priority
         });
-        setIsEditing(false);
-        navigate('/founder/post-announcement');
+        
+        setAnnouncements(prev => prev.map(announcement => {
+          if (announcement.id === editId) {
+            return {
+              ...announcement,
+              title: formData.title,
+              content: formData.content,
+              expiresAt: formData.expiry,
+              priority: formData.priority,
+              updatedAt: new Date().toISOString()
+            };
+          }
+          return announcement;
+        }));
+        
+        setSuccessMessage("Announcement updated successfully!");
+      } else {
+        // Create new announcement
+        const response = await announcementService.createAnnouncement({
+          title: formData.title,
+          content: formData.content,
+          createdAt: new Date().toISOString(),
+          expires_at: formData.expiry,
+          priority: formData.priority,
+          author: "Abdullah Rahman", // In a real app, this would be the current user
+          views: 0
+        });
+        
+        setAnnouncements(prev => [response.data, ...prev]);
+        setSuccessMessage("Announcement created successfully!");
       }
       
-      setSuccessMessage("Announcement deleted successfully!");
+      // Reset form
+      setFormData({
+        title: '',
+        content: '',
+        expiry: '',
+        priority: 'normal',
+        sendNotification: false
+      });
+      
+      setIsEditing(false);
       setSuccess(true);
+      setActiveTab('list');
+      
+      // Reset URL parameter if we were editing
+      if (editId) {
+        navigate('/founder/post-announcement');
+      }
       
       // Hide success message after 3 seconds
       setTimeout(() => {
         setSuccess(false);
       }, 3000);
+    } catch (err) {
+      console.error("Error saving announcement:", err);
+      setError("Failed to save announcement. Please try again.");
+    }
+  };
+  
+  // Handle announcement deletion
+  const handleDelete = async (id) => {
+    if (window.confirm("Are you sure you want to delete this announcement?")) {
+      try {
+        await announcementService.deleteAnnouncement(id);
+        
+        setAnnouncements(prev => prev.filter(announcement => announcement.id !== id));
+        
+        if (editId === id) {
+          // Reset form and navigate back if we were editing the deleted announcement
+          setFormData({
+            title: '',
+            content: '',
+            expiry: '',
+            priority: 'normal',
+            sendNotification: false
+          });
+          setIsEditing(false);
+          navigate('/founder/post-announcement');
+        }
+        
+        setSuccessMessage("Announcement deleted successfully!");
+        setSuccess(true);
+        
+        // Hide success message after 3 seconds
+        setTimeout(() => {
+          setSuccess(false);
+        }, 3000);
+      } catch (err) {
+        console.error("Error deleting announcement:", err);
+        setError("Failed to delete announcement. Please try again.");
+      }
     }
   };
   
@@ -256,6 +258,22 @@ const PostAnnouncement = () => {
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium">{successMessage}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Error message */}
+        {error && (
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium">{error}</p>
               </div>
             </div>
           </div>
