@@ -558,4 +558,49 @@ export const dailyActivitiesService = {
   },
 };
 
+// Wake Up Call service - NEW
+export const wakeUpCallService = {
+  // Get wake-up call records with optional filters
+  getWakeUpCalls: async (params = {}) => {
+    try {
+      console.log("📞 Fetching wake-up calls with params:", params);
+
+      const response = await api.get("/wake-up-calls", { params });
+      console.log("✅ Wake-up calls response:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to fetch wake-up calls:", error);
+      throw error;
+    }
+  },
+
+  // Get wake-up call statistics
+  getWakeUpCallStats: async (params = {}) => {
+    try {
+      console.log("📊 Fetching wake-up call stats with params:", params);
+
+      const response = await api.get("/wake-up-calls/stats", { params });
+      console.log("✅ Wake-up call stats response:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to fetch wake-up call stats:", error);
+      throw error;
+    }
+  },
+
+  // Record wake-up call response (for mobile app integration)
+  recordWakeUpCall: async (callData) => {
+    try {
+      console.log("📞 Recording wake-up call response:", callData);
+
+      const response = await api.post("/wake-up-calls", callData);
+      console.log("✅ Wake-up call recorded:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to record wake-up call:", error);
+      throw error;
+    }
+  },
+};
+
 export default api;

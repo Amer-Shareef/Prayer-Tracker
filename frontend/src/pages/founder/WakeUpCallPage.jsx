@@ -1,68 +1,115 @@
 import React, { useState, useEffect } from 'react';
 import FounderLayout from '../../components/layouts/FounderLayout';
+import { wakeUpCallService } from '../../services/api';
 
 const WakeUpCallPage = () => {
-  const [wakeCalls, setWakeCalls] = useState([
-    // Dummy data for demonstration - automatic calls made to members
-    {
-      id: 1,
-      memberId: 'DE0001',
-      memberName: 'Ahmed Hassan Mohamed',
-      phone: '0771234567',
-      callDate: '2024-03-15',
-      callTime: '04:30',
-      prayerType: 'Fajr',
-      callStatus: 'accepted', // accepted, declined, no_answer
-      responseTime: '04:31',
-      createdAt: '2024-03-15T04:30:00Z'
-    },
-    {
-      id: 2,
-      memberId: 'C30002',
-      memberName: 'Muhammed Ali',
-      phone: '0769876543',
-      callDate: '2024-03-15',
-      callTime: '04:45',
-      prayerType: 'Fajr',
-      callStatus: 'declined',
-      responseTime: '04:46',
-      createdAt: '2024-03-15T04:45:00Z'
-    },
-    {
-      id: 3,
-      memberId: 'ML0003',
-      memberName: 'Omar Abdullah Khan',
-      phone: '0751234567',
-      callDate: '2024-03-15',
-      callTime: '04:15',
-      prayerType: 'Fajr',
-      callStatus: 'no_answer',
-      responseTime: null,
-      createdAt: '2024-03-15T04:15:00Z'
-    }
-  ]);
+  const [wakeCalls, setWakeCalls] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [stats, setStats] = useState({
+    total_calls: 0,
+    accepted_calls: 0,
+    declined_calls: 0,
+    no_answer_calls: 0
+  });
 
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterDate, setFilterDate] = useState('');
   const [filterPrayer, setFilterPrayer] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Statistics
-  const totalCalls = wakeCalls.length;
-  const acceptedCalls = wakeCalls.filter(call => call.callStatus === 'accepted').length;
-  const declinedCalls = wakeCalls.filter(call => call.callStatus === 'declined').length;
-  const noAnswerCalls = wakeCalls.filter(call => call.callStatus === 'no_answer').length;
+  // Fetch wake-up calls and stats
+  const fetchWakeUpCalls = async () => {
+    try {
+      setLoading(true);
+      console.log('🔄 Fetching wake-up calls...');
 
-  // Filter calls
+      // Build API parameters based on filters
+      const params = {};
+      if (filterDate) params.date = filterDate;
+      if (filterStatus !== 'all') params.status = filterStatus;
+      if (filterPrayer !== 'all') params.prayer_type = filterPrayer;
+
+      // Fetch calls and stats simultaneously
+      const [callsResponse, statsResponse] = await Promise.all([
+        wakeUpCallService.getWakeUpCalls(params),
+        wakeUpCallService.getWakeUpCallStats({
+          date_from: filterDate || undefined,
+          date_to: filterDate || undefined
+        })
+      ]);
+
+      if (callsResponse.data.success) {
+        setWakeCalls(callsResponse.data.data || []);
+        console.log(`✅ Loaded ${callsResponse.data.data?.length || 0} wake-up calls`);
+      }
+
+      if (statsResponse.data.success) {
+        setStats(statsResponse.data.data);
+        console.log('✅ Loaded wake-up call stats:', statsResponse.data.data);
+      }
+
+      setError('');
+    } catch (err) {
+      console.error('❌ Failed to fetch wake-up calls:', err);
+      setError('Failed to load wake-up call data. Please try again.');
+      
+      // Set empty data on error
+      setWakeCalls([]);
+      setStats({
+        total_calls: 0,
+        accepted_calls: 0,
+        declined_calls: 0,
+        no_answer_calls: 0
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load data on component mount and when filters change
+  useEffect(() => {
+    fetchWakeUpCalls();
+  }, [filterStatus, filterDate, filterPrayer]);
+
+  // Statistics from API data
+  const totalCalls = stats.total_calls || 0;
+  const acceptedCalls = stats.accepted_calls || 0;
+  const declinedCalls = stats.declined_calls || 0;
+  const noAnswerCalls = stats.no_answer_calls || 0;
+
+  // Client-side filtering for search term
   const filteredCalls = wakeCalls.filter(call => {
-    const matchesStatus = filterStatus === 'all' || call.callStatus === filterStatus;
-    const matchesDate = !filterDate || call.callDate === filterDate;
-    const matchesPrayer = filterPrayer === 'all' || call.prayerType === filterPrayer;
-    const matchesSearch = call.memberName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         call.memberId.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!searchTerm) return true;
     
-    return matchesStatus && matchesDate && matchesPrayer && matchesSearch;
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      call.username?.toLowerCase().includes(searchLower) ||
+      call.member_id?.toLowerCase().includes(searchLower) ||
+      call.phone?.toLowerCase().includes(searchLower)
+    );
   });
+
+  // Format display data
+  const formatCallData = (call) => ({
+    id: call.id,
+    memberId: call.member_id || 'N/A',
+    memberName: call.username || 'Unknown User',
+    phone: call.phone || 'N/A',
+    callDate: call.call_date,
+    callTime: call.call_time?.substring(0, 5) || 'N/A', // Format HH:MM
+    prayerType: call.prayer_type || 'Fajr',
+    callStatus: call.call_response,
+    responseTime: call.response_time ? 
+      new Date(call.response_time).toLocaleTimeString('en-US', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      }) : null,
+    createdAt: call.created_at
+  });
+
+  const displayCalls = filteredCalls.map(formatCallData);
 
   return (
     <FounderLayout>
@@ -73,66 +120,29 @@ const WakeUpCallPage = () => {
             <h1 className="text-2xl font-bold text-gray-900">Automatic Wake Up Calls</h1>
             <p className="text-gray-600 mt-1">Track automatic wake-up call responses from members</p>
           </div>
+          <button
+            onClick={fetchWakeUpCalls}
+            disabled={loading}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+          >
+            {loading ? 'Loading...' : 'Refresh'}
+          </button>
         </div>
 
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                </svg>
-              </div>
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div className="flex">
+              <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-500">Total Calls</p>
-                <p className="text-2xl font-semibold text-gray-900">{totalCalls}</p>
+                <p className="text-sm text-red-800">{error}</p>
               </div>
             </div>
           </div>
+        )}
 
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-500">Accepted</p>
-                <p className="text-2xl font-semibold text-gray-900">{acceptedCalls}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="flex items-center">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-500">Declined</p>
-                <p className="text-2xl font-semibold text-gray-900">{declinedCalls}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-500">No Answer</p>
-                <p className="text-2xl font-semibold text-gray-900">{noAnswerCalls}</p>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Filters */}
         <div className="bg-white p-4 rounded-lg shadow mb-6">
@@ -204,77 +214,89 @@ const WakeUpCallPage = () => {
           </div>
         </div>
 
-        {/* Calls Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Call Details</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Response</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Response Time</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredCalls.map((call) => (
-                  <tr key={call.id} className="hover:bg-gray-50">
-                    {/* Member Info */}
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{call.memberName}</div>
-                        <div className="text-sm text-gray-500">ID: {call.memberId}</div>
-                      </div>
-                    </td>
-
-                    {/* Contact */}
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{call.phone}</div>
-                    </td>
-
-                    {/* Call Details */}
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm text-gray-900">{call.callDate}</div>
-                        <div className="text-sm text-gray-500">{call.callTime} - {call.prayerType}</div>
-                      </div>
-                    </td>
-
-                    {/* Response Status */}
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        call.callStatus === 'accepted' ? 'bg-green-100 text-green-800' :
-                        call.callStatus === 'declined' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {call.callStatus === 'no_answer' ? 'No Answer' : 
-                         call.callStatus.charAt(0).toUpperCase() + call.callStatus.slice(1)}
-                      </span>
-                    </td>
-
-                    {/* Response Time */}
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {call.responseTime || '-'}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {/* Loading State */}
+        {loading && (
+          <div className="bg-white rounded-lg shadow p-8 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading wake-up call data...</p>
           </div>
+        )}
 
-          {filteredCalls.length === 0 && (
-            <div className="text-center py-8">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              </svg>
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No wake-up calls found</h3>
-              <p className="mt-1 text-sm text-gray-500">No calls match your current filters.</p>
+        {/* Calls Table */}
+        {!loading && (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Call Details</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Response</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Response Time</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {displayCalls.map((call) => (
+                    <tr key={call.id} className="hover:bg-gray-50">
+                      {/* Member Info */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{call.memberName}</div>
+                          <div className="text-sm text-gray-500">ID: {call.memberId}</div>
+                        </div>
+                      </td>
+
+                      {/* Contact */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{call.phone}</div>
+                      </td>
+
+                      {/* Call Details */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm text-gray-900">{call.callDate}</div>
+                          <div className="text-sm text-gray-500">{call.callTime} - {call.prayerType}</div>
+                        </div>
+                      </td>
+
+                      {/* Response Status */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          call.callStatus === 'accepted' ? 'bg-green-100 text-green-800' :
+                          call.callStatus === 'declined' ? 'bg-red-100 text-red-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {call.callStatus === 'no_answer' ? 'No Answer' : 
+                           call.callStatus.charAt(0).toUpperCase() + call.callStatus.slice(1)}
+                        </span>
+                      </td>
+
+                      {/* Response Time */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {call.responseTime || '-'}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
-        </div>
+
+            {displayCalls.length === 0 && !loading && (
+              <div className="text-center py-8">
+                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No wake-up calls found</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {error ? 'Unable to load data. Please try refreshing.' : 'No calls match your current filters.'}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </FounderLayout>
   );

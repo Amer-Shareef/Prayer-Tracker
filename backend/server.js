@@ -11,7 +11,7 @@ const app = express();
 const getAllowedOrigins = () => {
   const origins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(",")
-    : ["http://13.60.193.171:3000", "http://localhost:3000"];
+    : ["http://localhost:3000", "http://13.60.193.171:3000"];
 
   console.log("🌐 Allowed CORS origins:", origins);
   return origins;
@@ -53,7 +53,8 @@ const announcementRoutes = require("./routes/announcementRoutes");
 const pickupRoutes = require("./routes/pickupRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const dailyActivitiesRoutes = require("./routes/dailyActivitiesRoutes");
-const feedsRoutes = require("./routes/feedsRoutes"); // Import the new feeds routes
+const feedsRoutes = require("./routes/feedsRoutes");
+const wakeUpCallRoutes = require("./routes/wakeUpCallRoutes"); // Add this line
 
 // Use routes
 app.use("/api", authRoutes);
@@ -65,7 +66,8 @@ app.use("/api", pickupRoutes);
 app.use("/api", memberRoutes);
 app.use("/api", adminRoutes);
 app.use("/api/daily-activities", dailyActivitiesRoutes);
-app.use("/api/feeds", feedsRoutes); // Register the feeds routes
+app.use("/api/feeds", feedsRoutes);
+app.use("/api", wakeUpCallRoutes); // Add this line
 
 // Enhanced health endpoint
 app.get("/api/health", async (req, res) => {
