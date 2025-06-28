@@ -19,6 +19,7 @@ function ManageMembers() {
   const [filterEmail, setFilterEmail] = useState('');
   const [filterMobility, setFilterMobility] = useState('all');
   const [filterArea, setFilterArea] = useState('all');
+  const [filterAdditionalInfo, setFilterAdditionalInfo] = useState('all');
 
   // Fetch members from database
   useEffect(() => {
@@ -122,17 +123,24 @@ function ManageMembers() {
 
   // Filter members based on search and filters
   const filteredMembers = members.filter(member => {
-    const matchesSearch = member.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         member.fullName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (member.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (member.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (member.fullName || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = filterRole === 'all' || member.role === filterRole;
     const matchesStatus = filterStatus === 'all' || member.status === filterStatus;
-    const matchesMemberId = !filterMemberId || member.memberId.toLowerCase().includes(filterMemberId.toLowerCase());
-    const matchesFullName = !filterFullName || member.fullName.toLowerCase().includes(filterFullName.toLowerCase());
-    const matchesUsername = !filterUsername || member.username.toLowerCase().includes(filterUsername.toLowerCase());
-    const matchesEmail = !filterEmail || member.email.toLowerCase().includes(filterEmail.toLowerCase());
+    const matchesMemberId = !filterMemberId || (member.memberId || '').toLowerCase().includes(filterMemberId.toLowerCase());
+    const matchesFullName = !filterFullName || (member.fullName || '').toLowerCase().includes(filterFullName.toLowerCase());
+    const matchesUsername = !filterUsername || (member.username || '').toLowerCase().includes(filterUsername.toLowerCase());
+    const matchesEmail = !filterEmail || (member.email || '').toLowerCase().includes(filterEmail.toLowerCase());
     const matchesMobility = filterMobility === 'all' || member.mobility === filterMobility;
     const matchesArea = filterArea === 'all' || member.area === filterArea;
+    
+    // Additional Info filtering
+    const matchesAdditionalInfo = filterAdditionalInfo === 'all' || 
+      (filterAdditionalInfo === 'zakath' && member.zakathEligible) ||
+      (filterAdditionalInfo === 'rent' && member.onRent) ||
+      (filterAdditionalInfo === 'disabled' && member.differentlyAbled) ||
+      (filterAdditionalInfo === 'convert' && member.MuallafathilQuloob);
     
     // Age filtering
     const memberAge = calculateAge(member.dateOfBirth);
@@ -141,7 +149,7 @@ function ManageMembers() {
     
     return matchesSearch && matchesRole && matchesStatus && matchesMemberId && 
            matchesFullName && matchesUsername && matchesEmail && matchesMobility && 
-           matchesArea && matchesMinAge && matchesMaxAge;
+           matchesArea && matchesAdditionalInfo && matchesMinAge && matchesMaxAge;
   });
 
   if (loading) {
@@ -289,6 +297,22 @@ function ManageMembers() {
               </select>
             </div>
             
+            {/* Additional Info Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Additional Info</label>
+              <select
+                value={filterAdditionalInfo}
+                onChange={(e) => setFilterAdditionalInfo(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All Additional Info</option>
+                <option value="zakath">Zakath Eligible</option>
+                <option value="rent">On Rent</option>
+                <option value="disabled">Differently Abled</option>
+                <option value="convert">Muallafathil Quloob</option>
+              </select>
+            </div>
+            
             {/* Role Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
@@ -331,6 +355,7 @@ function ManageMembers() {
                   setFilterEmail('');
                   setFilterMobility('all');
                   setFilterArea('all');
+                  setFilterAdditionalInfo('all');
                   setFilterRole('all');
                   setFilterStatus('all');
                 }}

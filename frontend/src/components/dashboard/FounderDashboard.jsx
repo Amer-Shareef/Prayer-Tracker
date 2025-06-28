@@ -52,8 +52,8 @@ const FounderDashboard = () => {
   const [feedsError, setFeedsError] = useState(null);
     
   const [currentDate, setCurrentDate] = useState({
-    gregorian: 'Thursday, May 8, 2025',
-    hijri: '15 Shawwal 1447'
+    gregorian: 'Thursday, June 29, 2025',
+    hijri: '03 Muharram 1447'
   });
   
   // Fetch latest feeds from the API

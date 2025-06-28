@@ -552,110 +552,110 @@ router.delete(
 );
 
 // PUT /api/pickup-requests/:id/approve - Approve pickup request and assign driver
-router.put("/:id/approve", async (req, res) => {
-  const requestId = req.params.id;
-  const { assignedDriverId, assignedDriverName } = req.body;
+router.put(
+  "/:id/approve",
+  authenticateToken,
+  dbHealthCheck,
+  async (req, res) => {
+    const requestId = req.params.id;
+    const { assignedDriverId, assignedDriverName } = req.body;
 
-  console.log(
-    "🟢 Approving pickup request:",
-    requestId,
-    "with driver:",
-    assignedDriverName
-  );
-
-  try {
-    const connection = await pool.getConnection();
-
-    // Update the pickup request with approval and driver assignment
-    const [result] = await connection.query(
-      `
-      UPDATE pickup_requests 
-      SET 
-        status = 'approved',
-        assigned_driver_id = ?,
-        assigned_driver_name = ?,
-        approved_at = NOW()
-      WHERE id = ?
-    `,
-      [assignedDriverId, assignedDriverName, requestId]
+    console.log(
+      "🟢 Approving pickup request:",
+      requestId,
+      "with driver:",
+      assignedDriverName
     );
 
-    if (result.affectedRows === 0) {
-      connection.release();
-      return res.status(404).json({
+    try {
+      // Update the pickup request with approval and driver assignment
+      const [result] = await pool.execute(
+        `
+        UPDATE pickup_requests 
+        SET 
+          status = 'approved',
+          assigned_driver_id = ?,
+          assigned_driver_name = ?,
+          approved_at = NOW()
+        WHERE id = ?
+      `,
+        [assignedDriverId, assignedDriverName, requestId]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Pickup request not found",
+        });
+      }
+
+      console.log("✅ Pickup request approved successfully");
+      res.json({
+        success: true,
+        message: "Pickup request approved successfully",
+      });
+    } catch (error) {
+      console.error("❌ Error approving pickup request:", error);
+      res.status(500).json({
         success: false,
-        message: "Pickup request not found",
+        message: "Failed to approve pickup request",
+        error: error.message,
       });
     }
-
-    connection.release();
-
-    console.log("✅ Pickup request approved successfully");
-    res.json({
-      success: true,
-      message: "Pickup request approved successfully",
-    });
-  } catch (error) {
-    console.error("❌ Error approving pickup request:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to approve pickup request",
-      error: error.message,
-    });
   }
-});
+);
 
 // PUT /api/pickup-requests/:id/reject - Reject pickup request
-router.put("/:id/reject", async (req, res) => {
-  const requestId = req.params.id;
-  const { rejectionReason } = req.body;
+router.put(
+  "/:id/reject",
+  authenticateToken,
+  dbHealthCheck,
+  async (req, res) => {
+    const requestId = req.params.id;
+    const { rejectionReason } = req.body;
 
-  console.log(
-    "🔴 Rejecting pickup request:",
-    requestId,
-    "reason:",
-    rejectionReason
-  );
-
-  try {
-    const connection = await pool.getConnection();
-
-    // Update the pickup request with rejection
-    const [result] = await connection.query(
-      `
-      UPDATE pickup_requests 
-      SET 
-        status = 'rejected',
-        rejection_reason = ?,
-        rejected_at = NOW()
-      WHERE id = ?
-    `,
-      [rejectionReason, requestId]
+    console.log(
+      "🔴 Rejecting pickup request:",
+      requestId,
+      "reason:",
+      rejectionReason
     );
 
-    if (result.affectedRows === 0) {
-      connection.release();
-      return res.status(404).json({
+    try {
+      // Update the pickup request with rejection
+      const [result] = await pool.execute(
+        `
+        UPDATE pickup_requests 
+        SET 
+          status = 'rejected',
+          rejection_reason = ?,
+          rejected_at = NOW()
+        WHERE id = ?
+      `,
+        [rejectionReason, requestId]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Pickup request not found",
+        });
+      }
+
+      console.log("✅ Pickup request rejected successfully");
+      res.json({
+        success: true,
+        message: "Pickup request rejected successfully",
+      });
+    } catch (error) {
+      console.error("❌ Error rejecting pickup request:", error);
+      res.status(500).json({
         success: false,
-        message: "Pickup request not found",
+        message: "Failed to reject pickup request",
+        error: error.message,
       });
     }
-
-    connection.release();
-
-    console.log("✅ Pickup request rejected successfully");
-    res.json({
-      success: true,
-      message: "Pickup request rejected successfully",
-    });
-  } catch (error) {
-    console.error("❌ Error rejecting pickup request:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to reject pickup request",
-      error: error.message,
-    });
   }
-});
+);
 
 module.exports = router;

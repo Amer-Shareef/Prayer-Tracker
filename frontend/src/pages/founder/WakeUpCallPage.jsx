@@ -14,7 +14,8 @@ const WakeUpCallPage = () => {
   });
 
   const [filterStatus, setFilterStatus] = useState('all');
-  const [filterDate, setFilterDate] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
   const [filterPrayer, setFilterPrayer] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -26,22 +27,39 @@ const WakeUpCallPage = () => {
 
       // Build API parameters based on filters
       const params = {};
-      if (filterDate) params.date = filterDate;
+      if (filterDateFrom) {
+        params.date_from = filterDateFrom;
+        // If no end date, use same date for single day filter
+        if (!filterDateTo) {
+          params.date_to = filterDateFrom;
+        }
+      }
+      if (filterDateTo) {
+        params.date_to = filterDateTo;
+        // If no start date, use a reasonable default (30 days ago)
+        if (!filterDateFrom) {
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          params.date_from = thirtyDaysAgo.toISOString().split('T')[0];
+        }
+      }
       if (filterStatus !== 'all') params.status = filterStatus;
       if (filterPrayer !== 'all') params.prayer_type = filterPrayer;
+
+      console.log('API Parameters:', params);
 
       // Fetch calls and stats simultaneously
       const [callsResponse, statsResponse] = await Promise.all([
         wakeUpCallService.getWakeUpCalls(params),
-        wakeUpCallService.getWakeUpCallStats({
-          date_from: filterDate || undefined,
-          date_to: filterDate || undefined
-        })
+        wakeUpCallService.getWakeUpCallStats(params)
       ]);
 
       if (callsResponse.data.success) {
         setWakeCalls(callsResponse.data.data || []);
         console.log(`✅ Loaded ${callsResponse.data.data?.length || 0} wake-up calls`);
+      } else {
+        console.error('API Error:', callsResponse.data.message);
+        setError(callsResponse.data.message || 'Failed to fetch wake-up calls');
       }
 
       if (statsResponse.data.success) {
@@ -70,7 +88,7 @@ const WakeUpCallPage = () => {
   // Load data on component mount and when filters change
   useEffect(() => {
     fetchWakeUpCalls();
-  }, [filterStatus, filterDate, filterPrayer]);
+  }, [filterStatus, filterDateFrom, filterDateTo, filterPrayer]);
 
   // Statistics from API data
   const totalCalls = stats.total_calls || 0;
@@ -78,38 +96,86 @@ const WakeUpCallPage = () => {
   const declinedCalls = stats.declined_calls || 0;
   const noAnswerCalls = stats.no_answer_calls || 0;
 
-  // Client-side filtering for search term
+  // Format display data
+  const formatCallData = (call) => {
+    // Format call date properly
+    let formattedDate = 'N/A';
+    if (call.call_date) {
+      try {
+        const date = new Date(call.call_date);
+        formattedDate = date.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+      } catch (e) {
+        formattedDate = call.call_date;
+      }
+    }
+
+    // Format response time properly
+    let formattedResponseTime = '-';
+    if (call.response_time) {
+      try {
+        const responseDate = new Date(call.response_time);
+        formattedResponseTime = responseDate.toLocaleTimeString('en-US', { 
+          hour12: false, 
+          hour: '2-digit', 
+          minute: '2-digit',
+          second: '2-digit'
+        });
+      } catch (e) {
+        formattedResponseTime = call.response_time;
+      }
+    }
+
+    return {
+      id: call.id,
+      memberId: call.member_id || 'N/A',
+      memberName: call.username || 'Unknown User',
+      phone: call.phone || 'N/A',
+      callDate: formattedDate,
+      callTime: call.call_time?.substring(0, 5) || 'N/A', // Format HH:MM
+      prayerType: call.prayer_type || 'Fajr',
+      callStatus: call.call_response,
+      responseTime: formattedResponseTime,
+      createdAt: call.created_at
+    };
+  };
+
+  // Client-side filtering for search term (fix the filtering logic)
   const filteredCalls = wakeCalls.filter(call => {
     if (!searchTerm) return true;
     
     const searchLower = searchTerm.toLowerCase();
     return (
-      call.username?.toLowerCase().includes(searchLower) ||
-      call.member_id?.toLowerCase().includes(searchLower) ||
-      call.phone?.toLowerCase().includes(searchLower)
+      (call.username || '').toLowerCase().includes(searchLower) ||
+      (call.member_id || '').toLowerCase().includes(searchLower) ||
+      (call.phone || '').toLowerCase().includes(searchLower)
     );
   });
 
-  // Format display data
-  const formatCallData = (call) => ({
-    id: call.id,
-    memberId: call.member_id || 'N/A',
-    memberName: call.username || 'Unknown User',
-    phone: call.phone || 'N/A',
-    callDate: call.call_date,
-    callTime: call.call_time?.substring(0, 5) || 'N/A', // Format HH:MM
-    prayerType: call.prayer_type || 'Fajr',
-    callStatus: call.call_response,
-    responseTime: call.response_time ? 
-      new Date(call.response_time).toLocaleTimeString('en-US', { 
-        hour12: false, 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      }) : null,
-    createdAt: call.created_at
+  // Apply formatting to filtered calls
+  const displayCalls = filteredCalls.map(formatCallData);
+
+  // Client-side filtering for date range
+  const filteredByDate = displayCalls.filter(call => {
+    const callDate = new Date(call.callDate);
+    const fromDate = new Date(filterDateFrom);
+    const toDate = new Date(filterDateTo);
+
+    // If no date filters, include all calls
+    if (!filterDateFrom && !filterDateTo) return true;
+
+    // Check if call date is within the selected range
+    const isAfterFrom = !filterDateFrom || callDate >= fromDate;
+    const isBeforeTo = !filterDateTo || callDate <= toDate;
+
+    return isAfterFrom && isBeforeTo;
   });
 
-  const displayCalls = filteredCalls.map(formatCallData);
+  // Final display data after all filters
+  const finalDisplayCalls = filteredByDate;
 
   return (
     <FounderLayout>
@@ -146,7 +212,7 @@ const WakeUpCallPage = () => {
 
         {/* Filters */}
         <div className="bg-white p-4 rounded-lg shadow mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
               <input
@@ -159,11 +225,36 @@ const WakeUpCallPage = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date From</label>
               <input
                 type="date"
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
+                value={filterDateFrom}
+                onChange={(e) => {
+                  const newDateFrom = e.target.value;
+                  setFilterDateFrom(newDateFrom);
+                  // Auto-adjust "Date To" if it's before "Date From"
+                  if (filterDateTo && newDateFrom > filterDateTo) {
+                    setFilterDateTo(newDateFrom);
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date To</label>
+              <input
+                type="date"
+                value={filterDateTo}
+                onChange={(e) => {
+                  const newDateTo = e.target.value;
+                  setFilterDateTo(newDateTo);
+                  // Auto-adjust "Date From" if it's after "Date To"
+                  if (filterDateFrom && newDateTo < filterDateFrom) {
+                    setFilterDateFrom(newDateTo);
+                  }
+                }}
+                min={filterDateFrom || undefined}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -202,7 +293,8 @@ const WakeUpCallPage = () => {
               <button
                 onClick={() => {
                   setSearchTerm('');
-                  setFilterDate('');
+                  setFilterDateFrom('');
+                  setFilterDateTo('');
                   setFilterStatus('all');
                   setFilterPrayer('all');
                 }}
@@ -237,7 +329,7 @@ const WakeUpCallPage = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {displayCalls.map((call) => (
+                  {finalDisplayCalls.map((call) => (
                     <tr key={call.id} className="hover:bg-gray-50">
                       {/* Member Info */}
                       <td className="px-4 py-4 whitespace-nowrap">
@@ -284,7 +376,7 @@ const WakeUpCallPage = () => {
               </table>
             </div>
 
-            {displayCalls.length === 0 && !loading && (
+            {finalDisplayCalls.length === 0 && !loading && (
               <div className="text-center py-8">
                 <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
