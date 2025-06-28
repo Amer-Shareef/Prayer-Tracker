@@ -1,4 +1,4 @@
-import { memberAPI, meetingsService } from "./api";
+import { memberAPI } from "./api";
 
 const memberService = {
   // Add a new member
@@ -67,20 +67,6 @@ const memberService = {
       throw (
         error.response?.data || {
           message: "An error occurred while changing member status",
-        }
-      );
-    }
-  },
-
-  // Get members requiring counselling
-  getMembersForCounselling: async () => {
-    try {
-      const response = await meetingsService.getMembersForCounselling();
-      return response;
-    } catch (error) {
-      throw (
-        error.response?.data || {
-          message: "An error occurred while fetching members for counselling",
         }
       );
     }
