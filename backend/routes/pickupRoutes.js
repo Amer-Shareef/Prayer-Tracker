@@ -5,7 +5,7 @@ const { dbHealthCheck } = require("../middleware/dbHealthCheck"); // Added dbHea
 
 const router = express.Router();
 
-// Get pickup requests for user - COMPLETELY REWRITTEN APPROACH
+// Get pickup requests for user - ENHANCED to support founder/admin view
 router.get(
   "/pickup-requests",
   authenticateToken,
@@ -13,24 +13,68 @@ router.get(
   async (req, res) => {
     try {
       const { user } = req;
-      const { status, start_date, end_date, limit = 50 } = req.query;
+      const { status, start_date, end_date, limit = 50, all } = req.query;
 
-      console.log("🔍 Raw query params:", {
+      console.log("🔍 Pickup requests query:", {
+        user: user.username,
+        role: user.role,
         status,
         start_date,
         end_date,
         limit,
-        limitType: typeof limit,
+        all,
+        requestAll: all === "true",
       });
 
-      // Build query dynamically WITHOUT using LIMIT in prepared statement
-      let query = `
-      SELECT pr.*, m.name as mosque_name
-      FROM pickup_requests pr
-      LEFT JOIN mosques m ON pr.mosque_id = m.id
-      WHERE pr.user_id = ?
-    `;
-      const queryParams = [user.id];
+      // Build query based on user role and 'all' parameter
+      let query;
+      let queryParams = [];
+
+      if (
+        all === "true" &&
+        (user.role === "Founder" || user.role === "SuperAdmin")
+      ) {
+        // Founders and SuperAdmins can see all pickup requests
+        query = `
+          SELECT pr.*, 
+                 u.username as member_username,
+                 u.phone as member_phone,
+                 u.email as member_email,
+                 u.full_name as member_name,
+                 CONCAT(UPPER(LEFT(COALESCE(u.area, 'GEN'), 2)), LPAD(u.id, 4, '0')) as member_id,
+                 m.name as mosque_name
+          FROM pickup_requests pr
+          LEFT JOIN users u ON pr.user_id = u.id
+          LEFT JOIN mosques m ON pr.mosque_id = m.id
+          WHERE pr.mosque_id = ?
+        `;
+
+        // Get user's mosque_id or use 1 as default
+        const userMosqueId = user.mosque_id || 1;
+        queryParams.push(userMosqueId);
+
+        console.log(
+          `👑 Admin/Founder getting all requests for mosque ${userMosqueId}`
+        );
+      } else {
+        // Regular members see only their own requests
+        query = `
+          SELECT pr.*, 
+                 u.username as member_username,
+                 u.phone as member_phone,
+                 u.email as member_email,
+                 u.full_name as member_name,
+                 CONCAT(UPPER(LEFT(COALESCE(u.area, 'GEN'), 2)), LPAD(u.id, 4, '0')) as member_id,
+                 m.name as mosque_name
+          FROM pickup_requests pr
+          LEFT JOIN users u ON pr.user_id = u.id
+          LEFT JOIN mosques m ON pr.mosque_id = m.id
+          WHERE pr.user_id = ?
+        `;
+        queryParams.push(user.id);
+
+        console.log(`👤 Member getting own requests for user ${user.id}`);
+      }
 
       // Add status filter
       if (status) {
@@ -40,24 +84,24 @@ router.get(
 
       // Add date range filter
       if (start_date) {
-        query += " AND pr.request_date >= ?";
+        query += " AND pr.created_at >= ?";
         queryParams.push(start_date);
       }
 
       if (end_date) {
-        query += " AND pr.request_date <= ?";
+        query += " AND pr.created_at <= ?";
         queryParams.push(end_date);
       }
 
-      query += " ORDER BY pr.request_date DESC, pr.created_at DESC";
+      query += " ORDER BY pr.created_at DESC, pr.id DESC";
 
-      console.log("🔍 Query without LIMIT:", query);
+      console.log("🔍 Final query:", query);
       console.log("📋 Query params:", queryParams);
 
-      // Execute query first WITHOUT LIMIT
+      // Execute query WITHOUT LIMIT in SQL
       const [allResults] = await pool.execute(query, queryParams);
 
-      // Apply LIMIT in JavaScript instead of SQL
+      // Apply LIMIT in JavaScript
       const limitValue = parseInt(limit, 10);
       const results =
         isNaN(limitValue) || limitValue <= 0
@@ -68,22 +112,30 @@ router.get(
         `✅ Found ${allResults.length} total requests, returning ${results.length} with limit ${limitValue}`
       );
 
+      // Log sample data for debugging
+      if (results.length > 0) {
+        console.log("📋 Sample request data:", {
+          id: results[0].id,
+          user_id: results[0].user_id,
+          member_name: results[0].member_name || results[0].member_username,
+          pickup_location: results[0].pickup_location,
+          status: results[0].status,
+          created_at: results[0].created_at,
+        });
+      }
+
       res.json({
         success: true,
         data: results,
         count: results.length,
         total: allResults.length,
+        userRole: user.role,
+        viewingAll:
+          all === "true" &&
+          (user.role === "Founder" || user.role === "SuperAdmin"),
       });
     } catch (error) {
       console.error("❌ Error fetching pickup requests:", error);
-      console.error("Full error details:", {
-        message: error.message,
-        code: error.code,
-        errno: error.errno,
-        sqlState: error.sqlState,
-        sql: error.sql,
-      });
-
       res.status(500).json({
         success: false,
         message: "Failed to fetch pickup requests",
@@ -201,7 +253,7 @@ router.post(
        (user_id, mosque_id, prayer_type, pickup_location, 
         special_instructions, contact_number,
         device_info, app_version, location_coordinates, days, prayers, status, created_at)
-       VALUES (?, ?, 'Fajr', ?, ?, ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)`,
+       VALUES (?, ?, 'Fajr', ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)`,
         [
           user.id,
           mosqueId,
@@ -498,5 +550,112 @@ router.delete(
     }
   }
 );
+
+// PUT /api/pickup-requests/:id/approve - Approve pickup request and assign driver
+router.put("/:id/approve", async (req, res) => {
+  const requestId = req.params.id;
+  const { assignedDriverId, assignedDriverName } = req.body;
+
+  console.log(
+    "🟢 Approving pickup request:",
+    requestId,
+    "with driver:",
+    assignedDriverName
+  );
+
+  try {
+    const connection = await pool.getConnection();
+
+    // Update the pickup request with approval and driver assignment
+    const [result] = await connection.query(
+      `
+      UPDATE pickup_requests 
+      SET 
+        status = 'approved',
+        assigned_driver_id = ?,
+        assigned_driver_name = ?,
+        approved_at = NOW()
+      WHERE id = ?
+    `,
+      [assignedDriverId, assignedDriverName, requestId]
+    );
+
+    if (result.affectedRows === 0) {
+      connection.release();
+      return res.status(404).json({
+        success: false,
+        message: "Pickup request not found",
+      });
+    }
+
+    connection.release();
+
+    console.log("✅ Pickup request approved successfully");
+    res.json({
+      success: true,
+      message: "Pickup request approved successfully",
+    });
+  } catch (error) {
+    console.error("❌ Error approving pickup request:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to approve pickup request",
+      error: error.message,
+    });
+  }
+});
+
+// PUT /api/pickup-requests/:id/reject - Reject pickup request
+router.put("/:id/reject", async (req, res) => {
+  const requestId = req.params.id;
+  const { rejectionReason } = req.body;
+
+  console.log(
+    "🔴 Rejecting pickup request:",
+    requestId,
+    "reason:",
+    rejectionReason
+  );
+
+  try {
+    const connection = await pool.getConnection();
+
+    // Update the pickup request with rejection
+    const [result] = await connection.query(
+      `
+      UPDATE pickup_requests 
+      SET 
+        status = 'rejected',
+        rejection_reason = ?,
+        rejected_at = NOW()
+      WHERE id = ?
+    `,
+      [rejectionReason, requestId]
+    );
+
+    if (result.affectedRows === 0) {
+      connection.release();
+      return res.status(404).json({
+        success: false,
+        message: "Pickup request not found",
+      });
+    }
+
+    connection.release();
+
+    console.log("✅ Pickup request rejected successfully");
+    res.json({
+      success: true,
+      message: "Pickup request rejected successfully",
+    });
+  } catch (error) {
+    console.error("❌ Error rejecting pickup request:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reject pickup request",
+      error: error.message,
+    });
+  }
+});
 
 module.exports = router;

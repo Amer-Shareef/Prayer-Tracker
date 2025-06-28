@@ -50,16 +50,7 @@ const FounderDashboard = () => {
   const [feeds, setFeeds] = useState([]);
   const [feedsLoading, setFeedsLoading] = useState(true);
   const [feedsError, setFeedsError] = useState(null);
-  
-  // Member engagement stats
-  const [memberStats, setMemberStats] = useState({
-    total: 250,
-    active: 186,
-    new: 12,
-    engaged: 145,
-    prayerCompletion: 72
-  });
-  
+    
   const [currentDate, setCurrentDate] = useState({
     gregorian: 'Thursday, May 8, 2025',
     hijri: '15 Shawwal 1447'
@@ -115,8 +106,8 @@ const FounderDashboard = () => {
           </p>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Attendance Overview Card */}
+        <div className="grid grid-cols-1 gap-6 mb-6">
+          {/* Attendance Overview Card - Now full width */}
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Attendance Overview</h2>
@@ -161,53 +152,6 @@ const FounderDashboard = () => {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-          
-          {/* Member Stats Card */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Member Engagement</h2>
-              <button className="text-green-600 hover:text-green-800 text-sm font-medium">
-                Export Data
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="text-center">
-                <h3 className="text-3xl font-bold text-gray-900">{memberStats.total}</h3>
-                <p className="text-sm text-gray-500">Total Members</p>
-              </div>
-              <div className="text-center">
-                <h3 className="text-3xl font-bold text-gray-900">{memberStats.active}</h3>
-                <p className="text-sm text-gray-500">Active Members</p>
-              </div>
-              <div className="text-center">
-                <h3 className="text-3xl font-bold text-green-600">+{memberStats.new}</h3>
-                <p className="text-sm text-gray-500">New This Month</p>
-              </div>
-              <div className="text-center">
-                <h3 className="text-3xl font-bold text-gray-900">{memberStats.prayerCompletion}%</h3>
-                <p className="text-sm text-gray-500">Prayer Completion</p>
-              </div>
-            </div>
-            
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-bold text-gray-700 mb-2">Engagement Insights</h3>
-              <ul className="space-y-2">
-                <li className="flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                  </svg>
-                  <span>Fajr attendance improved by 12% this week</span>
-                </li>
-                <li className="flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
-                  </svg>
-                  <span>Isha attendance dropped by 8% this week</span>
-                </li>
-              </ul>
             </div>
           </div>
         </div>
