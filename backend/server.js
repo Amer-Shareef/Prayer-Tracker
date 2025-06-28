@@ -54,9 +54,10 @@ const pickupRoutes = require("./routes/pickupRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const dailyActivitiesRoutes = require("./routes/dailyActivitiesRoutes");
 const feedsRoutes = require("./routes/feedsRoutes");
-const wakeUpCallRoutes = require("./routes/wakeUpCallRoutes"); // Add this line
+const wakeUpCallRoutes = require("./routes/wakeUpCallRoutes");
+const meetingRoutes = require("./routes/meetingRoutes");
 
-// Use routes
+// Use routes - Make sure meetingRoutes is properly registered
 app.use("/api", authRoutes);
 app.use("/api", userRoutes);
 app.use("/api", mosqueRoutes);

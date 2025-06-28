@@ -335,94 +335,62 @@ export const announcementService = {
 
 // Enhanced pickup service for mobile-first workflow
 export const pickupService = {
-  // Create pickup request with enhanced mobile data
-  createPickupRequest: async (requestData) => {
-    try {
-      // Create enhanced data with the original request data
-      const enhancedData = { ...requestData };
-
-      // Remove undefined fields to keep request clean
-      Object.keys(enhancedData).forEach((key) => {
-        if (enhancedData[key] === undefined) {
-          delete enhancedData[key];
-        }
-      });
-
-      // Add location coordinates if geolocation is available
-      if (navigator.geolocation) {
-        try {
-          const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              timeout: 5000,
-              enableHighAccuracy: true,
-            });
-          });
-
-          enhancedData.location_coordinates = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-          };
-        } catch (geoError) {
-          console.log("⚠️ Geolocation not available:", geoError.message);
-        }
-      }
-
-      const response = await api.post("/pickup-requests", enhancedData);
-      console.log("✅ Enhanced pickup request created:", response.data);
-      return response;
-    } catch (error) {
-      console.error("❌ Enhanced pickup request creation failed:", error);
-      throw error;
-    }
-  },
-
-  // Get pickup requests - FIXED to ensure proper parameter types
+  // Get pickup requests (for both members and founders)
   getPickupRequests: async (params = {}) => {
     try {
-      console.log("📤 Fetching pickup requests with params:", params);
+      console.log("🔄 Getting pickup requests with params:", params);
+      const queryParams = new URLSearchParams(params).toString();
+      const url = `/pickup-requests${queryParams ? `?${queryParams}` : ""}`;
+      console.log("📡 API URL:", url);
 
-      // Ensure limit is a number when passed
-      const cleanParams = { ...params };
-      if (cleanParams.limit) {
-        cleanParams.limit = parseInt(cleanParams.limit, 10);
-        console.log("🔧 Converted limit to integer:", cleanParams.limit);
-      }
-
-      const response = await api.get("/pickup-requests", {
-        params: cleanParams,
-      });
-      console.log("✅ Pickup requests response:", response.data);
+      const response = await api.get(url);
+      console.log("📥 Pickup requests response:", response.data);
       return response;
     } catch (error) {
       console.error("❌ Failed to fetch pickup requests:", error);
-      console.error("Request config:", error.config);
       throw error;
     }
   },
 
-  // Update pickup request status (for members to cancel)
-  updatePickupRequest: async (requestId, updateData) => {
+  // Get ALL pickup requests (for founders/admin - not just user's own) - MISSING METHOD ADDED
+  getAllPickupRequests: async (params = {}) => {
     try {
-      // Handle optional days and prayers in updates
-      const cleanUpdateData = { ...updateData };
+      console.log("🔄 Getting ALL pickup requests (admin/founder view)");
+      const queryParams = new URLSearchParams({
+        all: "true", // Flag to get all requests, not just user's own
+        ...params,
+      }).toString();
+      const url = `/pickup-requests?${queryParams}`;
+      console.log("📡 Admin API URL:", url);
 
-      if (cleanUpdateData.days && Array.isArray(cleanUpdateData.days)) {
-        cleanUpdateData.days = cleanUpdateData.days.map((day) =>
-          day.toLowerCase()
-        );
-      }
+      const response = await api.get(url);
+      console.log("📥 All pickup requests response:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to fetch all pickup requests:", error);
+      throw error;
+    }
+  },
 
-      if (cleanUpdateData.prayers && Array.isArray(cleanUpdateData.prayers)) {
-        cleanUpdateData.prayers = cleanUpdateData.prayers.map((prayer) =>
-          prayer.toLowerCase()
-        );
-      }
+  // Create pickup request
+  createPickupRequest: async (requestData) => {
+    try {
+      console.log("📤 Creating pickup request:", requestData);
+      const response = await api.post("/pickup-requests", requestData);
+      console.log("✅ Pickup request created:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to create pickup request:", error);
+      throw error;
+    }
+  },
 
-      const response = await api.put(
-        `/pickup-requests/${requestId}`,
-        cleanUpdateData
-      );
+  // Update pickup request
+  updatePickupRequest: async (id, requestData) => {
+    try {
+      console.log(`📤 Updating pickup request ${id}:`, requestData);
+      const response = await api.put(`/pickup-requests/${id}`, requestData);
+      console.log("✅ Pickup request updated:", response.data);
       return response;
     } catch (error) {
       console.error("❌ Failed to update pickup request:", error);
@@ -430,25 +398,62 @@ export const pickupService = {
     }
   },
 
-  // Cancel pickup request - ENHANCED with better logging
-  cancelPickupRequest: async (requestId) => {
+  // Delete pickup request
+  deletePickupRequest: async (id) => {
     try {
-      console.log(`📤 Cancelling pickup request ID: ${requestId}`);
-
-      const response = await api.delete(`/pickup-requests/${requestId}`);
-
-      console.log("✅ Cancel request response:", response.data);
-
-      if (response.data.success) {
-        console.log(`✅ Request ${requestId} cancelled successfully`);
-      } else {
-        console.log(`❌ Cancel failed: ${response.data.message}`);
-      }
-
+      console.log(`🗑️ Deleting pickup request ${id}`);
+      const response = await api.delete(`/pickup-requests/${id}`);
+      console.log("✅ Pickup request deleted:", response.data);
       return response;
     } catch (error) {
-      console.error("❌ Failed to cancel pickup request:", error);
-      console.error("Request config:", error.config);
+      console.error("❌ Failed to delete pickup request:", error);
+      throw error;
+    }
+  },
+
+  // Approve pickup request with driver assignment
+  approvePickupRequest: async (
+    requestId,
+    assignedDriverId,
+    assignedDriverName
+  ) => {
+    try {
+      console.log(
+        "🟢 Approving pickup request:",
+        requestId,
+        "with driver:",
+        assignedDriverName
+      );
+      const response = await api.put(`/pickup-requests/${requestId}/approve`, {
+        assignedDriverId,
+        assignedDriverName,
+      });
+      console.log("✅ Pickup request approved:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to approve pickup request:", error);
+      console.error("Error details:", error.response?.data);
+      throw error;
+    }
+  },
+
+  // Reject pickup request
+  rejectPickupRequest: async (requestId, rejectionReason) => {
+    try {
+      console.log(
+        "🔴 Rejecting pickup request:",
+        requestId,
+        "reason:",
+        rejectionReason
+      );
+      const response = await api.put(`/pickup-requests/${requestId}/reject`, {
+        rejectionReason,
+      });
+      console.log("✅ Pickup request rejected:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to reject pickup request:", error);
+      console.error("Error details:", error.response?.data);
       throw error;
     }
   },
@@ -598,6 +603,209 @@ export const wakeUpCallService = {
       return response;
     } catch (error) {
       console.error("❌ Failed to record wake-up call:", error);
+      throw error;
+    }
+  },
+};
+
+// Meetings service - ENHANCED for counselling functionality
+export const meetingsService = {
+  // Get members requiring counselling (attendance < 70%)
+  getMembersForCounselling: async (params = {}) => {
+    try {
+      console.log("📅 Fetching members for counselling with params:", params);
+
+      const response = await api.get("/members-for-counselling", { params });
+      console.log("✅ Members for counselling response:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to fetch members for counselling:", error);
+      throw error;
+    }
+  },
+
+  // Get counselling sessions
+  getCounsellingSessions: async (params = {}) => {
+    try {
+      console.log("📅 Fetching counselling sessions with params:", params);
+
+      const response = await api.get("/counselling-sessions", { params });
+      console.log("✅ Counselling sessions response:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to fetch counselling sessions:", error);
+      throw error;
+    }
+  },
+
+  // Schedule counselling session
+  scheduleCounsellingSession: async (sessionData) => {
+    try {
+      console.log("📅 Scheduling counselling session:", sessionData);
+      const response = await api.post("/counselling-sessions", sessionData);
+      console.log("✅ Counselling session scheduled:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to schedule counselling session:", error);
+      throw error;
+    }
+  },
+
+  // Update counselling session
+  updateCounsellingSession: async (sessionId, updateData) => {
+    try {
+      console.log("🔄 Updating counselling session:", sessionId, updateData);
+      const response = await api.put(
+        `/counselling-sessions/${sessionId}`,
+        updateData
+      );
+      console.log("✅ Counselling session updated:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to update counselling session:", error);
+      throw error;
+    }
+  },
+
+  // Delete counselling session
+  deleteCounsellingSession: async (sessionId) => {
+    try {
+      console.log("🗑️ Deleting counselling session:", sessionId);
+      const response = await api.delete(`/counselling-sessions/${sessionId}`);
+      console.log("✅ Counselling session deleted:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to delete counselling session:", error);
+      throw error;
+    }
+  },
+
+  // Alias for backward compatibility
+  deleteMeeting: async (sessionId) => {
+    return meetingsService.deleteCounsellingSession(sessionId);
+  },
+
+  // Get counselling statistics
+  getCounsellingStats: async (params = {}) => {
+    try {
+      console.log("📊 Fetching counselling stats with params:", params);
+
+      const response = await api.get("/counselling-sessions/stats", { params });
+      console.log("✅ Counselling stats response:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to fetch counselling stats:", error);
+      throw error;
+    }
+  },
+
+  // Get meetings with optional filters
+  getMeetings: async (params = {}) => {
+    try {
+      console.log("📅 Fetching meetings with params:", params);
+
+      const response = await api.get("/meetings", { params });
+      console.log("✅ Meetings response:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to fetch meetings:", error);
+      throw error;
+    }
+  },
+
+  // Create or update a meeting
+  upsertMeeting: async (meetingData) => {
+    try {
+      console.log("📅 Saving meeting data:", meetingData);
+
+      const response = await api.post("/meetings", meetingData);
+      console.log("✅ Meeting saved:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to save meeting:", error);
+      throw error;
+    }
+  },
+
+  // Delete a meeting
+  deleteMeeting: async (meetingId) => {
+    try {
+      console.log("🗑️ Deleting meeting ID:", meetingId);
+
+      const response = await api.delete(`/meetings/${meetingId}`);
+      console.log("✅ Meeting deleted:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to delete meeting:", error);
+      throw error;
+    }
+  },
+
+  // Get all members (for meetings page)
+  getAllMembers: async () => {
+    try {
+      console.log("🌐 API Call: Getting all members from /all-members");
+      const response = await api.get("/all-members");
+      console.log("📥 All members API response:", response);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to fetch all members:", error);
+      console.error("Error details:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      throw error;
+    }
+  },
+};
+
+// Feeds service - ADD this service that's missing
+export const feedsService = {
+  getFeeds: async (params = {}) => {
+    try {
+      console.log("📰 Fetching feeds with params:", params);
+      const response = await api.get("/feeds", { params });
+      console.log("✅ Feeds response:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to fetch feeds:", error);
+      throw error;
+    }
+  },
+
+  createFeed: async (feedData) => {
+    try {
+      console.log("📰 Creating feed:", feedData);
+      const response = await api.post("/feeds", feedData);
+      console.log("✅ Feed created:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to create feed:", error);
+      throw error;
+    }
+  },
+
+  updateFeed: async (feedId, feedData) => {
+    try {
+      console.log("📰 Updating feed:", feedId, feedData);
+      const response = await api.put(`/feeds/${feedId}`, feedData);
+      console.log("✅ Feed updated:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to update feed:", error);
+      throw error;
+    }
+  },
+
+  deleteFeed: async (feedId) => {
+    try {
+      console.log("🗑️ Deleting feed:", feedId);
+      const response = await api.delete(`/feeds/${feedId}`);
+      console.log("✅ Feed deleted:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to delete feed:", error);
       throw error;
     }
   },
