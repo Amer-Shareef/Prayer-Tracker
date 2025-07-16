@@ -8,9 +8,8 @@ export const getRedirectPathForRole = (role) => {
     case "Member":
       return "/member/dashboard";
     case "Founder":
-      return "/founder/dashboard";
     case "SuperAdmin":
-      return "/superadmin/dashboard";
+      return "/founder/dashboard";
     default:
       return "/login";
   }

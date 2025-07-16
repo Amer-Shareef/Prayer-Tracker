@@ -34,10 +34,16 @@ router.get(
       let queryParams = [];
 
       // If founder, only show members from their mosque
+      // If superadmin, show all members
       if (user.role === "Founder") {
         query += ` WHERE u.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)`;
         queryParams.push(user.id);
+      } else if (user.role === "Member") {
+        // Members should only see their own data (if this route is accessible to them)
+        query += ` WHERE u.id = ?`;
+        queryParams.push(user.id);
       }
+      // SuperAdmin sees all members (no WHERE clause added)
 
       query += ` GROUP BY u.id ORDER BY u.created_at DESC`;
 
@@ -139,14 +145,26 @@ router.post(
         });
       }
 
-      // Get founder's mosque ID
+      // Get mosque ID for new member
       let mosqueId = null;
       if (user.role === "Founder") {
-        const [founderData] = await pool.execute(
+        // Founders add members to their own mosque
+        const [userData] = await pool.execute(
           "SELECT mosque_id FROM users WHERE id = ?",
           [user.id]
         );
-        mosqueId = founderData[0]?.mosque_id;
+        mosqueId = userData[0]?.mosque_id;
+      } else if (user.role === "SuperAdmin") {
+        // SuperAdmins can specify mosque_id in request body, or use their own if available
+        if (req.body.mosque_id) {
+          mosqueId = req.body.mosque_id;
+        } else {
+          const [userData] = await pool.execute(
+            "SELECT mosque_id FROM users WHERE id = ?",
+            [user.id]
+          );
+          mosqueId = userData[0]?.mosque_id;
+        }
       }
 
       // Hash password
@@ -224,15 +242,17 @@ router.put(
       const { username, email, phone, role, status } = req.body;
       const { user } = req;
 
-      // Check if member exists and belongs to founder's mosque (if founder)
+      // Check if member exists and access permissions
       let checkQuery = "SELECT * FROM users WHERE id = ?";
       let checkParams = [id];
 
       if (user.role === "Founder") {
+        // Founders can only edit members from their mosque
         checkQuery +=
           " AND mosque_id = (SELECT mosque_id FROM users WHERE id = ?)";
         checkParams.push(user.id);
       }
+      // SuperAdmin can edit any member (no additional WHERE clause)
 
       const [existingMember] = await pool.execute(checkQuery, checkParams);
 
@@ -293,15 +313,17 @@ router.delete(
       const { id } = req.params;
       const { user } = req;
 
-      // Check if member exists and belongs to founder's mosque (if founder)
+      // Check if member exists and access permissions
       let checkQuery = "SELECT * FROM users WHERE id = ?";
       let checkParams = [id];
 
       if (user.role === "Founder") {
+        // Founders can only delete members from their mosque
         checkQuery +=
           " AND mosque_id = (SELECT mosque_id FROM users WHERE id = ?)";
         checkParams.push(user.id);
       }
+      // SuperAdmin can delete any member (no additional WHERE clause)
 
       const [existingMember] = await pool.execute(checkQuery, checkParams);
 
@@ -334,6 +356,54 @@ router.delete(
         success: false,
         message: "Failed to delete member",
         error: error.message,
+      });
+    }
+  }
+);
+
+// Get founders from the same mosque (for mentor selection)
+router.get(
+  "/founders",
+  authenticateToken,
+  authorizeRole(["Founder", "SuperAdmin"]),
+  async (req, res) => {
+    try {
+      const { user } = req;
+
+      let query = `
+      SELECT u.id, u.full_name as fullName, u.username, u.email, u.phone, u.role, u.status, 
+             u.joined_date, u.last_login, u.created_at, u.mosque_id,
+             m.name as mosque_name
+      FROM users u
+      LEFT JOIN mosques m ON u.mosque_id = m.id
+      WHERE u.role = 'Founder' AND u.status = 'active'
+    `;
+      let queryParams = [];
+
+      // If founder, only show founders from their mosque (excluding themselves)
+      if (user.role === "Founder") {
+        query += ` AND u.mosque_id = (SELECT mosque_id FROM users WHERE id = ?) AND u.id != ?`;
+        queryParams.push(user.id, user.id);
+      } else if (user.role === "SuperAdmin") {
+        // SuperAdmin can see all founders
+        query += ` ORDER BY u.created_at DESC`;
+      }
+
+      query += ` ORDER BY u.full_name, u.username`;
+
+      const [founders] = await pool.execute(query, queryParams);
+
+      console.log(`✅ Found ${founders.length} founders for mentor selection`);
+      res.json({
+        success: true,
+        data: founders,
+      });
+    } catch (error) {
+      console.error("❌ Error fetching founders:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch founders",
+        details: error.message,
       });
     }
   }

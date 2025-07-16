@@ -54,10 +54,10 @@ const pickupRoutes = require("./routes/pickupRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const dailyActivitiesRoutes = require("./routes/dailyActivitiesRoutes");
 const feedsRoutes = require("./routes/feedsRoutes");
-const wakeUpCallRoutes = require("./routes/wakeUpCallRoutes");
+const wakeUpCallRoutes = require("./routes/wakeUpCallRoutes"); // Add this line
 const meetingRoutes = require("./routes/meetingRoutes");
 
-// Use routes - Make sure meetingRoutes is properly registered
+// Use routes
 app.use("/api", authRoutes);
 app.use("/api", userRoutes);
 app.use("/api", mosqueRoutes);
@@ -66,32 +66,10 @@ app.use("/api", announcementRoutes);
 app.use("/api", pickupRoutes);
 app.use("/api", memberRoutes);
 app.use("/api", adminRoutes);
+app.use("/api", meetingRoutes);
 app.use("/api/daily-activities", dailyActivitiesRoutes);
 app.use("/api/feeds", feedsRoutes);
 app.use("/api", wakeUpCallRoutes);
-app.use("/api", meetingRoutes); // This registers all /api/counselling-sessions routes
-
-// Add debugging middleware to see what routes are registered
-app.use("/api/*", (req, res, next) => {
-  console.log(`🔍 API Request: ${req.method} ${req.originalUrl}`);
-  next();
-});
-
-// Add a catch-all for missing API routes
-app.use("/api/*", (req, res) => {
-  console.log(`❌ Route not found: ${req.method} ${req.originalUrl}`);
-  res.status(404).json({
-    success: false,
-    message: `Route ${req.method} ${req.originalUrl} not found`,
-    availableRoutes: [
-      "GET /api/counselling-sessions",
-      "POST /api/counselling-sessions",
-      "PUT /api/counselling-sessions/:id",
-      "DELETE /api/counselling-sessions/:id",
-      "GET /api/members-for-counselling",
-    ],
-  });
-});
 
 // Enhanced health endpoint
 app.get("/api/health", async (req, res) => {
@@ -133,7 +111,7 @@ app.get("/api/health", async (req, res) => {
         uptime: process.uptime(),
         memory: process.memoryUsage(),
         version: process.version,
-        host: process.env.HOST || "13.60.193.171",
+        host: process.env.HOST || "localhost",
         port: process.env.PORT || 5000,
       },
       environment: process.env.NODE_ENV || "development",
@@ -191,7 +169,7 @@ app.get("/api/monitor", async (req, res) => {
 
 // Test connection on startup
 const PORT = process.env.PORT || 5000;
-const HOST = process.env.HOST || "13.60.193.171";
+const HOST = process.env.HOST || "localhost";
 
 app.listen(PORT, async () => {
   console.log(`🚀 Server running on http://${HOST}:${PORT}`);

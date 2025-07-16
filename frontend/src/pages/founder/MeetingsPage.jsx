@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FounderLayout from '../../components/layouts/FounderLayout';
-import { meetingsService } from '../../services/api';
+import { meetingsService, memberAPI } from '../../services/api';
 
 const MeetingsPage = () => {
   const navigate = useNavigate();
@@ -9,6 +9,7 @@ const MeetingsPage = () => {
   // State management
   const [members, setMembers] = useState([]);
   const [meetings, setMeetings] = useState([]);
+  const [availableMentors, setAvailableMentors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
@@ -26,7 +27,8 @@ const MeetingsPage = () => {
   
   const [scheduleForm, setScheduleForm] = useState({
     date: '',
-    time: ''
+    time: '',
+    mentorId: ''
   });
   
   const [completeForm, setCompleteForm] = useState({
@@ -37,22 +39,45 @@ const MeetingsPage = () => {
     fetchData();
   }, []);
 
+  const fetchAvailableMentors = async () => {
+    try {
+      // Fetch founders from the same mosque as the current user
+      const response = await memberAPI.getFounders();
+      if (response && response.success) {
+        return { success: true, data: response.data };
+      }
+      return { success: false, data: [] };
+    } catch (error) {
+      console.error('Error fetching mentors:', error);
+      return { success: false, data: [] };
+    }
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
       setError('');
       
-      const [membersResponse, meetingsResponse] = await Promise.all([
-        meetingsService.getMembersForCounselling().catch(() => ({ data: { success: false, data: [] } })),
-        meetingsService.getCounsellingSessions().catch(() => ({ data: { success: false, data: [] } }))
+      const [membersResponse, meetingsResponse, mentorsResponse] = await Promise.all([
+        memberAPI.getMembers().catch(() => ({ success: false, data: [] })),
+        meetingsService.getCounsellingSessions().catch(() => ({ data: { success: false, data: [] } })),
+        fetchAvailableMentors().catch(() => ({ success: false, data: [] }))
       ]);
 
-      if (membersResponse.data && membersResponse.data.success) {
-        setMembers(membersResponse.data.data || []);
+      if (membersResponse && membersResponse.success) {
+        // Filter to show only active members with Member role
+        const activeMembers = (membersResponse.data || []).filter(member => 
+          member.status === 'active' && member.role === 'Member'
+        );
+        setMembers(activeMembers);
       }
 
       if (meetingsResponse.data && meetingsResponse.data.success) {
         setMeetings(meetingsResponse.data.data || []);
+      }
+
+      if (mentorsResponse && mentorsResponse.success) {
+        setAvailableMentors(mentorsResponse.data || []);
       }
 
     } catch (err) {
@@ -65,7 +90,7 @@ const MeetingsPage = () => {
 
   const handleScheduleMeeting = (member) => {
     setSelectedMember(member);
-    setScheduleForm({ date: '', time: '' });
+    setScheduleForm({ date: '', time: '', mentorId: '' });
     setShowScheduleModal(true);
   };
 
@@ -116,17 +141,27 @@ const MeetingsPage = () => {
       return;
     }
 
+    if (!scheduleForm.mentorId) {
+      alert('Please select a mentor');
+      return;
+    }
+
     try {
       const sessionData = {
         memberId: selectedMember.id,
+        counsellorId: parseInt(scheduleForm.mentorId), // Ensure it's a number
         scheduledDate: scheduleForm.date,
         scheduledTime: scheduleForm.time,
         sessionType: 'phone_call',
         priority: 'medium',
-        preSessionNotes: `Meeting scheduled for ${selectedMember.memberName || selectedMember.username}`
+        preSessionNotes: `Meeting scheduled for ${selectedMember.memberName || selectedMember.username} with mentor`
       };
 
+      console.log('📤 Sending session data:', sessionData);
+
       const response = await meetingsService.scheduleCounsellingSession(sessionData);
+      
+      console.log('📥 Response:', response);
       
       if (response.data && response.data.success) {
         alert('Meeting scheduled successfully!');
@@ -134,11 +169,13 @@ const MeetingsPage = () => {
         setSelectedMember(null);
         await fetchData(); // Refresh data
       } else {
-        alert('Failed to schedule meeting');
+        console.error('❌ Failed response:', response);
+        alert(`Failed to schedule meeting: ${response.data?.message || 'Unknown error'}`);
       }
     } catch (err) {
-      console.error('Error scheduling:', err);
-      alert('Failed to schedule meeting');
+      console.error('❌ Error scheduling:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Unknown error occurred';
+      alert(`Failed to schedule meeting: ${errorMessage}`);
     }
   };
 
@@ -170,9 +207,31 @@ const MeetingsPage = () => {
     }
   };
 
+  // Helper function to calculate age from date of birth
+  const calculateAge = (dateOfBirth) => {
+    if (!dateOfBirth) return '-';
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  // Helper function to format date
+  const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    try {
+      return new Date(dateString).toLocaleDateString();
+    } catch {
+      return '-';
+    }
+  };
+
   // Filter members based on selected filter
   const getFilteredMembers = () => {
-    // For now, both filters show the same members since we only have low attendance members
     return members;
   };
 
@@ -278,6 +337,9 @@ const MeetingsPage = () => {
                           <p className="text-sm text-gray-600">
                             {new Date(meeting.scheduled_date).toLocaleDateString()} at {meeting.scheduled_time}
                           </p>
+                          <p className="text-sm text-gray-500">
+                            Mentor: {meeting.counsellor_full_name || meeting.counsellor_username || 'Not assigned'}
+                          </p>
                           <span className="inline-block px-2 py-1 text-xs rounded bg-blue-100 text-blue-800">
                             {meeting.status}
                           </span>
@@ -307,40 +369,84 @@ const MeetingsPage = () => {
           {/* Members Tab */}
           {activeTab === 'members' && (
             <div>
-              <div className="p-4 border-b flex justify-between items-center">
+              <div className="p-4 border-b">
                 <h2 className="text-lg font-semibold">Members</h2>
-                <div className="flex items-center space-x-4">
-                  
-                </div>
+                <p className="text-sm text-gray-600 mt-1">Active members available for meetings</p>
               </div>
-              <div className="p-4">
-                {getFilteredMembers().length === 0 ? (
-                  <p className="text-gray-500">No members found</p>
-                ) : (
-                  <div className="space-y-4">
-                    {getFilteredMembers().map((member) => (
-                      <div key={member.id} className="border rounded p-4 flex justify-between items-center">
-                        <div>
-                          <h3 className="font-medium">
-                            {member.memberName || member.full_name || member.username || 'Unknown Member'}
-                          </h3>
-                          <p className="text-sm text-gray-600">ID: {member.memberId}</p>
-                          <p className="text-sm text-gray-600">Phone: {member.phone || 'N/A'}</p>
-                          <p className={`text-sm ${member.attendanceRate < 70 ? 'text-red-600' : 'text-green-600'}`}>
-                            Attendance: {member.attendanceRate || 0}%
-                          </p>
-                        </div>
-                        <div>
-                          <button
-                            onClick={() => handleScheduleMeeting(member)}
-                            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                          >
-                            Schedule Meeting
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+              <div className="overflow-x-auto">
+                {loading ? (
+                  <div className="p-8 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="mt-2 text-gray-600">Loading members...</p>
                   </div>
+                ) : getFilteredMembers().length === 0 ? (
+                  <div className="p-8 text-center">
+                    <p className="text-gray-500">No active members found</p>
+                  </div>
+                ) : (
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Member Info
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Contact
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Address
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Prayer Attendance
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {getFilteredMembers().map((member) => (
+                        <tr key={member.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {member.full_name || member.username || 'Unknown'}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{member.email || '-'}</div>
+                            <div className="text-sm text-gray-500">{member.phone || '-'}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{member.address || '-'}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {member.attendanceRate ? `${member.attendanceRate}%` : 'N/A'}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {member.totalPrayers ? `${member.totalPrayers} prayers` : 'No data'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button
+                              onClick={() => handleScheduleMeeting(member)}
+                              className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 mr-2"
+                            >
+                              Schedule Meeting
+                            </button>
+                            <button
+                              onClick={() => navigate(`/founder/manage-members`)}
+                              className="bg-gray-600 text-white px-3 py-1 rounded text-xs hover:bg-gray-700"
+                            >
+                              View Profile
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
               </div>
             </div>
@@ -365,6 +471,9 @@ const MeetingsPage = () => {
                           </h3>
                           <p className="text-sm text-gray-600">
                             {new Date(meeting.scheduled_date).toLocaleDateString()} at {meeting.scheduled_time}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Mentor: {meeting.counsellor_full_name || meeting.counsellor_username || 'Not assigned'}
                           </p>
                           <span className="inline-block px-2 py-1 text-xs rounded bg-green-100 text-green-800">
                             {meeting.status}
@@ -420,6 +529,25 @@ const MeetingsPage = () => {
                       onChange={(e) => setScheduleForm({...scheduleForm, time: e.target.value})}
                       className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Assign Mentor</label>
+                    <select
+                      value={scheduleForm.mentorId}
+                      onChange={(e) => setScheduleForm({...scheduleForm, mentorId: e.target.value})}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    >
+                      <option value="">Select a mentor from your mosque</option>
+                      {availableMentors.map((mentor) => (
+                        <option key={mentor.id} value={mentor.id}>
+                          {mentor.fullName || mentor.username} ({mentor.email})
+                        </option>
+                      ))}
+                    </select>
+                    {availableMentors.length === 0 && (
+                      <p className="text-sm text-gray-500 mt-1">No mentors available from your mosque</p>
+                    )}
                   </div>
                 </div>
                 

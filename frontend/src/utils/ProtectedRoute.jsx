@@ -2,7 +2,7 @@ import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-const ProtectedRoute = ({ children, role }) => {
+const ProtectedRoute = ({ children, role, roles }) => {
   const { user, loading } = useAuth();
 
   // Show loading state or spinner while checking authentication
@@ -19,9 +19,10 @@ const ProtectedRoute = ({ children, role }) => {
     return <Navigate to="/login" />;
   }
 
-  // Check role - SIMPLIFIED
-  if (role) {
-    if (user.role !== role) {
+  // Check role - Support both single role and multiple roles
+  if (role || roles) {
+    const allowedRoles = roles || [role];
+    if (!allowedRoles.includes(user.role)) {
       return <Navigate to="/login" />;
     }
   }

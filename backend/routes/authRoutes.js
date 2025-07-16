@@ -475,7 +475,7 @@ router.post("/forgot-password", async (req, res) => {
 
     // Create reset link
     const resetLink = `${
-      process.env.FRONTEND_URL || "http://13.60.193.171:3000"
+      process.env.FRONTEND_URL || "http://localhost:3000"
     }/reset-password?token=${resetToken}`;
 
     // Send reset email via Gmail

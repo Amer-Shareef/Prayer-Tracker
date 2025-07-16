@@ -1,6 +1,6 @@
-import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import React from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const ProtectedRoute = ({ children, role }) => {
   const { user, isAuthenticated, loading } = useAuth();
@@ -16,17 +16,13 @@ const ProtectedRoute = ({ children, role }) => {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  // Check role authorization
+  } // Check role authorization
   if (role && user.role !== role) {
     // Redirect to appropriate dashboard based on user's actual role
-    if (user.role === 'Member') {
+    if (user.role === "Member") {
       return <Navigate to="/member/dashboard" replace />;
-    } else if (user.role === 'Founder') {
+    } else if (user.role === "Founder" || user.role === "SuperAdmin") {
       return <Navigate to="/founder/dashboard" replace />;
-    } else if (user.role === 'SuperAdmin') {
-      return <Navigate to="/superadmin/dashboard" replace />;
     } else {
       return <Navigate to="/login" replace />;
     }

@@ -91,11 +91,12 @@ router.get("/counselling-sessions", async (req, res) => {
 // POST /api/counselling-sessions - Create new counselling session
 router.post("/counselling-sessions", async (req, res) => {
   console.log("📝 Creating new counselling session");
+  console.log("📦 Request body:", req.body);
+
   try {
     const {
       memberId,
-      counsellorId = 2, // Default to user ID 2 if not provided
-      mosqueId = 1, // Default to mosque ID 1 if not provided
+      counsellorId,
       scheduledDate,
       scheduledTime,
       sessionType = "phone_call",
@@ -103,23 +104,43 @@ router.post("/counselling-sessions", async (req, res) => {
       preSessionNotes,
     } = req.body;
 
-    if (!memberId || !scheduledDate || !scheduledTime) {
+    console.log("🔍 Extracted data:", {
+      memberId,
+      counsellorId,
+      scheduledDate,
+      scheduledTime,
+      sessionType,
+      priority,
+    });
+
+    if (!memberId || !counsellorId || !scheduledDate || !scheduledTime) {
+      console.log("❌ Missing required fields:", {
+        memberId: !!memberId,
+        counsellorId: !!counsellorId,
+        scheduledDate: !!scheduledDate,
+        scheduledTime: !!scheduledTime,
+      });
       return res.status(400).json({
         success: false,
-        message: "Member ID, scheduled date, and time are required",
+        message:
+          "Member ID, counsellor ID, scheduled date, and time are required",
       });
     }
 
     const connection = await pool.getConnection();
+    console.log("🔗 Database connection established");
 
-    // Get member details
+    // Get member details including mosque_id
+    console.log("🔍 Looking up member:", memberId);
     const [memberDetails] = await connection.query(
       `
-      SELECT u.id, u.username, u.full_name, u.phone, u.email
+      SELECT u.id, u.username, u.full_name, u.phone, u.email, u.mosque_id
       FROM users u WHERE u.id = ?
     `,
       [memberId]
     );
+
+    console.log("👤 Member details:", memberDetails);
 
     if (memberDetails.length === 0) {
       connection.release();
@@ -131,7 +152,58 @@ router.post("/counselling-sessions", async (req, res) => {
 
     const member = memberDetails[0];
 
+    // Verify counsellor exists and is from the same mosque
+    console.log("🔍 Looking up counsellor:", counsellorId);
+    const [counsellorDetails] = await connection.query(
+      `
+      SELECT u.id, u.username, u.full_name, u.mosque_id
+      FROM users u WHERE u.id = ? AND u.role = 'Founder' AND u.status = 'active'
+    `,
+      [counsellorId]
+    );
+
+    console.log("👨‍🏫 Counsellor details:", counsellorDetails);
+
+    if (counsellorDetails.length === 0) {
+      connection.release();
+      return res.status(404).json({
+        success: false,
+        message: "Counsellor not found or not authorized",
+      });
+    }
+
+    const counsellor = counsellorDetails[0];
+
+    // Check if counsellor is from the same mosque as the member
+    console.log("🏛️ Mosque check:", {
+      memberMosqueId: member.mosque_id,
+      counsellorMosqueId: counsellor.mosque_id,
+      match: counsellor.mosque_id === member.mosque_id,
+    });
+
+    if (counsellor.mosque_id !== member.mosque_id) {
+      connection.release();
+      return res.status(403).json({
+        success: false,
+        message: "Counsellor must be from the same mosque as the member",
+      });
+    }
+
     // Create counselling session
+    console.log("💾 Creating counselling session with data:", {
+      memberId: member.id,
+      counsellorId,
+      mosqueId: member.mosque_id,
+      memberName: member.full_name || member.username,
+      memberPhone: member.phone,
+      memberEmail: member.email,
+      scheduledDate,
+      scheduledTime,
+      priority,
+      sessionType,
+      preSessionNotes,
+    });
+
     const [result] = await connection.query(
       `
       INSERT INTO counselling_sessions 
@@ -142,7 +214,7 @@ router.post("/counselling-sessions", async (req, res) => {
       [
         member.id,
         counsellorId,
-        mosqueId,
+        member.mosque_id,
         member.full_name || member.username,
         member.phone,
         member.email,
@@ -154,6 +226,7 @@ router.post("/counselling-sessions", async (req, res) => {
       ]
     );
 
+    console.log("💾 Database insert result:", result);
     connection.release();
 
     console.log(`✅ Created counselling session with ID: ${result.insertId}`);

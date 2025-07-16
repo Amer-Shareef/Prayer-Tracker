@@ -36,12 +36,22 @@ import TransportPage from "./pages/founder/TransportPage";
 import MosqueWorkPage from "./pages/founder/MosqueWorkPage";
 import KnowledgeProgramPage from "./pages/founder/KnowledgeProgramPage";
 import ScheduleMeeting from "./pages/founder/ScheduleMeeting";
+import AreaPage from "./pages/founder/AreaPage";
 
 // SuperAdmin Pages
 import SuperAdminDashboard from "./components/dashboard/SuperAdminDashboard";
+import SuperAdminDashboardComplete from "./components/dashboard/SuperAdminDashboardComplete";
 import AssignFounder from "./pages/superadmin/AssignFounder";
 import PromoteUser from "./pages/superadmin/PromoteUser";
 import ViewMosques from "./pages/superadmin/ViewMosques";
+import SuperAdminManageMembers from "./pages/superadmin/SuperAdminManageMembers";
+import SuperAdminPostFeeds from "./pages/superadmin/SuperAdminPostFeeds";
+import SuperAdminViewAttendance from "./pages/superadmin/SuperAdminViewAttendance";
+import SuperAdminTransportPage from "./pages/superadmin/SuperAdminTransportPage";
+import SuperAdminReminderPage from "./pages/superadmin/SuperAdminReminderPage";
+import SuperAdminMeetingsPage from "./pages/superadmin/SuperAdminMeetingsPage";
+import SuperAdminWakeUpCallPage from "./pages/superadmin/SuperAdminWakeUpCallPage";
+import SuperAdminKnowledgeProgramPage from "./pages/superadmin/SuperAdminKnowledgeProgramPage";
 
 // Test Page
 import TestPage from "./pages/TestPage";
@@ -56,7 +66,6 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/" element={<Navigate to="/login" replace />} />
-
           {/* Member Routes */}
           <Route
             path="/member"
@@ -129,13 +138,12 @@ function App() {
                 <ChangePassword />
               </ProtectedRoute>
             }
-          />
-
+          />{" "}
           {/* Founder Routes */}
           <Route
             path="/founder"
             element={
-              <ProtectedRoute role="Founder">
+              <ProtectedRoute roles={["Founder", "Admin"]}>
                 <Navigate to="/founder/dashboard" replace />
               </ProtectedRoute>
             }
@@ -143,7 +151,7 @@ function App() {
           <Route
             path="/founder/dashboard"
             element={
-              <ProtectedRoute role="Founder">
+              <ProtectedRoute roles={["Founder", "Admin"]}>
                 <FounderDashboard />
               </ProtectedRoute>
             }
@@ -151,7 +159,7 @@ function App() {
           <Route
             path="/founder/approve-pickup"
             element={
-              <ProtectedRoute role="Founder">
+              <ProtectedRoute roles={["Founder", "Admin"]}>
                 <ApprovePickup />
               </ProtectedRoute>
             }
@@ -159,7 +167,7 @@ function App() {
           <Route
             path="/founder/schedule-meeting"
             element={
-              <ProtectedRoute role="Founder">
+              <ProtectedRoute roles={["Founder", "Admin"]}>
                 <ScheduleMeeting />
               </ProtectedRoute>
             }
@@ -167,7 +175,7 @@ function App() {
           <Route
             path="/founder/post-feeds"
             element={
-              <ProtectedRoute role="Founder">
+              <ProtectedRoute roles={["Founder", "Admin"]}>
                 <PostFeeds />
               </ProtectedRoute>
             }
@@ -175,7 +183,7 @@ function App() {
           <Route
             path="/founder/view-attendance"
             element={
-              <ProtectedRoute role="Founder">
+              <ProtectedRoute roles={["Founder", "Admin"]}>
                 <ViewAttendance />
               </ProtectedRoute>
             }
@@ -183,7 +191,7 @@ function App() {
           <Route
             path="/founder/manage-members"
             element={
-              <ProtectedRoute role="Founder">
+              <ProtectedRoute roles={["Founder", "Admin"]}>
                 <ManageMembers />
               </ProtectedRoute>
             }
@@ -191,7 +199,7 @@ function App() {
           <Route
             path="/founder/add-member"
             element={
-              <ProtectedRoute role="Founder">
+              <ProtectedRoute roles={["Founder", "Admin"]}>
                 <AddMember />
               </ProtectedRoute>
             }
@@ -199,7 +207,7 @@ function App() {
           <Route
             path="/founder/send-reminder"
             element={
-              <ProtectedRoute role="Founder">
+              <ProtectedRoute roles={["Founder", "Admin"]}>
                 <SendReminder />
               </ProtectedRoute>
             }
@@ -207,7 +215,7 @@ function App() {
           <Route
             path="/founder/reminder"
             element={
-              <ProtectedRoute role="Founder">
+              <ProtectedRoute roles={["Founder", "Admin"]}>
                 <ReminderPage />
               </ProtectedRoute>
             }
@@ -215,7 +223,7 @@ function App() {
           <Route
             path="/founder/meetings"
             element={
-              <ProtectedRoute role="Founder">
+              <ProtectedRoute roles={["Founder", "Admin"]}>
                 <MeetingsPage />
               </ProtectedRoute>
             }
@@ -223,7 +231,7 @@ function App() {
           <Route
             path="/founder/wake-up-call"
             element={
-              <ProtectedRoute role="Founder">
+              <ProtectedRoute roles={["Founder", "Admin"]}>
                 <WakeUpCallPage />
               </ProtectedRoute>
             }
@@ -231,7 +239,7 @@ function App() {
           <Route
             path="/founder/transport"
             element={
-              <ProtectedRoute role="Founder">
+              <ProtectedRoute roles={["Founder", "Admin"]}>
                 <TransportPage />
               </ProtectedRoute>
             }
@@ -239,7 +247,7 @@ function App() {
           <Route
             path="/founder/mosque-work"
             element={
-              <ProtectedRoute role="Founder">
+              <ProtectedRoute roles={["Founder", "Admin"]}>
                 <MosqueWorkPage />
               </ProtectedRoute>
             }
@@ -247,12 +255,19 @@ function App() {
           <Route
             path="/founder/knowledge-program"
             element={
-              <ProtectedRoute role="Founder">
+              <ProtectedRoute roles={["Founder", "Admin"]}>
                 <KnowledgeProgramPage />
               </ProtectedRoute>
             }
           />
-
+          <Route
+            path="/founder/area"
+            element={
+              <ProtectedRoute role="SuperAdmin">
+                <AreaPage />
+              </ProtectedRoute>
+            }
+          />
           {/* SuperAdmin Routes - Use "SuperAdmin" to match database */}
           <Route
             path="/superadmin"
@@ -261,12 +276,12 @@ function App() {
                 <Navigate to="/superadmin/dashboard" replace />
               </ProtectedRoute>
             }
-          />
+          />{" "}
           <Route
             path="/superadmin/dashboard"
             element={
               <ProtectedRoute role="SuperAdmin">
-                <SuperAdminDashboard />
+                <SuperAdminDashboardComplete />
               </ProtectedRoute>
             }
           />
@@ -285,7 +300,7 @@ function App() {
                 <PromoteUser />
               </ProtectedRoute>
             }
-          />
+          />{" "}
           <Route
             path="/superadmin/view-mosques"
             element={
@@ -294,10 +309,72 @@ function App() {
               </ProtectedRoute>
             }
           />
-
+          <Route
+            path="/superadmin/manage-members"
+            element={
+              <ProtectedRoute role="SuperAdmin">
+                <SuperAdminManageMembers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/superadmin/post-feeds"
+            element={
+              <ProtectedRoute role="SuperAdmin">
+                <SuperAdminPostFeeds />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/superadmin/view-attendance"
+            element={
+              <ProtectedRoute role="SuperAdmin">
+                <SuperAdminViewAttendance />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/superadmin/transport"
+            element={
+              <ProtectedRoute role="SuperAdmin">
+                <SuperAdminTransportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/superadmin/reminder"
+            element={
+              <ProtectedRoute role="SuperAdmin">
+                <SuperAdminReminderPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/superadmin/meetings"
+            element={
+              <ProtectedRoute role="SuperAdmin">
+                <SuperAdminMeetingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/superadmin/wake-up-call"
+            element={
+              <ProtectedRoute role="SuperAdmin">
+                <SuperAdminWakeUpCallPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/superadmin/knowledge-program"
+            element={
+              <ProtectedRoute role="SuperAdmin">
+                <SuperAdminKnowledgeProgramPage />
+              </ProtectedRoute>
+            }
+          />
           {/* Test Page for debugging */}
           <Route path="/test" element={<TestPage />} />
-
           {/* 404 Route */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

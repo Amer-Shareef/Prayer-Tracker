@@ -71,16 +71,12 @@ const LoginPage = () => {
             ...response.data.user,
             // Don't log sensitive information
             password: undefined
-          });
-          
-          // Redirect based on role
+          });          // Redirect based on role
           const { role } = response.data.user;
           if (role === 'Member') {
             navigate('/member/dashboard');
-          } else if (role === 'Founder') {
+          } else if (role === 'Founder' || role === 'SuperAdmin') {
             navigate('/founder/dashboard');
-          } else if (role === 'SuperAdmin') {
-            navigate('/superadmin/dashboard');
           } else {
             navigate('/member/dashboard');
           }

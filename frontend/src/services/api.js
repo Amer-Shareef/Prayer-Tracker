@@ -311,6 +311,10 @@ export const memberAPI = {
     const response = await api.get("/members");
     return response.data;
   },
+  getFounders: async () => {
+    const response = await api.get("/founders");
+    return response.data;
+  },
   addMember: async (memberData) => {
     const response = await api.post("/members", memberData);
     return response.data;

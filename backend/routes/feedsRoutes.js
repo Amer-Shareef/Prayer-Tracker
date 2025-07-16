@@ -7,56 +7,99 @@ const router = express.Router();
 // GET all feeds - FIXED version using direct query
 router.get("/", authenticateToken, async (req, res) => {
   try {
-    console.log("📋 Fetching all feeds");
-
-    // Get mosque_id from the authenticated user
+    console.log("📋 Fetching all feeds"); // Get mosque_id from the authenticated user
     const { user } = req;
-
-    // Get mosque_id from query params or from the user
-    let mosqueId;
-    if (req.query.mosque_id) {
-      mosqueId = parseInt(req.query.mosque_id);
-    } else {
-      const [userRows] = await pool.execute(
-        "SELECT mosque_id FROM users WHERE id = ?",
-        [user.id]
-      );
-
-      if (userRows.length === 0 || !userRows[0].mosque_id) {
-        return res.status(400).json({
-          success: false,
-          message: "No mosque associated with this user",
-        });
-      }
-
-      mosqueId = userRows[0].mosque_id;
-    }
 
     // Pagination parameters
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    // Use direct query
-    const queryString = `
-      SELECT f.*, 
-             u.username as author_name,
-             u.full_name as author_full_name,
-             m.name as mosque_name
-      FROM feeds f
-      LEFT JOIN users u ON f.author_id = u.id
-      LEFT JOIN mosques m ON f.mosque_id = m.id
-      WHERE f.mosque_id = ${mosqueId} AND f.is_active = TRUE
-      ORDER BY f.created_at DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
+    let queryString;
+    let queryParams = [];
+    let countQuery;
+    let countParams = [];
 
-    const [feeds] = await pool.query(queryString);
+    if (user.role === "SuperAdmin") {
+      // SuperAdmin can see all feeds or filter by mosque_id if provided
+      if (req.query.mosque_id) {
+        const mosqueId = parseInt(req.query.mosque_id);
+        queryString = `
+          SELECT f.*, 
+                 u.username as author_name,
+                 u.full_name as author_full_name,
+                 m.name as mosque_name
+          FROM feeds f
+          LEFT JOIN users u ON f.author_id = u.id
+          LEFT JOIN mosques m ON f.mosque_id = m.id
+          WHERE f.mosque_id = ? AND f.is_active = TRUE
+          ORDER BY f.created_at DESC
+          LIMIT ? OFFSET ?
+        `;
+        queryParams = [mosqueId, limit, offset];
+        countQuery =
+          "SELECT COUNT(*) as total FROM feeds WHERE mosque_id = ? AND is_active = TRUE";
+        countParams = [mosqueId];
+      } else {
+        // Show all feeds for SuperAdmin
+        queryString = `
+          SELECT f.*, 
+                 u.username as author_name,
+                 u.full_name as author_full_name,
+                 m.name as mosque_name
+          FROM feeds f
+          LEFT JOIN users u ON f.author_id = u.id
+          LEFT JOIN mosques m ON f.mosque_id = m.id
+          WHERE f.is_active = TRUE
+          ORDER BY f.created_at DESC
+          LIMIT ? OFFSET ?
+        `;
+        queryParams = [limit, offset];
+        countQuery =
+          "SELECT COUNT(*) as total FROM feeds WHERE is_active = TRUE";
+        countParams = [];
+      }
+    } else {
+      // For Founder and Member, get mosque_id from user
+      let mosqueId;
+      if (req.query.mosque_id) {
+        mosqueId = parseInt(req.query.mosque_id);
+      } else {
+        const [userRows] = await pool.execute(
+          "SELECT mosque_id FROM users WHERE id = ?",
+          [user.id]
+        );
 
-    const [countResult] = await pool.execute(
-      "SELECT COUNT(*) as total FROM feeds WHERE mosque_id = ? AND is_active = TRUE",
-      [mosqueId]
-    );
+        if (userRows.length === 0 || !userRows[0].mosque_id) {
+          return res.status(400).json({
+            success: false,
+            message: "No mosque associated with this user",
+          });
+        }
+
+        mosqueId = userRows[0].mosque_id;
+      }
+
+      queryString = `
+        SELECT f.*, 
+               u.username as author_name,
+               u.full_name as author_full_name,
+               m.name as mosque_name
+        FROM feeds f
+        LEFT JOIN users u ON f.author_id = u.id
+        LEFT JOIN mosques m ON f.mosque_id = m.id
+        WHERE f.mosque_id = ? AND f.is_active = TRUE
+        ORDER BY f.created_at DESC
+        LIMIT ? OFFSET ?
+      `;
+      queryParams = [mosqueId, limit, offset];
+      countQuery =
+        "SELECT COUNT(*) as total FROM feeds WHERE mosque_id = ? AND is_active = TRUE";
+      countParams = [mosqueId];
+    }
+
+    const [feeds] = await pool.query(queryString, queryParams);
+    const [countResult] = await pool.execute(countQuery, countParams);
 
     const totalFeeds = countResult[0].total;
     const totalPages = Math.ceil(totalFeeds / limit);
@@ -131,25 +174,46 @@ router.post(
         image_url,
       } = req.body;
       const { user } = req;
-
       if (!title || !content) {
         return res
           .status(400)
           .json({ success: false, message: "Title and content are required" });
       }
 
-      const [userRows] = await pool.execute(
-        "SELECT mosque_id FROM users WHERE id = ?",
-        [user.id]
-      );
-      if (!userRows.length || !userRows[0].mosque_id) {
-        return res.status(400).json({
-          success: false,
-          message: "No mosque associated with this user",
-        });
-      }
+      let mosqueId;
 
-      const mosqueId = userRows[0].mosque_id;
+      if (user.role === "SuperAdmin") {
+        // SuperAdmin can specify mosque_id in request body or use their own
+        if (req.body.mosque_id) {
+          mosqueId = req.body.mosque_id;
+        } else {
+          const [userRows] = await pool.execute(
+            "SELECT mosque_id FROM users WHERE id = ?",
+            [user.id]
+          );
+          if (!userRows.length || !userRows[0].mosque_id) {
+            return res.status(400).json({
+              success: false,
+              message:
+                "SuperAdmin must specify mosque_id or have a default mosque associated",
+            });
+          }
+          mosqueId = userRows[0].mosque_id;
+        }
+      } else {
+        // Founder uses their mosque
+        const [userRows] = await pool.execute(
+          "SELECT mosque_id FROM users WHERE id = ?",
+          [user.id]
+        );
+        if (!userRows.length || !userRows[0].mosque_id) {
+          return res.status(400).json({
+            success: false,
+            message: "No mosque associated with this user",
+          });
+        }
+        mosqueId = userRows[0].mosque_id;
+      }
 
       const [result] = await pool.execute(
         `
@@ -213,21 +277,30 @@ router.put(
         is_active,
       } = req.body;
       const { user } = req;
-
       if (!title || !content) {
         return res
           .status(400)
           .json({ success: false, message: "Title and content are required" });
       }
 
-      const [feeds] = await pool.execute(
-        `
-      SELECT f.* FROM feeds f
-      JOIN users u ON f.mosque_id = u.mosque_id
-      WHERE f.id = ? AND u.id = ?
-    `,
-        [id, user.id]
-      );
+      // Check access permissions
+      let accessQuery, accessParams;
+
+      if (user.role === "SuperAdmin") {
+        // SuperAdmin can edit any feed
+        accessQuery = "SELECT f.* FROM feeds f WHERE f.id = ?";
+        accessParams = [id];
+      } else if (user.role === "Founder") {
+        // Founder can only edit feeds from their mosque
+        accessQuery = `
+          SELECT f.* FROM feeds f
+          JOIN users u ON f.mosque_id = u.mosque_id
+          WHERE f.id = ? AND u.id = ?
+        `;
+        accessParams = [id, user.id];
+      }
+
+      const [feeds] = await pool.execute(accessQuery, accessParams);
 
       if (!feeds.length) {
         return res.status(404).json({
@@ -290,14 +363,24 @@ router.delete(
       const { id } = req.params;
       const { user } = req;
 
-      const [feeds] = await pool.execute(
-        `
-      SELECT f.* FROM feeds f
-      JOIN users u ON f.mosque_id = u.mosque_id
-      WHERE f.id = ? AND u.id = ?
-    `,
-        [id, user.id]
-      );
+      // Check access permissions
+      let accessQuery, accessParams;
+
+      if (user.role === "SuperAdmin") {
+        // SuperAdmin can delete any feed
+        accessQuery = "SELECT f.* FROM feeds f WHERE f.id = ?";
+        accessParams = [id];
+      } else if (user.role === "Founder") {
+        // Founder can only delete feeds from their mosque
+        accessQuery = `
+          SELECT f.* FROM feeds f
+          JOIN users u ON f.mosque_id = u.mosque_id
+          WHERE f.id = ? AND u.id = ?
+        `;
+        accessParams = [id, user.id];
+      }
+
+      const [feeds] = await pool.execute(accessQuery, accessParams);
 
       if (!feeds.length) {
         return res.status(404).json({
