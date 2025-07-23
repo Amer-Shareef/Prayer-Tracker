@@ -815,4 +815,31 @@ export const feedsService = {
   },
 };
 
+// Area service
+export const areaService = {
+  getAreas: async () => {
+    try {
+      console.log("🔄 Getting areas from database");
+      const response = await api.get("/areas");
+      console.log("✅ Areas fetched:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to fetch areas:", error);
+      throw error;
+    }
+  },
+
+  createArea: async (areaData) => {
+    try {
+      console.log("➕ Creating area:", areaData);
+      const response = await api.post("/areas", areaData);
+      console.log("✅ Area created:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to create area:", error);
+      throw error;
+    }
+  },
+};
+
 export default api;

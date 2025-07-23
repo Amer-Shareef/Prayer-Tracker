@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FounderLayout from '../../components/layouts/FounderLayout';
-import { memberAPI } from '../../services/api';
+import { memberAPI, areaService } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 const AddMember = () => {
   const navigate = useNavigate();
+  const { user } = useAuth(); // Get current user to check role
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [areas, setAreas] = useState([]);
+  const [loadingAreas, setLoadingAreas] = useState(true);
   const [formData, setFormData] = useState({
     fullName: '',
     username: '',
@@ -28,6 +32,72 @@ const AddMember = () => {
     otherSpecify: '',
     MuallafathilQuloob: false
   });
+
+  // Fetch areas from database
+  useEffect(() => {
+    const fetchAreas = async () => {
+      try {
+        setLoadingAreas(true);
+        const response = await areaService.getAreas();
+        console.log('🏞️ Areas API Response:', response.data);
+        if (response.data.success) {
+          setAreas(response.data.data);
+          console.log('✅ Areas loaded:', response.data.data);
+        } else {
+          console.error('Failed to fetch areas:', response.data.message);
+        }
+      } catch (err) {
+        console.error('Error fetching areas:', err);
+        // Fallback: try direct fetch if service fails
+        try {
+          const token = localStorage.getItem('token');
+          const directResponse = await fetch('http://13.60.193.171:5000/api/areas', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (directResponse.ok) {
+            const data = await directResponse.json();
+            console.log('🔄 Direct fetch areas data:', data);
+            setAreas(data.data || []);
+          }
+        } catch (directErr) {
+          console.error('Direct fetch also failed:', directErr);
+        }
+      } finally {
+        setLoadingAreas(false);
+      }
+    };
+
+    fetchAreas();
+  }, []);
+
+  // Get allowed roles based on current user's role
+  const getAllowedRoles = () => {
+    if (!user) return [];
+    
+    switch (user.role) {
+      case 'SuperAdmin':
+        // SuperAdmin can create: Member, Founder (Working Committee Member), and SuperAdmin
+        return [
+          { value: 'Member', label: 'Member' },
+          { value: 'Founder', label: 'Working Committee Member' },
+          { value: 'SuperAdmin', label: 'Super Admin' }
+        ];
+      case 'Founder':
+        // Founder can create: Member and Founder (Working Committee Member) only
+        return [
+          { value: 'Member', label: 'Member' },
+          { value: 'Founder', label: 'Working Committee Member' }
+        ];
+      default:
+        // Default case: only Member
+        return [
+          { value: 'Member', label: 'Member' }
+        ];
+    }
+  };
   
   // Handle form input changes
   const handleInputChange = (e) => {
@@ -261,43 +331,16 @@ const AddMember = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="">Select area</option>
-                    <option value="ANGODA [AN]">ANGODA [AN]</option>
-                    <option value="ATHURUGIRIYA [AT]">ATHURUGIRIYA [AT]</option>
-                    <option value="AVISSAWELLA [AV]">AVISSAWELLA [AV]</option>
-                    <option value="BATTARAMULLA [BA]">BATTARAMULLA [BA]</option>
-                    <option value="BORALESGAMUWA [BO]">BORALESGAMUWA [BO]</option>
-                    <option value="COLOMBO 01 [C1]">COLOMBO 01 [C1]</option>
-                    <option value="COLOMBO 02 [C2]">COLOMBO 02 [C2]</option>
-                    <option value="COLOMBO 03 [C3]">COLOMBO 03 [C3]</option>
-                    <option value="COLOMBO 04 [C4]">COLOMBO 04 [C4]</option>
-                    <option value="COLOMBO 05 [C5]">COLOMBO 05 [C5]</option>
-                    <option value="COLOMBO 06 [C6]">COLOMBO 06 [C6]</option>
-                    <option value="COLOMBO 07 [C7]">COLOMBO 07 [C7]</option>
-                    <option value="COLOMBO 08 [C8]">COLOMBO 08 [C8]</option>
-                    <option value="COLOMBO 09 [C9]">COLOMBO 09 [C9]</option>
-                    <option value="COLOMBO 10 [C10]">COLOMBO 10 [C10]</option>
-                    <option value="COLOMBO 11 [C11]">COLOMBO 11 [C11]</option>
-                    <option value="COLOMBO 12 [C12]">COLOMBO 12 [C12]</option>
-                    <option value="COLOMBO 13 [C13]">COLOMBO 13 [C13]</option>
-                    <option value="COLOMBO 14 [C14]">COLOMBO 14 [C14]</option>
-                    <option value="COLOMBO 15 [C15]">COLOMBO 15 [C15]</option>
-                    <option value="DEHIWALA [DE]">DEHIWALA [DE]</option>
-                    <option value="HOMAGAMA [HO]">HOMAGAMA [HO]</option>
-                    <option value="KADUWELA [KA]">KADUWELA [KA]</option>
-                    <option value="KESBEWA [KE]">KESBEWA [KE]</option>
-                    <option value="KOTTAWA [KO]">KOTTAWA [KO]</option>
-                    <option value="MAHARAGAMA [MA]">MAHARAGAMA [MA]</option>
-                    <option value="MORATUWA [MO]">MORATUWA [MO]</option>
-                    <option value="MOUNT LAVINIA [ML]">MOUNT LAVINIA [ML]</option>
-                    <option value="NUGEGODA [NU]">NUGEGODA [NU]</option>
-                    <option value="PADUKKA [PA]">PADUKKA [PA]</option>
-                    <option value="PANNIPITIYA [PN]">PANNIPITIYA [PN]</option>
-                    <option value="PILIYANDALA [PI]">PILIYANDALA [PI]</option>
-                    <option value="RAJAGIRIYA [RA]">RAJAGIRIYA [RA]</option>
-                    <option value="RATMALANA [RT]">RATMALANA [RT]</option>
-                    <option value="SRI JAYAWARDENEPURA KOTTE [SJ]">SRI JAYAWARDENEPURA KOTTE [SJ]</option>
-                    <option value="TALAWATUGODA [TA]">TALAWATUGODA [TA]</option>
-                    <option value="WELLAMPITIYA [WE]">WELLAMPITIYA [WE]</option>
+                    {loadingAreas ? (
+                      <option value="">Loading areas...</option>
+                    ) : (
+                      areas.map((area) => (
+                        <option key={area.id} value={area.area_name || area.name || `Area ${area.id}`}>
+                          {area.area_name || area.name || `Area ${area.id}`}
+                          {area.description && ` - ${area.description}`}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
@@ -352,8 +395,11 @@ const AddMember = () => {
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="Member">Member</option>
-                    <option value="Founder">Working Commitee Member</option>
+                    {getAllowedRoles().map((role) => (
+                      <option key={role.value} value={role.value}>
+                        {role.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

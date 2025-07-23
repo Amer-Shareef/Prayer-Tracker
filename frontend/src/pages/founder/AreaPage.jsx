@@ -10,78 +10,87 @@ const AreaPage = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingArea, setEditingArea] = useState(null);
   const [formData, setFormData] = useState({
-    name: '',
+    area_name: '',
+    address: '',
     description: '',
     coordinates: ''
   });
 
-  // Mock data for areas
+  // Fetch areas from API
   useEffect(() => {
-    setLoading(true);
-    setTimeout(() => {
-      setAreas([
-        {
-          id: 1,
-          name: 'Colombo Central',
-          description: 'Central Colombo area including Fort and Pettah',
-          coordinates: '6.9271° N, 79.8612° E',
-          founderCount: 5,
-          memberCount: 450,
-          status: 'active',
-          createdAt: '2024-01-15'
-        },
-        {
-          id: 2,
-          name: 'Dehiwala-Mount Lavinia',
-          description: 'Southern coastal area of Colombo',
-          coordinates: '6.8344° N, 79.8643° E',
-          founderCount: 8,
-          memberCount: 280,
-          status: 'active',
-          createdAt: '2024-02-10'
-        },
-        {
-          id: 3,
-          name: 'Kelaniya',
-          description: 'Northern suburban area',
-          coordinates: '6.9553° N, 79.9217° E',
-          founderCount: 12,
-          memberCount: 320,
-          status: 'active',
-          createdAt: '2024-01-28'
-        }
-      ]);
-      setLoading(false);
-    }, 1000);
+    fetchAreas();
   }, []);
 
-  const handleSubmit = (e) => {
+  const fetchAreas = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://13.60.193.171:5000/api/areas', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAreas(data.data || []);
+      } else {
+        console.error('Failed to fetch areas');
+      }
+    } catch (error) {
+      console.error('Error fetching areas:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (editingArea) {
-      // Update existing area
-      setAreas(areas.map(area => 
-        area.id === editingArea.id 
-          ? { ...area, ...formData }
-          : area
-      ));
-      setShowEditModal(false);
-      setEditingArea(null);
-    } else {
-      // Add new area
-      const newArea = {
-        id: areas.length + 1,
-        ...formData,
-        status: 'active',
-        createdAt: new Date().toISOString().split('T')[0]
-      };
-      setAreas([...areas, newArea]);
-      setShowAddModal(false);
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (editingArea) {
+        // Update existing area
+        const response = await fetch(`http://13.60.193.171:5000/api/areas/${editingArea.id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+
+        if (response.ok) {
+          await fetchAreas(); // Refresh the list
+          setShowEditModal(false);
+          setEditingArea(null);
+        }
+      } else {
+        // Add new area
+        const response = await fetch('http://13.60.193.171:5000/api/areas', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+
+        if (response.ok) {
+          await fetchAreas(); // Refresh the list
+          setShowAddModal(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error saving area:', error);
     }
     
     // Reset form
     setFormData({
-      name: '',
+      area_name: '',
+      address: '',
       description: '',
       coordinates: ''
     });
@@ -89,17 +98,33 @@ const AreaPage = () => {
 
   const handleEdit = (area) => {
     setFormData({
-      name: area.name,
-      description: area.description,
-      coordinates: area.coordinates
+      area_name: area.area_name || area.name || '',
+      address: area.address || '',
+      description: area.description || '',
+      coordinates: area.coordinates || ''
     });
     setEditingArea(area);
     setShowEditModal(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this area?')) {
-      setAreas(areas.filter(area => area.id !== id));
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://13.60.193.171:5000/api/areas/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          await fetchAreas(); // Refresh the list
+        }
+      } catch (error) {
+        console.error('Error deleting area:', error);
+      }
     }
   };
 
@@ -151,22 +176,10 @@ const AreaPage = () => {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-6">
           <div className="bg-white rounded-lg shadow p-6">
             <div className="text-2xl font-bold text-purple-600">{areas.length}</div>
             <div className="text-sm text-gray-500">Total Areas</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-2xl font-bold text-green-600">
-              {areas.reduce((sum, area) => sum + area.founderCount, 0)}
-            </div>
-            <div className="text-sm text-gray-500">Total Founders</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-2xl font-bold text-blue-600">
-              {areas.reduce((sum, area) => sum + area.memberCount, 0)}
-            </div>
-            <div className="text-sm text-gray-500">Total Members</div>
           </div>
         </div>
 
@@ -182,9 +195,8 @@ const AreaPage = () => {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Area</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Coordinates</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Founders</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Members</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
@@ -194,21 +206,20 @@ const AreaPage = () => {
                     <tr key={area.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-gray-900">{area.name}</div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {area.area_name || area.name || 'N/A'}
+                          </div>
                           <div className="text-sm text-gray-500">{area.description}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {area.coordinates}
+                        {area.address || 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {area.founderCount}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {area.memberCount}
+                        {area.coordinates || 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(area.status)}
+                        {getStatusBadge('active')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <button
@@ -247,8 +258,8 @@ const AreaPage = () => {
                   </label>
                   <input
                     type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    value={formData.area_name}
+                    onChange={(e) => setFormData({...formData, area_name: e.target.value})}
                     className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
                     required
                   />
@@ -259,10 +270,24 @@ const AreaPage = () => {
                     Address
                   </label>
                   <textarea
+                    value={formData.address}
+                    onChange={(e) => setFormData({...formData, address: e.target.value})}
+                    className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    rows="3"
+                    placeholder="Enter the full address of the area"
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-gray-700 font-medium mb-2">
+                    Description
+                  </label>
+                  <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({...formData, description: e.target.value})}
                     className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    rows="3"
+                    rows="2"
+                    placeholder="Brief description of the area"
                   />
                 </div>
 
@@ -287,7 +312,8 @@ const AreaPage = () => {
                       setShowEditModal(false);
                       setEditingArea(null);
                       setFormData({
-                        name: '',
+                        area_name: '',
+                        address: '',
                         description: '',
                         coordinates: ''
                       });
