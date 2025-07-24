@@ -113,7 +113,7 @@ app.get("/api/health", async (req, res) => {
         uptime: process.uptime(),
         memory: process.memoryUsage(),
         version: process.version,
-        host: process.env.HOST || "localhost",
+        host: process.env.HOST || "13.60.193.171",
         port: process.env.PORT || 5000,
       },
       environment: process.env.NODE_ENV || "development",
@@ -171,7 +171,7 @@ app.get("/api/monitor", async (req, res) => {
 
 // Test connection on startup
 const PORT = process.env.PORT || 5000;
-const HOST = process.env.HOST || "localhost";
+const HOST = process.env.HOST || "13.60.193.171";
 
 app.listen(PORT, async () => {
   console.log(`🚀 Server running on http://${HOST}:${PORT}`);

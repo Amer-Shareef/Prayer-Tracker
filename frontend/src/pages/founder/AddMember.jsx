@@ -51,7 +51,7 @@ const AddMember = () => {
         // Fallback: try direct fetch if service fails
         try {
           const token = localStorage.getItem('token');
-          const directResponse = await fetch('http://localhost:5000/api/areas', {
+          const directResponse = await fetch('http://13.60.193.171:5000/api/areas', {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
