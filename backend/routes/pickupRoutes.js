@@ -21,6 +21,7 @@ router.get(
         end_date,
         limit,
         limitType: typeof limit,
+        userId: user.id,
       });
 
       // Build query dynamically WITHOUT using LIMIT in prepared statement
@@ -38,18 +39,18 @@ router.get(
         queryParams.push(status);
       }
 
-      // Add date range filter
+      // Add date range filter using created_at instead of request_date
       if (start_date) {
-        query += " AND pr.request_date >= ?";
+        query += " AND DATE(pr.created_at) >= ?";
         queryParams.push(start_date);
       }
 
       if (end_date) {
-        query += " AND pr.request_date <= ?";
+        query += " AND DATE(pr.created_at) <= ?";
         queryParams.push(end_date);
       }
 
-      query += " ORDER BY pr.request_date DESC, pr.created_at DESC";
+      query += " ORDER BY pr.created_at DESC";
 
       console.log("🔍 Query without LIMIT:", query);
       console.log("📋 Query params:", queryParams);
@@ -102,68 +103,56 @@ router.post(
     try {
       const { user } = req;
       const {
+        mosque_id,
         pickup_location,
         contact_number,
         special_instructions,
-        device_info,
-        app_version,
         location_coordinates,
-        days, // REQUIRED: Array of selected days ['monday', 'tuesday', etc.]
-        prayers, // REQUIRED: Array of selected prayers ['fajr', 'dhuhr', etc.]
+        days, // Array of selected days ['monday', 'tuesday', etc.]
+        prayers, // Array of selected prayers ['fajr', 'dhuhr', etc.]
       } = req.body;
 
-      // Enhanced validation - REMOVED request_date requirement
-      if (!pickup_location || !days || !prayers) {
+      // Simplified validation - only pickup_location and mosque_id are mandatory
+      if (!pickup_location || !mosque_id) {
         return res.status(400).json({
           success: false,
-          message: "Pickup location, days, and prayers are required",
+          message: "Pickup location and mosque_id are required",
         });
       }
 
-      // Validate days array
-      const validDays = [
-        "monday",
-        "tuesday",
-        "wednesday",
-        "thursday",
-        "friday",
-        "saturday",
-        "sunday",
-      ];
-      if (!Array.isArray(days) || days.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Please select at least one day",
-        });
+      // Optional validation for days and prayers (if provided)
+      if (days && Array.isArray(days) && days.length > 0) {
+        const validDays = [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday",
+        ];
+        const invalidDays = days.filter(
+          (day) => !validDays.includes(day.toLowerCase())
+        );
+        if (invalidDays.length > 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid days: ${invalidDays.join(", ")}`,
+          });
+        }
       }
 
-      const invalidDays = days.filter(
-        (day) => !validDays.includes(day.toLowerCase())
-      );
-      if (invalidDays.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: `Invalid days: ${invalidDays.join(", ")}`,
-        });
-      }
-
-      // Validate prayers array
-      const validPrayers = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
-      if (!Array.isArray(prayers) || prayers.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Please select at least one prayer",
-        });
-      }
-
-      const invalidPrayers = prayers.filter(
-        (prayer) => !validPrayers.includes(prayer.toLowerCase())
-      );
-      if (invalidPrayers.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: `Invalid prayers: ${invalidPrayers.join(", ")}`,
-        });
+      if (prayers && Array.isArray(prayers) && prayers.length > 0) {
+        const validPrayers = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
+        const invalidPrayers = prayers.filter(
+          (prayer) => !validPrayers.includes(prayer.toLowerCase())
+        );
+        if (invalidPrayers.length > 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid prayers: ${invalidPrayers.join(", ")}`,
+          });
+        }
       }
 
       // Check for duplicate requests - UPDATED to check by days/prayers combination
@@ -181,38 +170,43 @@ router.post(
         });
       }
 
-      // Get user's mosque
-      const [userInfo] = await pool.execute(
-        "SELECT mosque_id FROM users WHERE id = ?",
-        [user.id]
-      );
+      // Get user's mosque if not provided
+      let mosqueId = mosque_id;
+      if (!mosqueId) {
+        const [userInfo] = await pool.execute(
+          "SELECT mosque_id FROM users WHERE id = ?",
+          [user.id]
+        );
+        mosqueId = userInfo[0]?.mosque_id;
+      }
 
-      const mosqueId = userInfo[0]?.mosque_id;
       if (!mosqueId) {
         return res.status(400).json({
           success: false,
-          message: "User is not assigned to any mosque",
+          message:
+            "User is not assigned to any mosque and mosque_id not provided",
         });
       }
 
-      // Create the pickup request with enhanced data - REMOVED request_date
+      // Create the pickup request with simplified data
       const [result] = await pool.execute(
         `INSERT INTO pickup_requests 
-       (user_id, mosque_id, prayer_type, pickup_location, 
-        special_instructions, contact_number,
-        device_info, app_version, location_coordinates, days, prayers, status, created_at)
-       VALUES (?, ?, 'Fajr', ?, ?, ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)`,
+       (user_id, mosque_id, pickup_location, special_instructions, contact_number,
+        location_coordinates, days, prayers, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)`,
         [
           user.id,
           mosqueId,
           pickup_location,
           special_instructions || null,
           contact_number || null,
-          device_info ? JSON.stringify(device_info) : null,
-          app_version || null,
           location_coordinates ? JSON.stringify(location_coordinates) : null,
-          JSON.stringify(days.map((d) => d.toLowerCase())),
-          JSON.stringify(prayers.map((p) => p.toLowerCase())),
+          days
+            ? JSON.stringify(days.map((d) => d.toLowerCase()))
+            : JSON.stringify(["daily"]),
+          prayers
+            ? JSON.stringify(prayers.map((p) => p.toLowerCase()))
+            : JSON.stringify(["fajr"]),
         ]
       );
 
@@ -455,7 +449,7 @@ router.delete(
 
       const request = existingRequest[0];
       console.log(
-        `📋 Found request: ${request.prayer_type} on ${request.request_date}, status: ${request.status}`
+        `📋 Found request: ${request.pickup_location} created ${request.created_at}, status: ${request.status}`
       );
 
       // Check if request can be deleted (only pending requests can be cancelled/deleted)
@@ -500,23 +494,28 @@ router.delete(
 );
 
 // PUT /api/pickup-requests/:id/approve - Approve pickup request and assign driver
-router.put("/:id/approve", async (req, res) => {
-  const requestId = req.params.id;
-  const { assignedDriverId, assignedDriverName } = req.body;
+router.put(
+  "/pickup-requests/:id/approve",
+  authenticateToken,
+  authorizeRole(["Founder", "SuperAdmin"]),
+  dbHealthCheck,
+  async (req, res) => {
+    const requestId = req.params.id;
+    const { assignedDriverId, assignedDriverName } = req.body;
 
-  console.log(
-    "🟢 Approving pickup request:",
-    requestId,
-    "with driver:",
-    assignedDriverName
-  );
+    console.log(
+      "🟢 Approving pickup request:",
+      requestId,
+      "with driver:",
+      assignedDriverName
+    );
 
-  try {
-    const connection = await pool.getConnection();
+    try {
+      const connection = await pool.getConnection();
 
-    // Update the pickup request with approval and driver assignment
-    const [result] = await connection.query(
-      `
+      // Update the pickup request with approval and driver assignment
+      const [result] = await connection.query(
+        `
       UPDATE pickup_requests 
       SET 
         status = 'approved',
@@ -525,85 +524,231 @@ router.put("/:id/approve", async (req, res) => {
         approved_at = NOW()
       WHERE id = ?
     `,
-      [assignedDriverId, assignedDriverName, requestId]
-    );
+        [assignedDriverId, assignedDriverName, requestId]
+      );
 
-    if (result.affectedRows === 0) {
+      if (result.affectedRows === 0) {
+        connection.release();
+        return res.status(404).json({
+          success: false,
+          message: "Pickup request not found",
+        });
+      }
+
       connection.release();
-      return res.status(404).json({
+
+      console.log("✅ Pickup request approved successfully");
+      res.json({
+        success: true,
+        message: "Pickup request approved successfully",
+      });
+    } catch (error) {
+      console.error("❌ Error approving pickup request:", error);
+      res.status(500).json({
         success: false,
-        message: "Pickup request not found",
+        message: "Failed to approve pickup request",
+        error: error.message,
       });
     }
-
-    connection.release();
-
-    console.log("✅ Pickup request approved successfully");
-    res.json({
-      success: true,
-      message: "Pickup request approved successfully",
-    });
-  } catch (error) {
-    console.error("❌ Error approving pickup request:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to approve pickup request",
-      error: error.message,
-    });
   }
-});
+);
 
 // PUT /api/pickup-requests/:id/reject - Reject pickup request
-router.put("/:id/reject", async (req, res) => {
-  const requestId = req.params.id;
-  const { rejectionReason } = req.body;
+router.put(
+  "/pickup-requests/:id/reject",
+  authenticateToken,
+  authorizeRole(["Founder", "SuperAdmin"]),
+  dbHealthCheck,
+  async (req, res) => {
+    const requestId = req.params.id;
+    const { rejectionReason } = req.body;
 
-  console.log(
-    "🔴 Rejecting pickup request:",
-    requestId,
-    "reason:",
-    rejectionReason
-  );
+    console.log(
+      "🔴 Rejecting pickup request:",
+      requestId,
+      "reason:",
+      rejectionReason
+    );
 
-  try {
-    const connection = await pool.getConnection();
+    try {
+      const connection = await pool.getConnection();
 
-    // Update the pickup request with rejection
-    const [result] = await connection.query(
-      `
+      // Update the pickup request with rejection - FIXED column name
+      const [result] = await connection.query(
+        `
       UPDATE pickup_requests 
       SET 
         status = 'rejected',
-        rejection_reason = ?,
-        rejected_at = NOW()
+        rejected_reason = ?,
+        rejected_at = NOW(),
+        rejected_by = ?
       WHERE id = ?
     `,
-      [rejectionReason, requestId]
-    );
+        [rejectionReason, req.user.id, requestId]
+      );
 
-    if (result.affectedRows === 0) {
+      if (result.affectedRows === 0) {
+        connection.release();
+        return res.status(404).json({
+          success: false,
+          message: "Pickup request not found",
+        });
+      }
+
       connection.release();
-      return res.status(404).json({
+
+      console.log("✅ Pickup request rejected successfully");
+      res.json({
+        success: true,
+        message: "Pickup request rejected successfully",
+      });
+    } catch (error) {
+      console.error("❌ Error rejecting pickup request:", error);
+      res.status(500).json({
         success: false,
-        message: "Pickup request not found",
+        message: "Failed to reject pickup request",
+        error: error.message,
       });
     }
-
-    connection.release();
-
-    console.log("✅ Pickup request rejected successfully");
-    res.json({
-      success: true,
-      message: "Pickup request rejected successfully",
-    });
-  } catch (error) {
-    console.error("❌ Error rejecting pickup request:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to reject pickup request",
-      error: error.message,
-    });
   }
-});
+);
+
+// GET /api/pickup-requests/all - Get all pickup requests for founders/superadmin
+router.get(
+  "/pickup-requests/all",
+  authenticateToken,
+  authorizeRole(["Founder", "SuperAdmin", "founder", "superadmin"]),
+  async (req, res) => {
+    try {
+      const { user } = req;
+      const { status, mosque_id } = req.query;
+
+      console.log("📋 Founder getting pickup requests:", {
+        userId: user.id,
+        userRole: user.role,
+        requestedMosqueId: mosque_id,
+      });
+
+      let query = `
+        SELECT pr.*, 
+               m.name as mosque_name,
+               u.username as member_username,
+               u.phone as member_phone,
+               u.email as member_email,
+               u.full_name as member_name,
+               du.username as driver_username,
+               du.phone as driver_phone
+        FROM pickup_requests pr
+        LEFT JOIN mosques m ON pr.mosque_id = m.id
+        LEFT JOIN users u ON pr.user_id = u.id
+        LEFT JOIN users du ON pr.assigned_driver_id = du.id
+        WHERE 1=1
+      `;
+      const queryParams = [];
+
+      // Filter by mosque for founders - CHECK MULTIPLE ROLE FORMATS
+      if (user.role === "Founder" || user.role === "founder") {
+        console.log("👑 User is founder, filtering by their mosque");
+        query +=
+          " AND pr.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)";
+        queryParams.push(user.id);
+      } else if (mosque_id) {
+        console.log("🔧 SuperAdmin specifying mosque_id:", mosque_id);
+        // SuperAdmin can specify mosque_id
+        query += " AND pr.mosque_id = ?";
+        queryParams.push(mosque_id);
+      } else {
+        console.log("🌍 No mosque filter applied (SuperAdmin seeing all)");
+      }
+
+      // Filter by status if provided
+      if (status) {
+        query += " AND pr.status = ?";
+        queryParams.push(status);
+      }
+
+      query += " ORDER BY pr.created_at DESC";
+
+      console.log("🔍 Founder query:", query);
+      console.log("📋 Founder query params:", queryParams);
+
+      const [requests] = await pool.execute(query, queryParams);
+
+      console.log(
+        `✅ Found ${requests.length} pickup requests for founder/admin`
+      );
+
+      res.json({
+        success: true,
+        data: requests,
+        total: requests.length,
+      });
+    } catch (error) {
+      console.error("❌ Error fetching pickup requests:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch pickup requests",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// GET /api/pickup-requests/available-drivers - Get members who can be assigned as drivers
+router.get(
+  "/pickup-requests/available-drivers",
+  authenticateToken,
+  authorizeRole(["Founder", "SuperAdmin"]),
+  async (req, res) => {
+    try {
+      const { user } = req;
+      const { mosque_id } = req.query;
+
+      console.log("🚗 Getting available drivers");
+
+      let query = `
+        SELECT u.id, u.username, u.full_name, u.phone, u.email, u.mobility,
+               m.name as mosque_name
+        FROM users u
+        LEFT JOIN mosques m ON u.mosque_id = m.id
+        WHERE u.role = 'Member' 
+        AND u.status = 'active'
+        AND u.mobility IN ('Car', 'Motorbike', 'car', 'motorbike', 'Vehicle')
+        AND u.mosque_id IS NOT NULL
+      `;
+      const queryParams = [];
+
+      // Filter by mosque for founders
+      if (user.role === "Founder") {
+        query +=
+          " AND u.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)";
+        queryParams.push(user.id);
+      } else if (mosque_id) {
+        // SuperAdmin can specify mosque_id
+        query += " AND u.mosque_id = ?";
+        queryParams.push(mosque_id);
+      }
+
+      query += " ORDER BY u.full_name, u.username";
+
+      const [drivers] = await pool.execute(query, queryParams);
+
+      console.log(`✅ Found ${drivers.length} available drivers`);
+
+      res.json({
+        success: true,
+        data: drivers,
+        total: drivers.length,
+      });
+    } catch (error) {
+      console.error("❌ Error fetching available drivers:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch available drivers",
+        error: error.message,
+      });
+    }
+  }
+);
 
 module.exports = router;

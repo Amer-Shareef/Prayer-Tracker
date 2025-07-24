@@ -411,15 +411,12 @@ export const pickupService = {
     }
   },
 
-  // Get ALL pickup requests (for founders/admin - not just user's own) - MISSING METHOD ADDED
+  // Get ALL pickup requests (for founders/admin - not just user's own) - FIXED ENDPOINT
   getAllPickupRequests: async (params = {}) => {
     try {
       console.log("🔄 Getting ALL pickup requests (admin/founder view)");
-      const queryParams = new URLSearchParams({
-        all: "true", // Flag to get all requests, not just user's own
-        ...params,
-      }).toString();
-      const url = `/pickup-requests?${queryParams}`;
+      const queryParams = new URLSearchParams(params).toString();
+      const url = `/pickup-requests/all${queryParams ? `?${queryParams}` : ""}`;
       console.log("📡 Admin API URL:", url);
 
       const response = await api.get(url);

@@ -111,7 +111,7 @@ const SuperAdminTransportPage = () => {
         prayers: request.prayers ? (typeof request.prayers === 'string' ? JSON.parse(request.prayers) : request.prayers) : ['Fajr'],
         assignedDriver: request.assigned_driver_name || null,
         approvedAt: request.updated_at,
-        rejectionReason: request.rejection_reason || null
+        rejectionReason: request.rejected_reason || null
       }));
 
       // Filter data by selected mosque if not 'all'

@@ -120,7 +120,10 @@ const TransportPage = () => {
           // Additional fields for approval workflow
           assignedDriver: request.assigned_driver_name || null,
           approvedBy: request.approved_by || null,
-          approvedAt: request.approved_at || null
+          approvedAt: request.approved_at || null,
+          // Additional fields for rejection workflow - FIXED: use rejected_reason not rejection_reason
+          rejectionReason: request.rejected_reason || null,
+          rejectedAt: request.rejected_at || null
         }));
 
         setPickupRequests(processedRequests);
@@ -363,8 +366,10 @@ const TransportPage = () => {
           <nav className="-mb-px flex space-x-8">
             {
   [
-    { id: 'members', label: 'Member Transport Info' },
-    { id: 'requests', label: 'Pickup Requests' }
+    { id: 'members', label: 'Member Details' },
+    { id: 'requests', label: 'Pickup Requests' },
+    { id: 'approved', label: 'Approved Requests' },
+    { id: 'rejected', label: 'Rejected Requests' }
   ].map(tab => (
     <button
       key={tab.id}
@@ -376,6 +381,22 @@ const TransportPage = () => {
       }`}
     >
       {tab.label}
+      {/* Show count badges for request tabs */}
+      {tab.id === 'requests' && transportStats.pendingRequests > 0 && (
+        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          {transportStats.pendingRequests}
+        </span>
+      )}
+      {tab.id === 'approved' && transportStats.approvedRequests > 0 && (
+        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          {transportStats.approvedRequests}
+        </span>
+      )}
+      {tab.id === 'rejected' && transportStats.rejectedRequests > 0 && (
+        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+          {transportStats.rejectedRequests}
+        </span>
+      )}
     </button>
   ))
 }
@@ -386,6 +407,10 @@ const TransportPage = () => {
         {/* Tab Content */}
         {activeTab === 'members' && (
           <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-medium">Member Transport Information</h3>
+              <p className="text-sm text-gray-600 mt-1">Overview of all members and their transportation modes</p>
+            </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -447,14 +472,10 @@ const TransportPage = () => {
         {activeTab === 'requests' && (
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="text-lg font-medium">Pickup Requests Management</h3>
-              <button
-                onClick={fetchData}
-                disabled={loading}
-                className="text-blue-600 hover:text-blue-800 text-sm"
-              >
-                🔄 Refresh
-              </button>
+              <div>
+                <h3 className="text-lg font-medium">Pending Pickup Requests</h3>
+                <p className="text-sm text-gray-600 mt-1">Requests awaiting approval or rejection</p>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -468,14 +489,14 @@ const TransportPage = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {pickupRequests.length === 0 ? (
+                  {pickupRequests.filter(request => request.status === 'pending').length === 0 ? (
                     <tr>
                       <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
-                        No pickup requests found
+                        No pending pickup requests found
                       </td>
                     </tr>
                   ) : (
-                    pickupRequests.map(request => (
+                    pickupRequests.filter(request => request.status === 'pending').map(request => (
                       <tr key={request.id}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div>
@@ -502,53 +523,186 @@ const TransportPage = () => {
                               Assistance Required
                             </span>
                           )}
-                          {request.assignedDriver && (
-                            <div className="text-xs text-green-600 mt-1">
-                              <strong>Member Assigned:</strong> {request.assignedDriver}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                            Pending
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex flex-col space-y-1">
+                            <button
+                              onClick={() => handleRequestAction(request, 'approve')}
+                              className="text-green-600 hover:text-green-900 text-xs"
+                              disabled={actionLoading}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleRequestAction(request, 'reject')}
+                              className="text-red-600 hover:text-red-900 text-xs"
+                              disabled={actionLoading}
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'approved' && (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-medium">Approved Pickup Requests</h3>
+                <p className="text-sm text-gray-600 mt-1">Requests that have been approved and assigned</p>
+              </div>
+              <button
+                onClick={fetchData}
+                disabled={loading}
+                className="text-blue-600 hover:text-blue-800 text-sm"
+              >
+                🔄 Refresh
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Member Details</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Schedule</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned Member</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Approved Date</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {pickupRequests.filter(request => request.status === 'approved').length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
+                        No approved pickup requests found
+                      </td>
+                    </tr>
+                  ) : (
+                    pickupRequests.filter(request => request.status === 'approved').map(request => (
+                      <tr key={request.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{request.memberName}</div>
+                            <div className="text-sm text-gray-500">{request.address}</div>
+                            <div className="text-xs text-gray-500">{request.phone}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {request.days.length > 0 ? request.days.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(', ') : 'Daily'}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {request.prayers.length > 0 ? request.prayers.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(', ') : 'Fajr'}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Requested: {new Date(request.requestedAt).toLocaleDateString()}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {request.assignedDriver ? (
+                            <div className="text-sm text-green-600">
+                              <div className="font-medium">{request.assignedDriver}</div>
+                              <div className="text-xs text-gray-500">Assigned Member</div>
                             </div>
+                          ) : (
+                            <div className="text-sm text-gray-500">Not assigned</div>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                            request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            request.status === 'approved' ? 'bg-green-100 text-green-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                            Approved
                           </span>
-                          {request.status === 'rejected' && request.rejectionReason && (
-                            <div className="text-xs text-red-600 mt-1 max-w-xs">
-                              <strong>Reason:</strong> {request.rejectionReason}
-                            </div>
-                          )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          {request.status === 'pending' && (
-                            <div className="flex flex-col space-y-1">
-                              <button
-                                onClick={() => handleRequestAction(request, 'approve')}
-                                className="text-green-600 hover:text-green-900 text-xs"
-                                disabled={actionLoading}
-                              >
-                                Approve
-                              </button>
-                              <button
-                                onClick={() => handleRequestAction(request, 'reject')}
-                                className="text-red-600 hover:text-red-900 text-xs"
-                                disabled={actionLoading}
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          )}
-                          {request.status !== 'pending' && (
-                            <div className="text-xs text-gray-500">
-                              {request.status === 'approved' ? 
-                                `Approved: ${request.approvedAt ? new Date(request.approvedAt).toLocaleDateString() : 'Recently'}` :
-                                `Rejected: ${request.rejectedAt ? new Date(request.rejectedAt).toLocaleDateString() : 'Recently'}`
-                              }
-                            </div>
-                          )}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {request.approvedAt ? new Date(request.approvedAt).toLocaleDateString() : 'Recently'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'rejected' && (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-medium">Rejected Pickup Requests</h3>
+                <p className="text-sm text-gray-600 mt-1">Requests that have been rejected with reasons</p>
+              </div>
+              <button
+                onClick={fetchData}
+                disabled={loading}
+                className="text-blue-600 hover:text-blue-800 text-sm"
+              >
+                🔄 Refresh
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Member Details</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Schedule</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rejection Reason</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rejected Date</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {pickupRequests.filter(request => request.status === 'rejected').length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
+                        No rejected pickup requests found
+                      </td>
+                    </tr>
+                  ) : (
+                    pickupRequests.filter(request => request.status === 'rejected').map(request => (
+                      <tr key={request.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{request.memberName}</div>
+                            <div className="text-sm text-gray-500">{request.address}</div>
+                            <div className="text-xs text-gray-500">{request.phone}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {request.days.length > 0 ? request.days.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(', ') : 'Daily'}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {request.prayers.length > 0 ? request.prayers.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(', ') : 'Fajr'}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Requested: {new Date(request.requestedAt).toLocaleDateString()}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-red-600 max-w-xs">
+                            {request.rejectionReason || 'No reason provided'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                            Rejected
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {request.rejectedAt ? new Date(request.rejectedAt).toLocaleDateString() : 'Recently'}
                         </td>
                       </tr>
                     ))
