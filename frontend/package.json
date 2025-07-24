@@ -19,7 +19,7 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "test-frontend": "echo 'Visit http://13.60.193.171:3000/test to run frontend tests'"
+    "test-frontend": "echo 'Visit http://localhost:3000/test to run frontend tests'"
   },
   "browserslist": {
     "production": [

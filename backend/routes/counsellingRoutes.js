@@ -27,13 +27,11 @@ router.get("/", async (req, res) => {
     res.json({ success: true, data: sessions });
   } catch (error) {
     console.error("❌ Error fetching counselling sessions:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        error: "Failed to fetch counselling sessions",
-        details: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch counselling sessions",
+      details: error.message,
+    });
   }
 });
 
@@ -66,9 +64,9 @@ router.post("/", async (req, res) => {
       `
       SELECT u.id, u.username, u.full_name, u.phone, u.email, u.mosque_id,
              COUNT(p.id) as total_prayers,
-             COUNT(CASE WHEN p.status = 'prayed' THEN 1 END) as prayed_count,
+             COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) as prayed_count,
              CASE 
-               WHEN COUNT(p.id) > 0 THEN ROUND((COUNT(CASE WHEN p.status = 'prayed' THEN 1 END) / COUNT(p.id)) * 100, 2)
+               WHEN COUNT(p.id) > 0 THEN ROUND((COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) / (COUNT(p.id) * 5)) * 100, 2)
                ELSE 0 
              END as attendance_rate
       FROM users u

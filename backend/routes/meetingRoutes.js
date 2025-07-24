@@ -20,9 +20,9 @@ router.get("/members-for-counselling", async (req, res) => {
         u.email,
         CONCAT(UPPER(LEFT(COALESCE(u.area, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId,
         COUNT(p.id) as totalPrayers,
-        COUNT(CASE WHEN p.status = 'prayed' THEN 1 END) as prayedCount,
+        COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) as prayedCount,
         CASE 
-          WHEN COUNT(p.id) > 0 THEN ROUND((COUNT(CASE WHEN p.status = 'prayed' THEN 1 END) / COUNT(p.id)) * 100, 2)
+          WHEN COUNT(p.id) > 0 THEN ROUND((COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) / (COUNT(p.id) * 5)) * 100, 2)
           ELSE 0 
         END as attendanceRate,
         MAX(p.prayer_date) as lastAttendance
@@ -355,9 +355,9 @@ router.get("/all-members", async (req, res) => {
         u.email,
         CONCAT(UPPER(LEFT(COALESCE(u.area, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId,
         COUNT(p.id) as totalPrayers,
-        COUNT(CASE WHEN p.status = 'prayed' THEN 1 END) as prayedCount,
+        COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) as prayedCount,
         CASE 
-          WHEN COUNT(p.id) > 0 THEN ROUND((COUNT(CASE WHEN p.status = 'prayed' THEN 1 END) / COUNT(p.id)) * 100, 2)
+          WHEN COUNT(p.id) > 0 THEN ROUND((COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) / (COUNT(p.id) * 5)) * 100, 2)
           ELSE 0 
         END as attendanceRate,
         MAX(p.prayer_date) as lastAttendance

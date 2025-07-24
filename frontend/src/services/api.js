@@ -223,7 +223,7 @@ export const userService = {
   updateProfile: (userData) => api.put("/users/profile", userData),
 };
 
-// Enhanced prayer service with connection monitoring
+// Enhanced prayer service with optimized table structure
 export const prayerService = {
   getPrayers: (params = {}) => {
     console.log("🌐 API: Getting prayers with params:", params);
@@ -254,46 +254,101 @@ export const prayerService = {
       });
   },
 
-  recordPrayer: (data) => {
-    console.log("🌐 API: Recording prayer:", data);
+  // Record daily prayers (new optimized structure)
+  recordDailyPrayers: (data) => {
+    console.log("🌐 API: Recording daily prayers:", data);
 
-    // Enhanced validation
-    if (!data.prayer_type || !data.prayer_date || !data.status) {
+    // Validation for new structure
+    if (!data.prayer_date) {
+      console.error("❌ API: Missing required field: prayer_date");
+      return Promise.reject({
+        response: {
+          data: {
+            success: false,
+            message: "Prayer date is required",
+          },
+        },
+      });
+    }
+
+    console.log("✅ API: Daily prayers data validation passed");
+    return api
+      .post("/prayers", data)
+      .then((response) => {
+        console.log("📥 Record Daily Prayers Response:", response.data);
+        return response;
+      })
+      .catch((error) => {
+        console.error("❌ Record Daily Prayers Error:", error.message);
+        throw error;
+      });
+  },
+
+  // Update individual prayer
+  updateIndividualPrayer: (data) => {
+    console.log("🌐 API: Updating individual prayer:", data);
+
+    // Validation
+    if (!data.prayer_date || !data.prayer_type || data.prayed === undefined) {
       console.error("❌ API: Missing required fields:", {
-        prayer_type: !!data.prayer_type,
         prayer_date: !!data.prayer_date,
-        status: !!data.status,
+        prayer_type: !!data.prayer_type,
+        prayed: data.prayed !== undefined,
       });
 
       return Promise.reject({
         response: {
           data: {
             success: false,
-            message: "Prayer type, date, and status are required",
+            message: "Prayer date, type, and prayed status are required",
           },
         },
       });
     }
 
-    console.log("✅ API: Prayer data validation passed");
+    console.log("✅ API: Individual prayer data validation passed");
     return api
-      .post("/prayers", data)
+      .patch("/prayers/individual", data)
       .then((response) => {
-        console.log("📥 Record Prayer Response:", response.data);
+        console.log("📥 Update Individual Prayer Response:", response.data);
         return response;
       })
       .catch((error) => {
-        console.error("❌ Record Prayer Error:", error.message);
+        console.error("❌ Update Individual Prayer Error:", error.message);
         throw error;
       });
   },
 
-  getStats: (period = 30) => {
-    console.log("🌐 API: Getting stats for period:", period);
-    return api.get("/prayers/stats", { params: { period } }).catch((error) => {
-      console.error("❌ Stats API Error:", error.message);
-      throw error;
-    });
+  // Legacy method for backward compatibility
+  recordPrayer: (data) => {
+    console.warn(
+      "⚠️ recordPrayer is deprecated. Use recordDailyPrayers or updateIndividualPrayer instead."
+    );
+
+    // Convert old format to new format if needed
+    if (data.prayer_type && data.status) {
+      return this.updateIndividualPrayer({
+        prayer_date: data.prayer_date,
+        prayer_type: data.prayer_type.toLowerCase(),
+        prayed: data.status === "prayed",
+      });
+    }
+
+    return this.recordDailyPrayers(data);
+  },
+
+  getStats: (params = {}) => {
+    console.log("🌐 API: Getting stats with params:", params);
+    return api
+      .get("/prayers/stats", { params })
+      .then((response) => {
+        console.log("📥 Prayer Stats Response:", response.data);
+        return response;
+      })
+      .catch((error) => {
+        console.error("❌ Stats API Error:", error.message);
+        throw error;
+      });
   },
 };
 

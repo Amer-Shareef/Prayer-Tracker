@@ -22,9 +22,9 @@ router.get(
              m.name as mosque_name,
              CONCAT(UPPER(LEFT(COALESCE(u.area, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId,
              COUNT(p.id) as total_prayers,
-             COUNT(CASE WHEN p.status = 'prayed' THEN 1 END) as prayed_count,
+             COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) as prayed_count,
              CASE 
-               WHEN COUNT(p.id) > 0 THEN ROUND((COUNT(CASE WHEN p.status = 'prayed' THEN 1 END) / COUNT(p.id)) * 100, 2)
+               WHEN COUNT(p.id) > 0 THEN ROUND((COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) / (COUNT(p.id) * 5)) * 100, 2)
                ELSE 0 
              END as attendance_rate
       FROM users u
@@ -384,10 +384,8 @@ router.get(
       if (user.role === "Founder") {
         query += ` AND u.mosque_id = (SELECT mosque_id FROM users WHERE id = ?) AND u.id != ?`;
         queryParams.push(user.id, user.id);
-      } else if (user.role === "SuperAdmin") {
-        // SuperAdmin can see all founders
-        query += ` ORDER BY u.created_at DESC`;
       }
+      // SuperAdmin can see all founders (no additional WHERE clause needed)
 
       query += ` ORDER BY u.full_name, u.username`;
 

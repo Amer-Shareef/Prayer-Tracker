@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FounderLayout from '../../components/layouts/FounderLayout';
-import { memberAPI } from '../../services/api';
+import { memberAPI, areaService } from '../../services/api';
 
 function ManageMembers() {
   const navigate = useNavigate();
   const [members, setMembers] = useState([]);
+  const [areas, setAreas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -21,10 +22,22 @@ function ManageMembers() {
   const [filterArea, setFilterArea] = useState('all');
   const [filterAdditionalInfo, setFilterAdditionalInfo] = useState('all');
 
-  // Fetch members from database
+  // Fetch members and areas from database
   useEffect(() => {
     fetchMembers();
+    fetchAreas();
   }, []);
+
+  const fetchAreas = async () => {
+    try {
+      const response = await areaService.getAreas();
+      if (response.data && response.data.success) {
+        setAreas(response.data.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching areas:', err);
+    }
+  };
 
   const fetchMembers = async () => {
     try {
@@ -257,43 +270,11 @@ function ManageMembers() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="all">All Areas</option>
-                <option value="ANGODA [AN]">ANGODA [AN]</option>
-                <option value="ATHURUGIRIYA [AT]">ATHURUGIRIYA [AT]</option>
-                <option value="AVISSAWELLA [AV]">AVISSAWELLA [AV]</option>
-                <option value="BATTARAMULLA [BA]">BATTARAMULLA [BA]</option>
-                <option value="BORALESGAMUWA [BO]">BORALESGAMUWA [BO]</option>
-                <option value="COLOMBO 01 [C1]">COLOMBO 01 [C1]</option>
-                <option value="COLOMBO 02 [C2]">COLOMBO 02 [C2]</option>
-                <option value="COLOMBO 03 [C3]">COLOMBO 03 [C3]</option>
-                <option value="COLOMBO 04 [C4]">COLOMBO 04 [C4]</option>
-                <option value="COLOMBO 05 [C5]">COLOMBO 05 [C5]</option>
-                <option value="COLOMBO 06 [C6]">COLOMBO 06 [C6]</option>
-                <option value="COLOMBO 07 [C7]">COLOMBO 07 [C7]</option>
-                <option value="COLOMBO 08 [C8]">COLOMBO 08 [C8]</option>
-                <option value="COLOMBO 09 [C9]">COLOMBO 09 [C9]</option>
-                <option value="COLOMBO 10 [C10]">COLOMBO 10 [C10]</option>
-                <option value="COLOMBO 11 [C11]">COLOMBO 11 [C11]</option>
-                <option value="COLOMBO 12 [C12]">COLOMBO 12 [C12]</option>
-                <option value="COLOMBO 13 [C13]">COLOMBO 13 [C13]</option>
-                <option value="COLOMBO 14 [C14]">COLOMBO 14 [C14]</option>
-                <option value="COLOMBO 15 [C15]">COLOMBO 15 [C15]</option>
-                <option value="DEHIWALA [DE]">DEHIWALA [DE]</option>
-                <option value="HOMAGAMA [HO]">HOMAGAMA [HO]</option>
-                <option value="KADUWELA [KA]">KADUWELA [KA]</option>
-                <option value="KESBEWA [KE]">KESBEWA [KE]</option>
-                <option value="KOTTAWA [KO]">KOTTAWA [KO]</option>
-                <option value="MAHARAGAMA [MA]">MAHARAGAMA [MA]</option>
-                <option value="MORATUWA [MO]">MORATUWA [MO]</option>
-                <option value="MOUNT LAVINIA [ML]">MOUNT LAVINIA [ML]</option>
-                <option value="NUGEGODA [NU]">NUGEGODA [NU]</option>
-                <option value="PADUKKA [PA]">PADUKKA [PA]</option>
-                <option value="PANNIPITIYA [PN]">PANNIPITIYA [PN]</option>
-                <option value="PILIYANDALA [PI]">PILIYANDALA [PI]</option>
-                <option value="RAJAGIRIYA [RA]">RAJAGIRIYA [RA]</option>
-                <option value="RATMALANA [RT]">RATMALANA [RT]</option>
-                <option value="SRI JAYAWARDENEPURA KOTTE [SJ]">SRI JAYAWARDENEPURA KOTTE [SJ]</option>
-                <option value="TALAWATUGODA [TA]">TALAWATUGODA [TA]</option>
-                <option value="WELLAMPITIYA [WE]">WELLAMPITIYA [WE]</option>
+                {areas.map((area) => (
+                  <option key={area.area_id} value={area.area_name}>
+                    {area.area_name}
+                  </option>
+                ))}
               </select>
             </div>
             
@@ -323,7 +304,7 @@ function ManageMembers() {
               >
                 <option value="all">All Roles</option>
                 <option value="Member">Member</option>
-                <option value="Founder">Founder</option>
+                <option value="Founder">WorkingCommiteeMember</option>
               </select>
             </div>
             
@@ -376,7 +357,7 @@ function ManageMembers() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member ID</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Age</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Area</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact No</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
@@ -386,6 +367,7 @@ function ManageMembers() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -407,9 +389,9 @@ function ManageMembers() {
                       {calculateAge(member.dateOfBirth)}
                     </td>
                     
-                    {/* Username */}
+                    {/* Area */}
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {member.username || '-'}
+                      {member.area || '-'}
                     </td>
                     
                     {/* Contact No */}
@@ -462,7 +444,7 @@ function ManageMembers() {
                         member.role === 'SuperAdmin' ? 'bg-red-100 text-red-800' :
                         'bg-green-100 text-green-800'
                       }`}>
-                        {member.role || '-'}
+                        {member.role === 'Founder' ? 'WorkingCommiteeMember' : (member.role || '-')}
                       </span>
                     </td>
                     
@@ -484,6 +466,11 @@ function ManageMembers() {
                         month: 'short',
                         day: 'numeric'
                       }) : '-'}
+                    </td>
+                    
+                    {/* Username */}
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {member.username || '-'}
                     </td>
                     
                     {/* Actions */}
