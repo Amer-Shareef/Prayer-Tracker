@@ -567,25 +567,102 @@ router.put(
       "🔴 Rejecting pickup request:",
       requestId,
       "reason:",
-      rejectionReason
+      rejectionReason,
+      "user:",
+      req.user.id
     );
+
+    // Validate input
+    if (!rejectionReason || !rejectionReason.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Rejection reason is required",
+      });
+    }
 
     try {
       const connection = await pool.getConnection();
 
-      // Update the pickup request with rejection - FIXED column name
-      const [result] = await connection.query(
-        `
-      UPDATE pickup_requests 
-      SET 
-        status = 'rejected',
-        rejected_reason = ?,
-        rejected_at = NOW(),
-        rejected_by = ?
-      WHERE id = ?
-    `,
-        [rejectionReason, req.user.id, requestId]
+      // First, check if the pickup request exists and get its current status
+      const [existingRequest] = await connection.query(
+        "SELECT id, status, user_id FROM pickup_requests WHERE id = ?",
+        [requestId]
       );
+
+      if (existingRequest.length === 0) {
+        connection.release();
+        return res.status(404).json({
+          success: false,
+          message: "Pickup request not found",
+        });
+      }
+
+      console.log("📋 Found pickup request:", existingRequest[0]);
+
+      // Check if rejected_reason column exists, if not try rejection_reason, if not use a different approach
+      let rejectionReasonColumn = "rejected_reason";
+      let includeRejectionReason = true;
+
+      try {
+        // Test the column by running a simple query
+        await connection.query(
+          "SELECT rejected_reason FROM pickup_requests LIMIT 1"
+        );
+        console.log("✅ rejected_reason column exists");
+      } catch (error) {
+        if (error.code === "ER_BAD_FIELD_ERROR") {
+          console.log(
+            "📝 rejected_reason column not found, trying rejection_reason..."
+          );
+          try {
+            await connection.query(
+              "SELECT rejection_reason FROM pickup_requests LIMIT 1"
+            );
+            rejectionReasonColumn = "rejection_reason";
+            console.log("✅ rejection_reason column exists");
+          } catch (error2) {
+            if (error2.code === "ER_BAD_FIELD_ERROR") {
+              console.log(
+                "⚠️ No rejection reason column found, will only update status"
+              );
+              includeRejectionReason = false;
+            }
+          }
+        }
+      }
+
+      // Update the pickup request with rejection - Handle missing columns gracefully
+      let updateQuery, queryParams;
+
+      if (includeRejectionReason) {
+        updateQuery = `
+        UPDATE pickup_requests 
+        SET 
+          status = 'rejected',
+          ${rejectionReasonColumn} = ?,
+          rejected_at = NOW()
+        WHERE id = ?
+        `;
+        queryParams = [rejectionReason.trim(), requestId];
+      } else {
+        // Fallback: Only update status if rejection reason column doesn't exist
+        updateQuery = `
+        UPDATE pickup_requests 
+        SET 
+          status = 'rejected'
+        WHERE id = ?
+        `;
+        queryParams = [requestId];
+        console.log("⚠️ Rejection reason will not be saved (column missing)");
+      }
+
+      const [result] = await connection.query(updateQuery, queryParams);
+
+      console.log("📊 Update result:", {
+        affectedRows: result.affectedRows,
+        changedRows: result.changedRows,
+        info: result.info,
+      });
 
       if (result.affectedRows === 0) {
         connection.release();
@@ -613,23 +690,19 @@ router.put(
   }
 );
 
-// GET /api/pickup-requests/all - Get all pickup requests for founders/superadmin
-router.get(
-  "/pickup-requests/all",
-  authenticateToken,
-  authorizeRole(["Founder", "SuperAdmin", "founder", "superadmin"]),
-  async (req, res) => {
-    try {
-      const { user } = req;
-      const { status, mosque_id } = req.query;
+// GET /api/pickup-requests/all - Get all pickup requests (accessible to all authenticated users)
+router.get("/pickup-requests/all", authenticateToken, async (req, res) => {
+  try {
+    const { user } = req;
+    const { status, mosque_id } = req.query;
 
-      console.log("📋 Founder getting pickup requests:", {
-        userId: user.id,
-        userRole: user.role,
-        requestedMosqueId: mosque_id,
-      });
+    console.log("Getting pickup requests for user:", {
+      userId: user.id,
+      userRole: user.role,
+      requestedMosqueId: mosque_id,
+    });
 
-      let query = `
+    let query = `
         SELECT pr.*, 
                m.name as mosque_name,
                u.username as member_username,
@@ -644,55 +717,81 @@ router.get(
         LEFT JOIN users du ON pr.assigned_driver_id = du.id
         WHERE 1=1
       `;
-      const queryParams = [];
+    const queryParams = [];
 
-      // Filter by mosque for founders - CHECK MULTIPLE ROLE FORMATS
-      if (user.role === "Founder" || user.role === "founder") {
-        console.log("👑 User is founder, filtering by their mosque");
-        query +=
-          " AND pr.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)";
-        queryParams.push(user.id);
-      } else if (mosque_id) {
-        console.log("🔧 SuperAdmin specifying mosque_id:", mosque_id);
-        // SuperAdmin can specify mosque_id
+    // Apply role-based filtering
+    // if (user.role === "Member") {
+    //   console.log("Member accessing - showing only their mosque's requests");
+    //   // Members can see all requests from their mosque but with limited personal info
+    //   query += " AND pr.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)";
+    //   queryParams.push(user.id);
+
+    //   // For members, remove sensitive personal information
+    //   query = `
+    //       SELECT pr.id, pr.pickup_location, pr.status, pr.created_at, pr.days, pr.prayers,
+    //              pr.special_instructions, pr.approved_at, pr.rejected_at,
+    //              m.name as mosque_name,
+    //              CASE WHEN pr.user_id = ? THEN u.username ELSE 'Anonymous Member' END as member_username,
+    //              CASE WHEN pr.user_id = ? THEN u.phone ELSE NULL END as member_phone,
+    //              CASE WHEN pr.user_id = ? THEN u.email ELSE NULL END as member_email,
+    //              CASE WHEN pr.user_id = ? THEN u.full_name ELSE 'Anonymous Member' END as member_name,
+    //              du.username as driver_username,
+    //              du.phone as driver_phone
+    //       FROM pickup_requests pr
+    //       LEFT JOIN mosques m ON pr.mosque_id = m.id
+    //       LEFT JOIN users u ON pr.user_id = u.id
+    //       LEFT JOIN users du ON pr.assigned_driver_id = du.id
+    //       WHERE pr.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)
+    //     `;
+    //   queryParams.push(user.id, user.id, user.id, user.id, user.id);
+    // } else
+    if (
+      user.role === "Founder" ||
+      user.role === "founder" ||
+      user.role === "Member"
+    ) {
+      console.log("Founder accessing - showing their mosque's requests");
+      query += " AND pr.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)";
+      queryParams.push(user.id);
+    } else if (user.role === "SuperAdmin" || user.role === "superadmin") {
+      if (mosque_id) {
+        console.log("SuperAdmin specifying mosque_id:", mosque_id);
         query += " AND pr.mosque_id = ?";
         queryParams.push(mosque_id);
       } else {
-        console.log("🌍 No mosque filter applied (SuperAdmin seeing all)");
+        console.log("SuperAdmin seeing all requests");
       }
-
-      // Filter by status if provided
-      if (status) {
-        query += " AND pr.status = ?";
-        queryParams.push(status);
-      }
-
-      query += " ORDER BY pr.created_at DESC";
-
-      console.log("🔍 Founder query:", query);
-      console.log("📋 Founder query params:", queryParams);
-
-      const [requests] = await pool.execute(query, queryParams);
-
-      console.log(
-        `✅ Found ${requests.length} pickup requests for founder/admin`
-      );
-
-      res.json({
-        success: true,
-        data: requests,
-        total: requests.length,
-      });
-    } catch (error) {
-      console.error("❌ Error fetching pickup requests:", error);
-      res.status(500).json({
-        success: false,
-        message: "Failed to fetch pickup requests",
-        error: error.message,
-      });
     }
+
+    // Filter by status if provided
+    if (status) {
+      query += " AND pr.status = ?";
+      queryParams.push(status);
+    }
+
+    query += " ORDER BY pr.created_at DESC";
+
+    console.log("Query:", query);
+    console.log("Query params:", queryParams);
+
+    const [requests] = await pool.execute(query, queryParams);
+
+    console.log(`✅ Found ${requests.length} pickup requests for ${user.role}`);
+
+    res.json({
+      success: true,
+      data: requests,
+      total: requests.length,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching pickup requests:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch pickup requests",
+      error: error.message,
+    });
   }
-);
+});
 
 // GET /api/pickup-requests/available-drivers - Get members who can be assigned as drivers
 router.get(
@@ -704,7 +803,7 @@ router.get(
       const { user } = req;
       const { mosque_id } = req.query;
 
-      console.log("🚗 Getting available drivers");
+      console.log("Getting available drivers");
 
       let query = `
         SELECT u.id, u.username, u.full_name, u.phone, u.email, u.mobility,
@@ -733,7 +832,7 @@ router.get(
 
       const [drivers] = await pool.execute(query, queryParams);
 
-      console.log(`✅ Found ${drivers.length} available drivers`);
+      console.log(`Found ${drivers.length} available drivers`);
 
       res.json({
         success: true,

@@ -358,6 +358,10 @@ export const mosqueService = {
   getMosqueById: (id) => api.get(`/mosques/${id}`),
   createMosque: (data) => api.post("/mosques", data),
   updateMosque: (id, data) => api.put(`/mosques/${id}`, data),
+  getAttendanceStats: (id, period = 30) =>
+    api.get(`/mosques/${id}/attendance?period=${period}`),
+  getGeneralAttendanceStats: (period = 30) =>
+    api.get(`/attendance/general?period=${period}`),
 };
 
 // Member Management APIs

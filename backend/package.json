@@ -20,15 +20,7 @@
     "backup-weekly": "node scripts/autoBackup.js weekly",
     "backup-monthly": "node scripts/autoBackup.js monthly",
     "add-reset-fields": "node scripts/addResetTokenFields.js",
-    "add-otp-fields": "node scripts/addOtpFields.js",
-    "create-abdullah": "node scripts/createAbdullahUser.js",
-    "remove-notes": "node scripts/removeNotesColumn.js",
-    "update-member-schema": "node scripts/updateMemberSchema.js",
-    "create-feeds-table": "node scripts/createFeedsTable.js",
-    "create-call-center-table": "node scripts/createCallCenterTable.js",
-    "update-pickup-schema": "node scripts/updatePickupRequestsSchema.js",
-    "create-wakeup-calls-table": "node scripts/createWakeUpCallsTable.js",
-    "create-meetings-table": "node scripts/createMeetingsTable.js"
+    "add-otp-fields": "node scripts/addOtpFields.js"
   },
   "keywords": [],
   "author": "",

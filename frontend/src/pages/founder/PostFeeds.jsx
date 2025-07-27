@@ -15,6 +15,8 @@ const PostFeeds = () => {
   const [formData, setFormData] = useState({
     title: '',
     content: '',
+    image_url: '',
+    video_url: '',
     sendNotification: false,
     priority: 'normal'
   });
@@ -113,6 +115,8 @@ const PostFeeds = () => {
       const dataToSend = {
         title: formData.title,
         content: formData.content,
+        image_url: formData.image_url,
+        video_url: formData.video_url,
         send_notification: formData.sendNotification,
         priority: formData.priority || 'normal'
       };
@@ -134,6 +138,8 @@ const PostFeeds = () => {
         setFormData({
           title: '',
           content: '',
+          image_url: '',
+          video_url: '',
           sendNotification: false,
           priority: 'normal'
         });
@@ -371,6 +377,44 @@ const PostFeeds = () => {
                   <p className="text-red-500 text-sm mt-1">{errors.content}</p>
                 )}
               </div>
+
+              {/* Image URL */}
+              <div className="mb-4">
+                <label className="block text-gray-700 font-medium mb-2" htmlFor="image_url">
+                  Image URL (Optional)
+                </label>
+                <input
+                  type="url"
+                  id="image_url"
+                  name="image_url"
+                  value={formData.image_url}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="https://example.com/image.jpg"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Add an image URL to display with your feed
+                </p>
+              </div>
+
+              {/* Video URL */}
+              <div className="mb-6">
+                <label className="block text-gray-700 font-medium mb-2" htmlFor="video_url">
+                  Video URL (Optional)
+                </label>
+                <input
+                  type="url"
+                  id="video_url"
+                  name="video_url"
+                  value={formData.video_url}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Add a YouTube or video URL to embed with your feed
+                </p>
+              </div>
               
               {/* Send Notification */}
               <div className="mb-6">
@@ -400,6 +444,8 @@ const PostFeeds = () => {
                     setFormData({
                       title: '',
                       content: '',
+                      image_url: '',
+                      video_url: '',
                       sendNotification: false,
                       priority: 'normal'
                     });
@@ -466,9 +512,9 @@ const PostFeeds = () => {
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Date
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {/* <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Views
-                      </th>
+                      </th> */}
                       <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
@@ -492,15 +538,15 @@ const PostFeeds = () => {
                           <div className="text-sm text-gray-900">
                             Created: {formatDate(feed.created_at || feed.createdAt)}
                           </div>
-                          <div className="text-sm text-gray-500">
+                          {/* <div className="text-sm text-gray-500">
                             {feed.expires_at || feed.expiresAt ? 
                               `Expires: ${formatDate(feed.expires_at || feed.expiresAt)}` : 
                               'No expiration'}
-                          </div>
+                          </div> */}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {feed.views || 0} views
-                        </td>
+                        </td> */}
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
                             onClick={() => {
@@ -508,6 +554,8 @@ const PostFeeds = () => {
                               setFormData({
                                 title: feed.title,
                                 content: feed.content,
+                                image_url: feed.image_url || '',
+                                video_url: feed.video_url || '',
                                 sendNotification: feed.send_notification === 1,
                                 priority: feed.priority || 'normal'
                               });

@@ -2,15 +2,15 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import SuperAdminLayout from "../layouts/SuperAdminLayout";
-import { feedsService } from "../../services/api";
+import { feedsService, mosqueService } from "../../services/api";
 
 const SuperAdminDashboardComplete = () => {
   const { user } = useAuth();
   
-  // Mosque information state (Super Admin can see all mosques)
+  // Mosque information state 
   const [mosque, setMosque] = useState({
-    name: "Super Admin - All Mosques",
-    address: "System Wide Management",
+    name: "Loading...",
+    address: "Loading mosque information...",
     prayerTimes: {
       fajr: '4:43 AM',
       dhuhr: '12:15 PM',
@@ -21,30 +21,34 @@ const SuperAdminDashboardComplete = () => {
     }
   });
   
-  // Attendance stats across all mosques
+  // Attendance stats - will be populated from API
   const [attendanceStats, setAttendanceStats] = useState({
     today: {
-      total: 1542,
-      percentage: 78
+      total: 0,
+      percentage: 0
     },
     thisWeek: {
-      total: 9834,
-      percentage: 72
+      total: 0,
+      percentage: 0
     },
     thisMonth: {
-      total: 38500,
-      percentage: 75
+      total: 0,
+      percentage: 0
     }
   });
 
-  // Prayer breakdown stats (across all mosques)
+  // Prayer breakdown stats - will be populated from API
   const [prayerStats, setPrayerStats] = useState([
-    { name: 'Fajr', count: 332, percentage: 65 },
-    { name: 'Dhuhr', count: 428, percentage: 84 },
-    { name: 'Asr', count: 396, percentage: 78 },
-    { name: 'Maghrib', count: 456, percentage: 89 },
-    { name: 'Isha', count: 364, percentage: 71 }
+    { name: 'Fajr', count: 0, percentage: 0 },
+    { name: 'Dhuhr', count: 0, percentage: 0 },
+    { name: 'Asr', count: 0, percentage: 0 },
+    { name: 'Maghrib', count: 0, percentage: 0 },
+    { name: 'Isha', count: 0, percentage: 0 }
   ]);
+
+  // Loading states
+  const [loadingMosqueData, setLoadingMosqueData] = useState(true);
+  const [attendanceError, setAttendanceError] = useState(null);
 
   // Feeds state for recent announcements
   const [feeds, setFeeds] = useState([]);
@@ -56,6 +60,104 @@ const SuperAdminDashboardComplete = () => {
     gregorian: 'Thursday, June 29, 2025',
     hijri: '03 Muharram 1447'
   });
+  
+  // Fetch mosque data and attendance statistics
+  useEffect(() => {
+    const fetchMosqueData = async () => {
+      setLoadingMosqueData(true);
+      setAttendanceError(null);
+      
+      try {
+        // First, get user's mosque information
+        const mosquesResponse = await mosqueService.getMosques();
+        
+        if (mosquesResponse.data.success && mosquesResponse.data.data.length > 0) {
+          const userMosque = mosquesResponse.data.data[0]; // Get first mosque for the user
+          
+          // Update mosque info
+          setMosque({
+            name: userMosque.name || "Mosque",
+            address: userMosque.address || "Address not available",
+            prayerTimes: userMosque.today_prayer_times || {
+              fajr: '4:43 AM',
+              dhuhr: '12:15 PM',
+              asr: '3:45 PM',
+              maghrib: '6:23 PM',
+              isha: '7:43 PM',
+              jumuah: '1:30 PM'
+            }
+          });
+          
+          // Fetch attendance statistics for this mosque
+          try {
+            const attendanceResponse = await mosqueService.getAttendanceStats(userMosque.id);
+            
+            if (attendanceResponse.data.success) {
+              const stats = attendanceResponse.data.data;
+              
+              // Update attendance stats
+              setAttendanceStats({
+                today: {
+                  total: stats.today.total,
+                  percentage: stats.today.percentage
+                },
+                thisWeek: {
+                  total: stats.weekly.total,
+                  percentage: stats.weekly.percentage
+                },
+                thisMonth: {
+                  total: stats.monthly.total,
+                  percentage: stats.monthly.percentage
+                }
+              });
+              
+              // Update prayer breakdown stats
+              const breakdown = stats.today.prayerBreakdown;
+              setPrayerStats([
+                { name: 'Fajr', count: breakdown.fajr.count, percentage: breakdown.fajr.percentage },
+                { name: 'Dhuhr', count: breakdown.dhuhr.count, percentage: breakdown.dhuhr.percentage },
+                { name: 'Asr', count: breakdown.asr.count, percentage: breakdown.asr.percentage },
+                { name: 'Maghrib', count: breakdown.maghrib.count, percentage: breakdown.maghrib.percentage },
+                { name: 'Isha', count: breakdown.isha.count, percentage: breakdown.isha.percentage }
+              ]);
+              
+              console.log('✅ Attendance data loaded successfully:', stats);
+            }
+          } catch (attendanceErr) {
+            console.error('❌ Error fetching attendance data:', attendanceErr);
+            setAttendanceError('Failed to load attendance statistics');
+            
+            // Keep default/fallback stats in case of attendance API error
+            setAttendanceStats({
+              today: { total: 0, percentage: 0 },
+              thisWeek: { total: 0, percentage: 0 },
+              thisMonth: { total: 0, percentage: 0 }
+            });
+            
+            setPrayerStats([
+              { name: 'Fajr', count: 0, percentage: 0 },
+              { name: 'Dhuhr', count: 0, percentage: 0 },
+              { name: 'Asr', count: 0, percentage: 0 },
+              { name: 'Maghrib', count: 0, percentage: 0 },
+              { name: 'Isha', count: 0, percentage: 0 }
+            ]);
+          }
+        } else {
+          console.warn('⚠️ No mosque data found for user');
+          setAttendanceError('No mosque data found');
+        }
+      } catch (error) {
+        console.error('❌ Error fetching mosque data:', error);
+        setAttendanceError('Failed to load mosque information');
+      } finally {
+        setLoadingMosqueData(false);
+      }
+    };
+    
+    if (user) {
+      fetchMosqueData();
+    }
+  }, [user]);
   
   // Fetch latest feeds from all mosques (Super Admin sees all)
   useEffect(() => {
@@ -107,55 +209,74 @@ const SuperAdminDashboardComplete = () => {
           <p className="mt-1 text-sm text-gray-600">
             {mosque.name} • {currentDate.gregorian} • {currentDate.hijri}
           </p>
+          {attendanceError && (
+            <p className="mt-1 text-sm text-red-600">
+              ⚠️ {attendanceError}
+            </p>
+          )}
         </div>
         
         <div className="grid grid-cols-1 gap-6 mb-6">
           {/* Attendance Overview Card - Now full width */}
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Global Attendance Overview</h2>
+              <h2 className="text-xl font-bold">
+                {user.role === "SuperAdmin" ? "Mosque Attendance Overview" : "Attendance Overview"}
+              </h2>
               <Link to="/superadmin/view-attendance" className="text-purple-600 hover:text-purple-800 text-sm font-medium">
                 View Full Report
               </Link>
             </div>
             
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="bg-gray-50 p-4 rounded-lg text-center">
-                <p className="text-sm text-gray-500 mb-1">Today</p>
-                <h3 className="text-2xl font-bold text-gray-900">{attendanceStats.today.total}</h3>
-                <p className="text-sm font-medium text-purple-600">{attendanceStats.today.percentage}%</p>
+            {loadingMosqueData ? (
+              <div className="flex items-center justify-center p-8">
+                <svg className="animate-spin h-8 w-8 text-purple-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p className="ml-3 text-gray-500">Loading attendance data...</p>
               </div>
-              <div className="bg-gray-50 p-4 rounded-lg text-center">
-                <p className="text-sm text-gray-500 mb-1">This Week</p>
-                <h3 className="text-2xl font-bold text-gray-900">{attendanceStats.thisWeek.total}</h3>
-                <p className="text-sm font-medium text-purple-600">{attendanceStats.thisWeek.percentage}%</p>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg text-center">
-                <p className="text-sm text-gray-500 mb-1">This Month</p>
-                <h3 className="text-2xl font-bold text-gray-900">{attendanceStats.thisMonth.total}</h3>
-                <p className="text-sm font-medium text-purple-600">{attendanceStats.thisMonth.percentage}%</p>
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Today's Prayer Breakdown (All Mosques)</h3>
-              {prayerStats.map((stats) => (
-                <div key={stats.name} className="flex items-center">
-                  <div className="w-16 text-sm font-medium text-gray-700">{stats.name}</div>
-                  <div className="w-full mx-4">
-                    <div className="bg-gray-200 rounded-full h-2.5">
-                      <div 
-                        className="bg-purple-600 h-2.5 rounded-full" 
-                        style={{ width: `${stats.percentage}%` }}
-                      ></div>
-                    </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="bg-gray-50 p-4 rounded-lg text-center">
+                    <p className="text-sm text-gray-500 mb-1">Today</p>
+                    <h3 className="text-2xl font-bold text-gray-900">{attendanceStats.today.total}</h3>
+                    <p className="text-sm font-medium text-purple-600">{attendanceStats.today.percentage}%</p>
                   </div>
-                  <div className="text-sm text-gray-600 w-24 text-right">
-                    {stats.count} ({stats.percentage}%)
+                  <div className="bg-gray-50 p-4 rounded-lg text-center">
+                    <p className="text-sm text-gray-500 mb-1">This Week</p>
+                    <h3 className="text-2xl font-bold text-gray-900">{attendanceStats.thisWeek.total}</h3>
+                    <p className="text-sm font-medium text-purple-600">{attendanceStats.thisWeek.percentage}%</p>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg text-center">
+                    <p className="text-sm text-gray-500 mb-1">This Month</p>
+                    <h3 className="text-2xl font-bold text-gray-900">{attendanceStats.thisMonth.total}</h3>
+                    <p className="text-sm font-medium text-purple-600">{attendanceStats.thisMonth.percentage}%</p>
                   </div>
                 </div>
-              ))}
-            </div>
+                
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Today's Prayer Breakdown</h3>
+                  {prayerStats.map((stats) => (
+                    <div key={stats.name} className="flex items-center">
+                      <div className="w-16 text-sm font-medium text-gray-700">{stats.name}</div>
+                      <div className="w-full mx-4">
+                        <div className="bg-gray-200 rounded-full h-2.5">
+                          <div 
+                            className="bg-purple-600 h-2.5 rounded-full" 
+                            style={{ width: `${stats.percentage}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      <div className="text-sm text-gray-600 w-24 text-right">
+                        {stats.count} ({stats.percentage}%)
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
         

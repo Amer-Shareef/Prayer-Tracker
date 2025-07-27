@@ -172,6 +172,7 @@ router.post(
         expires_at,
         send_notification,
         image_url,
+        video_url,
       } = req.body;
       const { user } = req;
       if (!title || !content) {
@@ -217,8 +218,8 @@ router.post(
 
       const [result] = await pool.execute(
         `
-      INSERT INTO feeds (title, content, priority, author_id, mosque_id, image_url, expires_at, send_notification)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO feeds (title, content, priority, author_id, mosque_id, image_url, video_url, expires_at, send_notification)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
         [
           title,
@@ -227,6 +228,7 @@ router.post(
           user.id,
           mosqueId,
           image_url || null,
+          video_url || null,
           expires_at || null,
           send_notification ? 1 : 0,
         ]
@@ -274,6 +276,7 @@ router.put(
         expires_at,
         send_notification,
         image_url,
+        video_url,
         is_active,
       } = req.body;
       const { user } = req;
@@ -294,8 +297,7 @@ router.put(
         // Founder can only edit feeds from their mosque
         accessQuery = `
           SELECT f.* FROM feeds f
-          JOIN users u ON f.mosque_id = u.mosque_id
-          WHERE f.id = ? AND u.id = ?
+          WHERE f.id = ? AND f.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)
         `;
         accessParams = [id, user.id];
       }
@@ -311,7 +313,7 @@ router.put(
 
       await pool.execute(
         `
-      UPDATE feeds SET title = ?, content = ?, priority = ?, image_url = ?, expires_at = ?, send_notification = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+      UPDATE feeds SET title = ?, content = ?, priority = ?, image_url = ?, video_url = ?, expires_at = ?, send_notification = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `,
         [
@@ -319,6 +321,7 @@ router.put(
           content,
           priority || "normal",
           image_url || null,
+          video_url || null,
           expires_at || null,
           send_notification ? 1 : 0,
           is_active !== undefined ? (is_active ? 1 : 0) : 1,
@@ -374,8 +377,7 @@ router.delete(
         // Founder can only delete feeds from their mosque
         accessQuery = `
           SELECT f.* FROM feeds f
-          JOIN users u ON f.mosque_id = u.mosque_id
-          WHERE f.id = ? AND u.id = ?
+          WHERE f.id = ? AND f.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)
         `;
         accessParams = [id, user.id];
       }

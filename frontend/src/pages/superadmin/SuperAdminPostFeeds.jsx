@@ -9,6 +9,8 @@ const SuperAdminPostFeeds = () => {
   const [formData, setFormData] = useState({
     title: '',
     content: '',
+    image_url: '',
+    video_url: '',
     sendNotification: false,
     priority: 'normal',
     mosqueId: 'all' // Super Admin can post to all mosques
@@ -44,6 +46,8 @@ const SuperAdminPostFeeds = () => {
         setFormData({
           title: '',
           content: '',
+          image_url: '',
+          video_url: '',
           sendNotification: false,
           priority: 'normal',
           mosqueId: 'all'
@@ -149,6 +153,38 @@ const SuperAdminPostFeeds = () => {
                   className="w-full border rounded-lg px-3 py-2"
                   required
                 />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Image URL (Optional)
+                </label>
+                <input
+                  type="url"
+                  value={formData.image_url}
+                  onChange={(e) => setFormData({...formData, image_url: e.target.value})}
+                  className="w-full border rounded-lg px-3 py-2"
+                  placeholder="https://example.com/image.jpg"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Add an image URL to display with your feed
+                </p>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Video URL (Optional)
+                </label>
+                <input
+                  type="url"
+                  value={formData.video_url}
+                  onChange={(e) => setFormData({...formData, video_url: e.target.value})}
+                  className="w-full border rounded-lg px-3 py-2"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Add a YouTube or video URL to embed with your feed
+                </p>
               </div>
 
               <div className="mb-4">

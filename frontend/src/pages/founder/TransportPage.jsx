@@ -273,7 +273,16 @@ const TransportPage = () => {
 
     } catch (error) {
       console.error('❌ Error processing request:', error);
-      alert('Failed to process request. Please try again.');
+      
+      // Show more specific error messages
+      let errorMessage = 'Failed to process request. Please try again.';
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(errorMessage);
     } finally {
       setActionLoading(false);
     }

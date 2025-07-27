@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import FounderLayout from '../../components/layouts/FounderLayout';
 import feedsService from '../../services/feedsService';
 
-const ReminderPage = () => {
+const PostFeeds = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -14,57 +14,66 @@ const ReminderPage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
-    image: null,
     content: '',
-    sendNotification: false
+    image_url: '',
+    video_url: '',
+    sendNotification: false,
+    priority: 'normal'
   });
   const [errors, setErrors] = useState({});
   const [success, setSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [activeTab, setActiveTab] = useState('editor');
   const [feeds, setFeeds] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState('');
+
+  // Fetch feeds from API
+  const fetchFeeds = async () => {
+    try {
+      setLoading(true);
+      setApiError('');
+      
+      const response = await feedsService.getAllFeeds();
+      if (response.success) {
+        setFeeds(response.data);
+      } else {
+        setApiError(response.message || 'Failed to fetch feeds');
+      }
+    } catch (error) {
+      console.error('Error fetching feeds:', error);
+      setApiError(error.message || 'Failed to fetch feeds');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     // Fetch feeds from API
-    const fetchFeeds = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const response = await feedsService.getAllFeeds();
-        setFeeds(response.data || []);
-      } catch (err) {
-        console.error("Error fetching feeds:", err);
-        setError("Failed to load feeds. Please try again.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
     fetchFeeds();
     
     // Check if we're in edit mode
     if (editId) {
-      const fetchFeed = async () => {
+      const loadFeed = async () => {
         try {
           const response = await feedsService.getFeedById(editId);
-          if (response.data) {
+          if (response.success) {
             setFormData({
               title: response.data.title,
-              image: response.data.image_url,
               content: response.data.content,
-              sendNotification: response.data.send_notification
+              image_url: response.data.image_url || '',
+              video_url: response.data.video_url || '',
+              sendNotification: response.data.send_notification === 1,
+              priority: response.data.priority || 'normal'
             });
             setIsEditing(true);
           }
-        } catch (err) {
-          console.error("Error fetching feed for editing:", err);
-          setError("Failed to load feed for editing.");
+        } catch (error) {
+          console.error('Error loading feed:', error);
         }
       };
       
-      fetchFeed();
+      loadFeed();
     }
   }, [editId]);
   
@@ -86,10 +95,10 @@ const ReminderPage = () => {
   
   // Handle form input changes
   const handleInputChange = (e) => {
-    const { name, value, type, checked, files } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : type === 'file' ? files[0] : value
+      [name]: type === 'checkbox' ? checked : value
     }));
   };
   
@@ -100,66 +109,67 @@ const ReminderPage = () => {
     if (!validateForm()) {
       return;
     }
+
+    setLoading(true);
+    setApiError('');
     
     try {
-      setIsLoading(true);
-      
-      const feedData = {
+      const dataToSend = {
         title: formData.title,
         content: formData.content,
+        image_url: formData.image_url,
+        video_url: formData.video_url,
         send_notification: formData.sendNotification,
-        image_url: formData.image
+        priority: formData.priority || 'normal'
       };
       
       let response;
       
       if (isEditing) {
         // Update feed
-        response = await feedsService.updateFeed(editId, feedData);
+        response = await feedsService.updateFeed(editId, dataToSend);
         setSuccessMessage("Feed updated successfully!");
-        
-        // Update the state with the edited feed
-        setFeeds(prev => prev.map(feed => {
-          if (feed.id === editId) {
-            return response.data;
-          }
-          return feed;
-        }));
       } else {
         // Create new feed
-        response = await feedsService.createFeed(feedData);
+        response = await feedsService.createFeed(dataToSend);
         setSuccessMessage("Feed created successfully!");
+      }
+      
+      if (response.success) {
+        // Reset form
+        setFormData({
+          title: '',
+          content: '',
+          image_url: '',
+          video_url: '',
+          sendNotification: false,
+          priority: 'normal'
+        });
         
-        // Add the new feed to the state
-        setFeeds(prev => [response.data, ...prev]);
+        setIsEditing(false);
+        setSuccess(true);
+        setActiveTab('list');
+        
+        // Refresh feeds list
+        fetchFeeds();
+        
+        // Reset URL parameter if we were editing
+        if (editId) {
+          navigate('/founder/post-feeds');
+        }
+        
+        // Hide success message after 3 seconds
+        setTimeout(() => {
+          setSuccess(false);
+        }, 3000);
+      } else {
+        setApiError(response.message || 'Operation failed');
       }
-      
-      // Reset form
-      setFormData({
-        title: '',
-        image: null,
-        content: '',
-        sendNotification: false
-      });
-      
-      setIsEditing(false);
-      setSuccess(true);
-      setActiveTab('list');
-      
-      // Reset URL parameter if we were editing
-      if (editId) {
-        navigate('/founder/reminder');
-      }
-      
-      // Hide success message after 3 seconds
-      setTimeout(() => {
-        setSuccess(false);
-      }, 3000);
-    } catch (err) {
-      console.error("Error submitting feed:", err);
-      setError(err.message || "Failed to save feed. Please try again.");
+    } catch (error) {
+      console.error('Error saving feed:', error);
+      setApiError(error.message || 'Failed to save feed');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
   
@@ -167,21 +177,41 @@ const ReminderPage = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this feed?")) {
       try {
-        setIsLoading(true);
-        await feedsService.deleteFeed(id);
-        setFeeds(prev => prev.filter(feed => feed.id !== id));
-        setSuccessMessage("Feed deleted successfully!");
-        setSuccess(true);
+        setLoading(true);
         
-        // Hide success message after 3 seconds
-        setTimeout(() => {
-          setSuccess(false);
-        }, 3000);
-      } catch (err) {
-        console.error("Error deleting feed:", err);
-        setError("Failed to delete feed. Please try again.");
+        const response = await feedsService.deleteFeed(id);
+        
+        if (response.success) {
+          // Refresh feeds list
+          fetchFeeds();
+          
+          if (editId === id) {
+            // Reset form and navigate back if we were editing the deleted feed
+            setFormData({
+              title: '',
+              content: '',
+              sendNotification: false,
+              priority: 'normal'
+            });
+            setIsEditing(false);
+            navigate('/founder/post-feeds');
+          }
+          
+          setSuccessMessage("Feed deleted successfully!");
+          setSuccess(true);
+          
+          // Hide success message after 3 seconds
+          setTimeout(() => {
+            setSuccess(false);
+          }, 3000);
+        } else {
+          setApiError(response.message || 'Failed to delete feed');
+        }
+      } catch (error) {
+        console.error('Error deleting feed:', error);
+        setApiError(error.message || 'Failed to delete feed');
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     }
   };
@@ -208,12 +238,6 @@ const ReminderPage = () => {
       day: 'numeric'
     });
   };
-  
-  // Get minimum date for expiry (today)
-  const getMinDate = () => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  };
 
   return (
     <FounderLayout>
@@ -233,6 +257,22 @@ const ReminderPage = () => {
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium">{successMessage}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* API Error message */}
+        {apiError && (
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium">{apiError}</p>
               </div>
             </div>
           </div>
@@ -301,31 +341,22 @@ const ReminderPage = () => {
                 )}
               </div>
               
-              {/* Feed Image */}
+              {/* Priority Selection */}
               <div className="mb-4">
-                <label className="block text-gray-700 font-medium mb-2" htmlFor="image">
-                  Feed Image
+                <label className="block text-gray-700 font-medium mb-2" htmlFor="priority">
+                  Priority
                 </label>
-                <input
-                  type="file"
-                  id="image"
-                  name="image"
+                <select
+                  id="priority"
+                  name="priority"
+                  value={formData.priority}
                   onChange={handleInputChange}
-                  accept="image/*"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  Upload an image for your feed (optional)
-                </p>
-                {formData.image && (
-                  <div className="mt-2">
-                    <img 
-                      src={URL.createObjectURL(formData.image)} 
-                      alt="Preview" 
-                      className="w-32 h-32 object-cover rounded-lg"
-                    />
-                  </div>
-                )}
+                >
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
               </div>
               
               {/* Feed Content */}
@@ -347,6 +378,44 @@ const ReminderPage = () => {
                 {errors.content && (
                   <p className="text-red-500 text-sm mt-1">{errors.content}</p>
                 )}
+              </div>
+
+              {/* Image URL */}
+              <div className="mb-4">
+                <label className="block text-gray-700 font-medium mb-2" htmlFor="image_url">
+                  Image URL (Optional)
+                </label>
+                <input
+                  type="url"
+                  id="image_url"
+                  name="image_url"
+                  value={formData.image_url}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="https://example.com/image.jpg"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Add an image URL to display with your feed
+                </p>
+              </div>
+
+              {/* Video URL */}
+              <div className="mb-6">
+                <label className="block text-gray-700 font-medium mb-2" htmlFor="video_url">
+                  Feed Video
+                </label>
+                <input
+                  type="url"
+                  id="video_url"
+                  name="video_url"
+                  value={formData.video_url}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Add a YouTube or video URL to embed with your feed (Optional)
+                </p>
               </div>
               
               {/* Send Notification */}
@@ -376,16 +445,19 @@ const ReminderPage = () => {
                   onClick={() => {
                     setFormData({
                       title: '',
-                      image: null,
                       content: '',
-                      sendNotification: false
+                      image_url: '',
+                      video_url: '',
+                      sendNotification: false,
+                      priority: 'normal'
                     });
                     setIsEditing(false);
                     if (editId) {
-                      navigate('/founder/reminder');
+                      navigate('/founder/post-feeds');
                     }
                   }}
                   className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 mr-2"
+                  disabled={loading}
                 >
                   Cancel
                 </button>
@@ -393,8 +465,19 @@ const ReminderPage = () => {
                 <button
                   type="submit"
                   className="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700"
+                  disabled={loading}
                 >
-                  {isEditing ? 'Update Feed' : 'Publish Feed'}
+                  {loading ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      {isEditing ? 'Updating...' : 'Publishing...'}
+                    </span>
+                  ) : (
+                    isEditing ? 'Update Feed' : 'Publish Feed'
+                  )}
                 </button>
               </div>
             </form>
@@ -402,7 +485,12 @@ const ReminderPage = () => {
         ) : (
           <div className="bg-white rounded-lg shadow">
             {/* Feed List */}
-            {feeds.length === 0 ? (
+            {loading && !feeds.length ? (
+              <div className="p-6 text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+                <p className="mt-3 text-gray-600">Loading feeds...</p>
+              </div>
+            ) : feeds.length === 0 ? (
               <div className="p-6 text-center">
                 <p className="text-gray-500">No feeds yet</p>
                 <button
@@ -426,9 +514,9 @@ const ReminderPage = () => {
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Date
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {/* <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Views
-                      </th>
+                      </th> */}
                       <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
@@ -445,31 +533,35 @@ const ReminderPage = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getPriorityBadgeColor(feed.priority)}`}>
-                            {feed.priority.charAt(0).toUpperCase() + feed.priority.slice(1)}
+                            {feed.priority?.charAt(0).toUpperCase() + feed.priority?.slice(1) || 'Normal'}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
-                            Created: {formatDate(feed.createdAt)}
+                            Created: {formatDate(feed.created_at || feed.createdAt)}
                           </div>
-                          <div className="text-sm text-gray-500">
-                            Expires: {formatDate(feed.expiresAt)}
-                          </div>
+                          {/* <div className="text-sm text-gray-500">
+                            {feed.expires_at || feed.expiresAt ? 
+                              `Expires: ${formatDate(feed.expires_at || feed.expiresAt)}` : 
+                              'No expiration'}
+                          </div> */}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {feed.views} views
-                        </td>
+                        {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {feed.views || 0} views
+                        </td> */}
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
                             onClick={() => {
                               setIsEditing(true);
                               setFormData({
                                 title: feed.title,
-                                image: feed.image,
                                 content: feed.content,
-                                sendNotification: false
+                                image_url: feed.image_url || '',
+                                video_url: feed.video_url || '',
+                                sendNotification: feed.send_notification === 1,
+                                priority: feed.priority || 'normal'
                               });
-                              navigate(`/founder/reminder?edit=${feed.id}`);
+                              navigate(`/founder/post-feeds?edit=${feed.id}`);
                               setActiveTab('editor');
                             }}
                             className="text-blue-600 hover:text-blue-900 mr-3"
@@ -496,4 +588,4 @@ const ReminderPage = () => {
   );
 };
 
-export default ReminderPage;
+export default PostFeeds;

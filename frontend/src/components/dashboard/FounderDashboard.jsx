@@ -3,14 +3,15 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import FounderLayout from "../layouts/FounderLayout";
 import feedService from "../../services/feedService"; // Import feed service
+import { mosqueService } from "../../services/api"; // Import mosque service
 
 const FounderDashboard = () => {
   const { user } = useAuth();
   
   // Mosque information state
   const [mosque, setMosque] = useState({
-    name: "Masjid Ul Jabbar Jumma Masjid",
-    address: "123 Mosque Road, Gothatuwa, 10101",
+    name: "Loading...",
+    address: "Loading mosque information...",
     prayerTimes: {
       fajr: '4:43 AM',
       dhuhr: '12:15 PM',
@@ -21,30 +22,34 @@ const FounderDashboard = () => {
     }
   });
   
-  // Attendance stats
+  // Attendance stats - will be populated from API
   const [attendanceStats, setAttendanceStats] = useState({
     today: {
-      total: 142,
-      percentage: 75,
+      total: 0,
+      percentage: 0,
       prayerBreakdown: {
-        fajr: { count: 32, percentage: 65 },
-        dhuhr: { count: 28, percentage: 57 },
-        asr: { count: 26, percentage: 53 },
-        maghrib: { count: 36, percentage: 73 },
-        isha: { count: 20, percentage: 41 }
+        fajr: { count: 0, percentage: 0 },
+        dhuhr: { count: 0, percentage: 0 },
+        asr: { count: 0, percentage: 0 },
+        maghrib: { count: 0, percentage: 0 },
+        isha: { count: 0, percentage: 0 }
       }
     },
     weekly: {
-      total: 934,
-      percentage: 68,
-      trend: 'up'
+      total: 0,
+      percentage: 0,
+      trend: 'stable'
     },
     monthly: {
-      total: 3850,
-      percentage: 71,
-      trend: 'up'
+      total: 0,
+      percentage: 0,
+      trend: 'stable'
     }
   });
+
+  // Loading states
+  const [loadingMosqueData, setLoadingMosqueData] = useState(true);
+  const [attendanceError, setAttendanceError] = useState(null);
   
   // Feeds state with loading and error handling
   const [feeds, setFeeds] = useState([]);
@@ -55,6 +60,145 @@ const FounderDashboard = () => {
     gregorian: 'Thursday, June 29, 2025',
     hijri: '03 Muharram 1447'
   });
+  
+  // Fetch mosque data and attendance statistics
+  useEffect(() => {
+    const fetchMosqueData = async () => {
+      setLoadingMosqueData(true);
+      setAttendanceError(null);
+      
+      try {
+        // First, get user's mosque information
+        console.log('🔍 Fetching mosque data for user:', user);
+        const mosquesResponse = await mosqueService.getMosques();
+        console.log('📊 Mosque API response:', mosquesResponse);
+        
+        if (mosquesResponse.data.success && mosquesResponse.data.data.length > 0) {
+          const userMosque = mosquesResponse.data.data[0]; // Get first mosque for the user
+          
+          // Update mosque info
+          setMosque({
+            name: userMosque.name || "Mosque",
+            address: userMosque.address || "Address not available",
+            prayerTimes: userMosque.today_prayer_times || {
+              fajr: '4:43 AM',
+              dhuhr: '12:15 PM',
+              asr: '3:45 PM',
+              maghrib: '6:23 PM',
+              isha: '7:43 PM',
+              jumuah: '1:30 PM'
+            }
+          });
+          
+          // Fetch attendance statistics for this mosque
+          try {
+            const attendanceResponse = await mosqueService.getAttendanceStats(userMosque.id);
+            
+            if (attendanceResponse.data.success) {
+              const stats = attendanceResponse.data.data;
+              
+              // Update attendance stats
+              setAttendanceStats({
+                today: {
+                  total: stats.today.total,
+                  percentage: stats.today.percentage,
+                  prayerBreakdown: {
+                    fajr: { count: stats.today.prayerBreakdown.fajr.count, percentage: stats.today.prayerBreakdown.fajr.percentage },
+                    dhuhr: { count: stats.today.prayerBreakdown.dhuhr.count, percentage: stats.today.prayerBreakdown.dhuhr.percentage },
+                    asr: { count: stats.today.prayerBreakdown.asr.count, percentage: stats.today.prayerBreakdown.asr.percentage },
+                    maghrib: { count: stats.today.prayerBreakdown.maghrib.count, percentage: stats.today.prayerBreakdown.maghrib.percentage },
+                    isha: { count: stats.today.prayerBreakdown.isha.count, percentage: stats.today.prayerBreakdown.isha.percentage }
+                  }
+                },
+                weekly: {
+                  total: stats.weekly.total,
+                  percentage: stats.weekly.percentage,
+                  trend: stats.weekly.percentage >= 70 ? 'up' : stats.weekly.percentage >= 50 ? 'stable' : 'down'
+                },
+                monthly: {
+                  total: stats.monthly.total,
+                  percentage: stats.monthly.percentage,
+                  trend: stats.monthly.percentage >= 70 ? 'up' : stats.monthly.percentage >= 50 ? 'stable' : 'down'
+                }
+              });
+              
+              console.log('✅ Attendance data loaded successfully:', stats);
+            }
+          } catch (attendanceErr) {
+            console.error('❌ Error fetching attendance data:', attendanceErr);
+            setAttendanceError('Failed to load attendance statistics');
+          }
+        } else {
+          console.warn('⚠️ No mosque data found for user, trying general stats...');
+          console.log('📊 Full response:', mosquesResponse);
+          
+          // Try to get general attendance stats instead
+          try {
+            const generalStatsResponse = await mosqueService.getGeneralAttendanceStats();
+            
+            if (generalStatsResponse.data.success) {
+              const stats = generalStatsResponse.data.data;
+              
+              // Set mosque info from general stats
+              setMosque({
+                name: stats.mosque.name,
+                address: stats.mosque.address,
+                prayerTimes: {
+                  fajr: '4:43 AM',
+                  dhuhr: '12:15 PM',
+                  asr: '3:45 PM',
+                  maghrib: '6:23 PM',
+                  isha: '7:43 PM',
+                  jumuah: '1:30 PM'
+                }
+              });
+              
+              // Update attendance stats
+              setAttendanceStats({
+                today: {
+                  total: stats.today.total,
+                  percentage: stats.today.percentage,
+                  prayerBreakdown: {
+                    fajr: { count: stats.today.prayerBreakdown.fajr.count, percentage: stats.today.prayerBreakdown.fajr.percentage },
+                    dhuhr: { count: stats.today.prayerBreakdown.dhuhr.count, percentage: stats.today.prayerBreakdown.dhuhr.percentage },
+                    asr: { count: stats.today.prayerBreakdown.asr.count, percentage: stats.today.prayerBreakdown.asr.percentage },
+                    maghrib: { count: stats.today.prayerBreakdown.maghrib.count, percentage: stats.today.prayerBreakdown.maghrib.percentage },
+                    isha: { count: stats.today.prayerBreakdown.isha.count, percentage: stats.today.prayerBreakdown.isha.percentage }
+                  }
+                },
+                weekly: {
+                  total: stats.weekly.total,
+                  percentage: stats.weekly.percentage,
+                  trend: stats.weekly.percentage >= 70 ? 'up' : stats.weekly.percentage >= 50 ? 'stable' : 'down'
+                },
+                monthly: {
+                  total: stats.monthly.total,
+                  percentage: stats.monthly.percentage,
+                  trend: stats.monthly.percentage >= 70 ? 'up' : stats.monthly.percentage >= 50 ? 'stable' : 'down'
+                }
+              });
+              
+              console.log('✅ General attendance data loaded successfully:', stats);
+            } else {
+              setAttendanceError('No attendance data available');
+            }
+          } catch (generalError) {
+            console.error('❌ Error fetching general stats:', generalError);
+            setAttendanceError('No mosque data found');
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error fetching mosque data:', error);
+        setAttendanceError('Failed to load mosque information');
+      } finally {
+        setLoadingMosqueData(false);
+      }
+    };
+    
+    if (user) {
+      fetchMosqueData();
+    }
+  }, [user]);
   
   // Fetch latest feeds from the API
   useEffect(() => {
@@ -106,6 +250,11 @@ const FounderDashboard = () => {
           <p className="mt-1 text-sm text-gray-600">
             {mosque.name} • {currentDate.gregorian} • {currentDate.hijri}
           </p>
+          {attendanceError && (
+            <p className="mt-1 text-sm text-red-600">
+              ⚠️ {attendanceError}
+            </p>
+          )}
         </div>
         
         <div className="grid grid-cols-1 gap-6 mb-6">
@@ -118,43 +267,55 @@ const FounderDashboard = () => {
               </Link>
             </div>
             
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="bg-gray-50 p-4 rounded-lg text-center">
-                <p className="text-sm text-gray-500 mb-1">Today</p>
-                <h3 className="text-2xl font-bold text-gray-900">{attendanceStats.today.total}</h3>
-                <p className="text-sm font-medium text-green-600">{attendanceStats.today.percentage}%</p>
+            {loadingMosqueData ? (
+              <div className="flex items-center justify-center p-8">
+                <svg className="animate-spin h-8 w-8 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p className="ml-3 text-gray-500">Loading attendance data...</p>
               </div>
-              <div className="bg-gray-50 p-4 rounded-lg text-center">
-                <p className="text-sm text-gray-500 mb-1">This Week</p>
-                <h3 className="text-2xl font-bold text-gray-900">{attendanceStats.weekly.total}</h3>
-                <p className="text-sm font-medium text-green-600">{attendanceStats.weekly.percentage}%</p>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg text-center">
-                <p className="text-sm text-gray-500 mb-1">This Month</p>
-                <h3 className="text-2xl font-bold text-gray-900">{attendanceStats.monthly.total}</h3>
-                <p className="text-sm font-medium text-green-600">{attendanceStats.monthly.percentage}%</p>
-              </div>
-            </div>
-            
-            <h3 className="font-bold text-gray-700 mb-2">Today's Prayer Breakdown</h3>
-            <div className="space-y-2">
-              {Object.entries(attendanceStats.today.prayerBreakdown).map(([prayer, stats]) => (
-                <div key={prayer} className="flex items-center">
-                  <div className="w-20 capitalize">{prayer}</div>
-                  <div className="w-full mx-4">
-                    <div className="bg-gray-200 rounded-full h-2.5">
-                      <div 
-                        className="bg-green-600 h-2.5 rounded-full" 
-                        style={{ width: `${stats.percentage}%` }}
-                      ></div>
-                    </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="bg-gray-50 p-4 rounded-lg text-center">
+                    <p className="text-sm text-gray-500 mb-1">Today</p>
+                    <h3 className="text-2xl font-bold text-gray-900">{attendanceStats.today.total}</h3>
+                    <p className="text-sm font-medium text-green-600">{attendanceStats.today.percentage}%</p>
                   </div>
-                  <div className="text-sm text-gray-600 w-24 text-right">
-                    {stats.count} ({stats.percentage}%)
+                  <div className="bg-gray-50 p-4 rounded-lg text-center">
+                    <p className="text-sm text-gray-500 mb-1">This Week</p>
+                    <h3 className="text-2xl font-bold text-gray-900">{attendanceStats.weekly.total}</h3>
+                    <p className="text-sm font-medium text-green-600">{attendanceStats.weekly.percentage}%</p>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg text-center">
+                    <p className="text-sm text-gray-500 mb-1">This Month</p>
+                    <h3 className="text-2xl font-bold text-gray-900">{attendanceStats.monthly.total}</h3>
+                    <p className="text-sm font-medium text-green-600">{attendanceStats.monthly.percentage}%</p>
                   </div>
                 </div>
-              ))}
-            </div>
+                
+                <h3 className="font-bold text-gray-700 mb-2">Today's Prayer Breakdown</h3>
+                <div className="space-y-2">
+                  {Object.entries(attendanceStats.today.prayerBreakdown).map(([prayer, stats]) => (
+                    <div key={prayer} className="flex items-center">
+                      <div className="w-20 capitalize">{prayer}</div>
+                      <div className="w-full mx-4">
+                        <div className="bg-gray-200 rounded-full h-2.5">
+                          <div 
+                            className="bg-green-600 h-2.5 rounded-full" 
+                            style={{ width: `${stats.percentage}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      <div className="text-sm text-gray-600 w-24 text-right">
+                        {stats.count} ({stats.percentage}%)
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
         

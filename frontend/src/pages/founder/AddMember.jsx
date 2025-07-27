@@ -111,10 +111,32 @@ const AddMember = () => {
     if (success) setSuccess('');
   };
 
+  // Handle phone number input with +94 prefix and 9-digit validation
+  const handlePhoneChange = (e) => {
+    let value = e.target.value.replace(/\D/g, ''); // Remove all non-digits
+    
+    // Limit to 9 digits
+    if (value.length > 9) {
+      value = value.substring(0, 9);
+    }
+    
+    // Format with +94 prefix
+    const formattedPhone = value ? `+94${value}` : '';
+    
+    setFormData({
+      ...formData,
+      phone: formattedPhone
+    });
+    
+    // Clear errors when user starts typing
+    if (error) setError('');
+    if (success) setSuccess('');
+  };
+
   // Validate form
   const validateForm = () => {
-    if (!formData.fullName || !formData.username || !formData.email || !formData.password) {
-      setError('Full name, username, email, and password are required');
+    if (!formData.fullName || !formData.username || !formData.email || !formData.password || !formData.phone) {
+      setError('Full name, username, email, phone number, and password are required');
       return false;
     }
     
@@ -131,6 +153,13 @@ const AddMember = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       setError('Please enter a valid email address');
+      return false;
+    }
+
+    // Phone number validation - must be exactly +94 followed by 9 digits (REQUIRED)
+    const phoneRegex = /^\+94\d{9}$/;
+    if (!phoneRegex.test(formData.phone)) {
+      setError('Phone number is required and must be exactly 9 digits after +94');
       return false;
     }
 
@@ -276,15 +305,23 @@ const AddMember = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="phone">
                     Phone Number *
                   </label>
-                  <input
-                    type="tel"
-                    id="phone"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Enter phone number"
-                  />
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <span className="text-gray-700 text-sm">+94</span>
+                    </div>
+                    <input
+                      type="tel"
+                      id="phone"
+                      name="phone"
+                      value={formData.phone.replace('+94', '')} // Display only the digits after +94
+                      onChange={handlePhoneChange}
+                      className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="7XXXXXXXX"
+                      maxLength="9"
+                      pattern="[0-9]{9}"
+                      required
+                    />
+                  </div>
                 </div>
 
                 {/* Age */}

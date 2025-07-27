@@ -108,10 +108,11 @@ router.post(
       const { user } = req;
 
       // Enhanced validation
-      if (!fullName || !username || !email || !password) {
+      if (!fullName || !username || !email || !password || !phone) {
         return res.status(400).json({
           success: false,
-          message: "Full name, username, email, and password are required",
+          message:
+            "Full name, username, email, phone number, and password are required",
         });
       }
 
@@ -132,17 +133,42 @@ router.post(
         });
       }
 
-      // Check if username or email already exists
+      // Phone number validation - must be in format +94XXXXXXXXX (exactly 9 digits after +94)
+      const phoneRegex = /^\+94\d{9}$/;
+      if (!phoneRegex.test(phone)) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Phone number must be in format +94XXXXXXXXX (exactly 9 digits after +94)",
+        });
+      }
+
+      // Check if username, email, or phone already exists
       const [existingUsers] = await pool.execute(
-        "SELECT id FROM users WHERE username = ? OR email = ?",
-        [username, email]
+        "SELECT id, username, email, phone FROM users WHERE username = ? OR email = ? OR phone = ?",
+        [username, email, phone]
       );
 
       if (existingUsers.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Username or email already exists",
-        });
+        const existing = existingUsers[0];
+        if (existing.username === username) {
+          return res.status(400).json({
+            success: false,
+            message: "Username already exists",
+          });
+        }
+        if (existing.email === email) {
+          return res.status(400).json({
+            success: false,
+            message: "Email already exists",
+          });
+        }
+        if (existing.phone === phone) {
+          return res.status(400).json({
+            success: false,
+            message: "Phone number already exists",
+          });
+        }
       }
 
       // Get mosque ID for new member
