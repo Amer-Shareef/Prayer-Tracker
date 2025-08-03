@@ -11,7 +11,8 @@ const NavigationBar = () => {
   if (!user) return null;
 
   // Determine base path based on user role
-  const basePath = user.role === 'Member' 
+  // WCM users get Member UI in web app
+  const basePath = (user.role === 'Member' || user.role === 'WCM') 
     ? '/member' 
     : user.role === 'Founder' 
       ? '/founder' 
@@ -19,7 +20,10 @@ const NavigationBar = () => {
 
   // Generate navigation links based on user role
   const getNavLinks = () => {
-    switch (user.role) {
+    // Treat WCM as Member for UI purposes
+    const uiRole = user.role === 'WCM' ? 'Member' : user.role;
+    
+    switch (uiRole) {
       case 'Member':
         return [
           { to: '/member/dashboard', label: 'Dashboard' },

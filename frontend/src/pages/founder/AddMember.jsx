@@ -79,17 +79,26 @@ const AddMember = () => {
     
     switch (user.role) {
       case 'SuperAdmin':
-        // SuperAdmin can create: Member, Founder (Working Committee Member), and SuperAdmin
+        // SuperAdmin can create all roles
         return [
           { value: 'Member', label: 'Member' },
-          { value: 'Founder', label: 'Working Committee Member' },
+          { value: 'WCM', label: 'Working Committee Member' },
+          { value: 'Founder', label: 'Working Committee Admin' },
           { value: 'SuperAdmin', label: 'Super Admin' }
         ];
       case 'Founder':
-        // Founder can create: Member and Founder (Working Committee Member) only
+        // Founder can create: Member, WCM, and other Founders
         return [
           { value: 'Member', label: 'Member' },
-          { value: 'Founder', label: 'Working Committee Member' }
+          { value: 'WCM', label: 'Working Committee Member' },
+          { value: 'Founder', label: 'Working Committee Admin' }
+        ];
+      case 'WCM':
+        // WCM can create: Member, WCM, and Founders (same as Founder backend permissions)
+        return [
+          { value: 'Member', label: 'Member' },
+          { value: 'WCM', label: 'Working Committee Member' },
+          { value: 'Founder', label: 'Working Committee Admin' }
         ];
       default:
         // Default case: only Member

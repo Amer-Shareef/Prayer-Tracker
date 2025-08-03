@@ -55,54 +55,55 @@ router.get("/users/profile", authenticateToken, async (req, res) => {
   }
 });
 
-// Update profile with comprehensive information
+// Update profile - only updates provided fields (PATCH behavior)
 router.put("/users/profile", authenticateToken, async (req, res) => {
   try {
     const { user } = req;
-    const {
-      fullName,
-      phone,
-      dateOfBirth,
-      address,
-      area,
-      mobility,
-      onRent,
-      zakathEligible,
-      differentlyAbled,
-      MuallafathilQuloob,
-    } = req.body;
+    const updateData = req.body;
 
-    console.log("📝 Updating user profile:", req.body);
+    console.log("📝 Updating user profile:", updateData);
 
-    // Update user in database with comprehensive data
-    const [result] = await pool.execute(
-      `UPDATE users SET
-        full_name = ?,
-        phone = ?,
-        date_of_birth = ?,
-        address = ?,
-        area = ?,
-        mobility = ?,
-        living_on_rent = ?,
-        zakath_eligible = ?,
-        differently_abled = ?,
-        muallafathil_quloob = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?`,
-      [
-        fullName || null,
-        phone || null,
-        dateOfBirth || null,
-        address || null,
-        area || null,
-        mobility || null,
-        onRent || false,
-        zakathEligible || false,
-        differentlyAbled || false,
-        MuallafathilQuloob || false,
-        user.id,
-      ]
-    );
+    // Build dynamic SQL query to only update provided fields
+    const fieldMappings = {
+      fullName: 'full_name',
+      phone: 'phone',
+      dateOfBirth: 'date_of_birth',
+      address: 'address',
+      area: 'area',
+      mobility: 'mobility',
+      onRent: 'living_on_rent',
+      zakathEligible: 'zakath_eligible',
+      differentlyAbled: 'differently_abled',
+      MuallafathilQuloob: 'muallafathil_quloob'
+    };
+
+    const updateFields = [];
+    const updateValues = [];
+
+    // Only include fields that are provided in the request body
+    Object.keys(updateData).forEach(key => {
+      if (fieldMappings[key] && updateData[key] !== undefined) {
+        updateFields.push(`${fieldMappings[key]} = ?`);
+        updateValues.push(updateData[key]);
+      }
+    });
+
+    // If no valid fields to update, return error
+    if (updateFields.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid fields provided for update"
+      });
+    }
+
+    // Add updated_at timestamp
+    updateFields.push('updated_at = CURRENT_TIMESTAMP');
+
+    // Build and execute dynamic query
+    const sql = `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`;
+    updateValues.push(user.id);
+
+    const [result] = await pool.execute(sql, updateValues);
 
     // Fetch updated user data with proper field mappings
     const [updatedUser] = await pool.execute(

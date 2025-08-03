@@ -497,7 +497,7 @@ router.delete(
 router.put(
   "/pickup-requests/:id/approve",
   authenticateToken,
-  authorizeRole(["Founder", "SuperAdmin"]),
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
   dbHealthCheck,
   async (req, res) => {
     const requestId = req.params.id;
@@ -557,7 +557,7 @@ router.put(
 router.put(
   "/pickup-requests/:id/reject",
   authenticateToken,
-  authorizeRole(["Founder", "SuperAdmin"]),
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
   dbHealthCheck,
   async (req, res) => {
     const requestId = req.params.id;
@@ -747,10 +747,11 @@ router.get("/pickup-requests/all", authenticateToken, async (req, res) => {
     // } else
     if (
       user.role === "Founder" ||
+      user.role === "WCM" ||
       user.role === "founder" ||
       user.role === "Member"
     ) {
-      console.log("Founder accessing - showing their mosque's requests");
+      console.log("Founder/WCM accessing - showing their mosque's requests");
       query += " AND pr.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)";
       queryParams.push(user.id);
     } else if (user.role === "SuperAdmin" || user.role === "superadmin") {
@@ -797,7 +798,7 @@ router.get("/pickup-requests/all", authenticateToken, async (req, res) => {
 router.get(
   "/pickup-requests/available-drivers",
   authenticateToken,
-  authorizeRole(["Founder", "SuperAdmin"]),
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
   async (req, res) => {
     try {
       const { user } = req;
@@ -817,8 +818,8 @@ router.get(
       `;
       const queryParams = [];
 
-      // Filter by mosque for founders
-      if (user.role === "Founder") {
+      // Filter by mosque for founders and WCMs
+      if (user.role === "Founder" || user.role === "WCM") {
         query +=
           " AND u.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)";
         queryParams.push(user.id);

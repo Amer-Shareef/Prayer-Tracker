@@ -9,7 +9,7 @@ const router = express.Router();
 router.get(
   "/members",
   authenticateToken,
-  authorizeRole(["Founder", "SuperAdmin"]),
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
   async (req, res) => {
     try {
       const { user } = req;
@@ -33,9 +33,9 @@ router.get(
     `;
       let queryParams = [];
 
-      // If founder, only show members from their mosque
+      // If founder or WCM, only show members from their mosque
       // If superadmin, show all members
-      if (user.role === "Founder") {
+      if (user.role === "Founder" || user.role === "WCM") {
         query += ` WHERE u.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)`;
         queryParams.push(user.id);
       } else if (user.role === "Member") {
@@ -68,7 +68,7 @@ router.get(
 router.post(
   "/members",
   authenticateToken,
-  authorizeRole(["Founder", "SuperAdmin"]),
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
   async (req, res) => {
     try {
       const {
@@ -173,8 +173,8 @@ router.post(
 
       // Get mosque ID for new member
       let mosqueId = null;
-      if (user.role === "Founder") {
-        // Founders add members to their own mosque
+      if (user.role === "Founder" || user.role === "WCM") {
+        // Founders and WCMs add members to their own mosque
         const [userData] = await pool.execute(
           "SELECT mosque_id FROM users WHERE id = ?",
           [user.id]
@@ -261,7 +261,7 @@ router.post(
 router.put(
   "/members/:id",
   authenticateToken,
-  authorizeRole(["Founder", "SuperAdmin"]),
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -272,8 +272,8 @@ router.put(
       let checkQuery = "SELECT * FROM users WHERE id = ?";
       let checkParams = [id];
 
-      if (user.role === "Founder") {
-        // Founders can only edit members from their mosque
+      if (user.role === "Founder" || user.role === "WCM") {
+        // Founders and WCMs can only edit members from their mosque
         checkQuery +=
           " AND mosque_id = (SELECT mosque_id FROM users WHERE id = ?)";
         checkParams.push(user.id);
@@ -333,7 +333,7 @@ router.put(
 router.delete(
   "/members/:id",
   authenticateToken,
-  authorizeRole(["Founder", "SuperAdmin"]),
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -343,8 +343,8 @@ router.delete(
       let checkQuery = "SELECT * FROM users WHERE id = ?";
       let checkParams = [id];
 
-      if (user.role === "Founder") {
-        // Founders can only delete members from their mosque
+      if (user.role === "Founder" || user.role === "WCM") {
+        // Founders and WCMs can only delete members from their mosque
         checkQuery +=
           " AND mosque_id = (SELECT mosque_id FROM users WHERE id = ?)";
         checkParams.push(user.id);
@@ -391,7 +391,7 @@ router.delete(
 router.get(
   "/founders",
   authenticateToken,
-  authorizeRole(["Founder", "SuperAdmin"]),
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
   async (req, res) => {
     try {
       const { user } = req;
@@ -407,7 +407,7 @@ router.get(
       let queryParams = [];
 
       // If founder, only show founders from their mosque (excluding themselves)
-      if (user.role === "Founder") {
+      if (user.role === "Founder" || user.role === "WCM") {
         query += ` AND u.mosque_id = (SELECT mosque_id FROM users WHERE id = ?) AND u.id != ?`;
         queryParams.push(user.id, user.id);
       }

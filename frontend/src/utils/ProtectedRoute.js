@@ -17,14 +17,19 @@ const ProtectedRoute = ({ children, role }) => {
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   } // Check role authorization
-  if (role && user.role !== role) {
-    // Redirect to appropriate dashboard based on user's actual role
-    if (user.role === "Member") {
-      return <Navigate to="/member/dashboard" replace />;
-    } else if (user.role === "Founder" || user.role === "SuperAdmin") {
-      return <Navigate to="/founder/dashboard" replace />;
-    } else {
-      return <Navigate to="/login" replace />;
+  if (role) {
+    // Special handling for WCM: treat as Member in frontend
+    const userRoleForUI = user.role === "WCM" ? "Member" : user.role;
+
+    if (userRoleForUI !== role) {
+      // Redirect to appropriate dashboard based on user's actual role
+      if (userRoleForUI === "Member") {
+        return <Navigate to="/member/dashboard" replace />;
+      } else if (userRoleForUI === "Founder" || user.role === "SuperAdmin") {
+        return <Navigate to="/founder/dashboard" replace />;
+      } else {
+        return <Navigate to="/login" replace />;
+      }
     }
   }
 

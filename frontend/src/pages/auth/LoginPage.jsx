@@ -73,7 +73,8 @@ const LoginPage = () => {
             password: undefined
           });          // Redirect based on role
           const { role } = response.data.user;
-          if (role === 'Member') {
+          if (role === 'Member' || role === 'WCM') {
+            // WCM users get Member UI in web app
             navigate('/member/dashboard');
           } else if (role === 'Founder' || role === 'SuperAdmin') {
             navigate('/founder/dashboard');

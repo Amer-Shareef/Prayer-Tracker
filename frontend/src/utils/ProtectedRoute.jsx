@@ -22,8 +22,19 @@ const ProtectedRoute = ({ children, role, roles }) => {
   // Check role - Support both single role and multiple roles
   if (role || roles) {
     const allowedRoles = roles || [role];
-    if (!allowedRoles.includes(user.role)) {
-      return <Navigate to="/login" />;
+    
+    // Special handling for WCM: treat as Member in frontend
+    const userRoleForUI = user.role === "WCM" ? "Member" : user.role;
+    
+    if (!allowedRoles.includes(userRoleForUI)) {
+      // Redirect to appropriate dashboard based on user's actual role
+      if (userRoleForUI === "Member") {
+        return <Navigate to="/member/dashboard" replace />;
+      } else if (userRoleForUI === "Founder" || user.role === "SuperAdmin") {
+        return <Navigate to="/founder/dashboard" replace />;
+      } else {
+        return <Navigate to="/login" replace />;
+      }
     }
   }
 

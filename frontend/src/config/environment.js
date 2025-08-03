@@ -9,8 +9,7 @@ export const ENV_CONFIG = {
     "http://13.60.193.171:5000/api/health",
 
   // Frontend Configuration - Updated for EC2
-  FRONTEND_URL:
-    process.env.REACT_APP_FRONTEND_URL || "http://13.60.193.171:3000",
+  FRONTEND_URL: process.env.REACT_APP_FRONTEND_URL || "http://13.60.193.171:3000",
   HOST: process.env.REACT_APP_HOST || "13.60.193.171",
   PORT: process.env.REACT_APP_PORT || 3000,
 

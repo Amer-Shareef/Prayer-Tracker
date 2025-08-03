@@ -46,7 +46,7 @@ router.get("/announcements", authenticateToken, async (req, res) => {
 router.post(
   "/announcements",
   authenticateToken,
-  authorizeRole(["Founder", "SuperAdmin"]),
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
   async (req, res) => {
     try {
       const { title, content, priority = "medium", expires_at } = req.body;
@@ -103,7 +103,7 @@ router.post(
 router.put(
   "/announcements/:id",
   authenticateToken,
-  authorizeRole(["Founder", "SuperAdmin"]),
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -114,8 +114,8 @@ router.put(
       let checkQuery = "SELECT * FROM announcements WHERE id = ?";
       let checkParams = [id];
 
-      if (user.role === "Founder") {
-        // Founder can only edit announcements from their mosque that they authored
+      if (user.role === "Founder" || user.role === "WCM") {
+        // Founder and WCM can only edit announcements from their mosque that they authored
         checkQuery += " AND mosque_id = ? AND author_id = ?";
         checkParams.push(user.mosque_id, user.id);
       }
@@ -167,7 +167,7 @@ router.put(
 router.delete(
   "/announcements/:id",
   authenticateToken,
-  authorizeRole(["Founder", "SuperAdmin"]),
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -177,8 +177,8 @@ router.delete(
       let checkQuery = "SELECT * FROM announcements WHERE id = ?";
       let checkParams = [id];
 
-      if (user.role === "Founder") {
-        // Founder can only delete announcements from their mosque that they authored
+      if (user.role === "Founder" || user.role === "WCM") {
+        // Founder and WCM can only delete announcements from their mosque that they authored
         checkQuery += " AND mosque_id = ? AND author_id = ?";
         checkParams.push(user.mosque_id, user.id);
       }

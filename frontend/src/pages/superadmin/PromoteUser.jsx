@@ -123,7 +123,8 @@ const PromoteUser = () => {
 
   const handlePromoteUser = (user) => {
     setSelectedUser(user);
-    setNewRole(user.role === 'Member' ? 'Founder' : 'Member');
+    // Don't auto-set role, let user choose
+    setNewRole('');
     setShowModal(true);
   };
 
@@ -149,13 +150,21 @@ const PromoteUser = () => {
   const getRoleBadge = (role) => {
     const colors = {
       'Member': 'bg-blue-100 text-blue-800',
+      'WCM': 'bg-indigo-100 text-indigo-800',
       'Founder': 'bg-green-100 text-green-800',
-      'Admin': 'bg-purple-100 text-purple-800'
+      'SuperAdmin': 'bg-purple-100 text-purple-800'
+    };
+    
+    const labels = {
+      'Member': 'Member',
+      'WCM': 'Working Committee Member',
+      'Founder': 'Working Committee Admin',
+      'SuperAdmin': 'Super Admin'
     };
     
     return (
       <span className={`px-2 py-1 ${colors[role]} text-xs rounded-full`}>
-        {role}
+        {labels[role] || role}
       </span>
     );
   };
@@ -288,7 +297,7 @@ const PromoteUser = () => {
                           onClick={() => handlePromoteUser(user)}
                           className="text-purple-600 hover:text-purple-900"
                         >
-                          {user.role === 'Member' ? 'Promote to Founder' : 'Demote to Member'}
+                          Change Role
                         </button>
                       </td>
                     </tr>
@@ -310,20 +319,40 @@ const PromoteUser = () => {
                 
                 <div className="mb-6">
                   <p className="text-sm text-gray-600 mb-2">
-                    Are you sure you want to change the role of:
+                    Change the role for:
                   </p>
                   <p className="font-medium text-gray-900">{selectedUser.name}</p>
                   <p className="text-sm text-gray-500">{selectedUser.email}</p>
                   
                   <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center mb-3">
                       <span className="text-sm">Current Role:</span>
                       {getRoleBadge(selectedUser.role)}
                     </div>
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="text-sm">New Role:</span>
-                      {getRoleBadge(newRole)}
+                    
+                    <div className="text-left">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select New Role:
+                      </label>
+                      <select
+                        value={newRole}
+                        onChange={(e) => setNewRole(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="">Choose a role...</option>
+                        <option value="Member">Member</option>
+                        <option value="WCM">Working Committee Member</option>
+                        <option value="Founder">Working Committee Admin</option>
+                        <option value="SuperAdmin">Super Admin</option>
+                      </select>
                     </div>
+                    
+                    {newRole && (
+                      <div className="flex justify-between items-center mt-3">
+                        <span className="text-sm">New Role:</span>
+                        {getRoleBadge(newRole)}
+                      </div>
+                    )}
                   </div>
                 </div>
                 
@@ -336,7 +365,12 @@ const PromoteUser = () => {
                   </button>
                   <button
                     onClick={confirmPromotion}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                    disabled={!newRole || newRole === selectedUser?.role}
+                    className={`px-4 py-2 rounded-lg ${
+                      !newRole || newRole === selectedUser?.role
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-purple-600 text-white hover:bg-purple-700'
+                    }`}
                   >
                     Confirm Change
                   </button>

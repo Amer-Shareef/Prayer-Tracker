@@ -162,7 +162,7 @@ router.get("/:id", authenticateToken, async (req, res) => {
 router.post(
   "/",
   authenticateToken,
-  authorizeRole(["Founder", "SuperAdmin"]),
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
   async (req, res) => {
     try {
       const {
@@ -265,7 +265,7 @@ router.post(
 router.put(
   "/:id",
   authenticateToken,
-  authorizeRole(["Founder", "SuperAdmin"]),
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -293,8 +293,8 @@ router.put(
         // SuperAdmin can edit any feed
         accessQuery = "SELECT f.* FROM feeds f WHERE f.id = ?";
         accessParams = [id];
-      } else if (user.role === "Founder") {
-        // Founder can only edit feeds from their mosque
+      } else if (user.role === "Founder" || user.role === "WCM") {
+        // Founder and WCM can only edit feeds from their mosque
         accessQuery = `
           SELECT f.* FROM feeds f
           WHERE f.id = ? AND f.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)
@@ -360,7 +360,7 @@ router.put(
 router.delete(
   "/:id",
   authenticateToken,
-  authorizeRole(["Founder", "SuperAdmin"]),
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -373,8 +373,8 @@ router.delete(
         // SuperAdmin can delete any feed
         accessQuery = "SELECT f.* FROM feeds f WHERE f.id = ?";
         accessParams = [id];
-      } else if (user.role === "Founder") {
-        // Founder can only delete feeds from their mosque
+      } else if (user.role === "Founder" || user.role === "WCM") {
+        // Founder and WCM can only delete feeds from their mosque
         accessQuery = `
           SELECT f.* FROM feeds f
           WHERE f.id = ? AND f.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)

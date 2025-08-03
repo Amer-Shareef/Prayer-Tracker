@@ -25,8 +25,8 @@ router.get("/mosques", authenticateToken, async (req, res) => {
     `;
     let queryParams = [];
     if (user.role !== "SuperAdmin") {
-      if (user.role === "Founder") {
-        // For founders, show mosques they founded OR if no mosque founded, show their assigned mosque
+      if (user.role === "Founder" || user.role === "WCM") {
+        // For founders and WCMs, show mosques they founded OR if no mosque founded, show their assigned mosque
         query +=
           " WHERE (m.founder_id = ? OR (? IN (SELECT mosque_id FROM users WHERE id = ?) AND m.id = ?))";
         queryParams.push(
@@ -52,9 +52,12 @@ router.get("/mosques", authenticateToken, async (req, res) => {
     );
 
     // If no mosques found and user is Founder, get any mosque with prayer data
-    if (mosques.length === 0 && user.role === "Founder") {
+    if (
+      mosques.length === 0 &&
+      (user.role === "Founder" || user.role === "WCM")
+    ) {
       console.log(
-        "🔍 No mosques found for founder, checking for any mosque with prayer data..."
+        "🔍 No mosques found for founder/WCM, checking for any mosque with prayer data..."
       );
       const [anyMosques] = await pool.execute(`
         SELECT DISTINCT m.*, u.username as founder_name,
@@ -168,7 +171,7 @@ router.get("/mosques/:id", authenticateToken, async (req, res) => {
         message: "Access denied",
       });
     }
-    if (user.role === "Founder") {
+    if (user.role === "Founder" || user.role === "WCM") {
       query += " AND m.founder_id = ?";
       queryParams.push(user.id);
     }
@@ -276,13 +279,13 @@ router.post(
 router.put(
   "/mosques/:id",
   authenticateToken,
-  authorizeRole(["Founder", "SuperAdmin"]),
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
   async (req, res) => {
     try {
       const { id } = req.params;
       const { name, address, phone, email, prayer_times } = req.body;
       const { user } = req; // Check access rights
-      if (user.role === "Founder") {
+      if (user.role === "Founder" || user.role === "WCM") {
         const [mosque] = await pool.execute(
           "SELECT founder_id FROM mosques WHERE id = ?",
           [id]
@@ -364,8 +367,8 @@ router.get("/mosques/:id/attendance", authenticateToken, async (req, res) => {
           message: "Access denied to this mosque's attendance data",
         });
       }
-    } else if (user.role === "Founder") {
-      // For founders, be very permissive - allow access to any mosque if they don't have one assigned
+    } else if (user.role === "Founder" || user.role === "WCM") {
+      // For founders and WCMs, be very permissive - allow access to any mosque if they don't have one assigned
       const [mosque] = await pool.execute(
         "SELECT founder_id FROM mosques WHERE id = ?",
         [id]
