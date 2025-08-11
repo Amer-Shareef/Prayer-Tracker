@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MemberLayout from '../../components/layouts/MemberLayout';
 import { useAuth } from '../../context/AuthContext';
-import { prayerService, announcementService, mosqueService, dailyActivitiesService } from '../../services/api';
+import { prayerService, announcementService, areaService, dailyActivitiesService } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 import SimpleChart from '../../components/charts/SimpleChart';
 
@@ -13,10 +13,11 @@ const Dashboard = () => {
   const [todayPrayers, setTodayPrayers] = useState([]);
   const [stats, setStats] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
-  const [mosque, setMosque] = useState(null);
+  const [area, setArea] = useState(null);
   const [activityStats, setActivityStats] = useState(null);
   const [todayActivities, setTodayActivities] = useState({
     zikr_count: 0,
+    zikr_count_2: 0,
     quran_minutes: 0
   });
   const [currentDate, setCurrentDate] = useState(new Date()); // NEW: Track current date
@@ -55,10 +56,10 @@ const Dashboard = () => {
         setTodayPrayers(prayerResponse.data.data);
       }
 
-      // Fetch mosque data
-      const mosqueResponse = await mosqueService.getMosques();
-      if (mosqueResponse.data.success && mosqueResponse.data.data.length > 0) {
-        setMosque(mosqueResponse.data.data[0]);
+      // Fetch area data
+      const areaResponse = await areaService.getAreas();
+      if (areaResponse.data.success && areaResponse.data.data.length > 0) {
+        setArea(areaResponse.data.data[0]);
       }
 
       // Fetch stats
@@ -84,6 +85,7 @@ const Dashboard = () => {
 
         setTodayActivities({
           zikr_count: zikrToday?.count_value || 0,
+          zikr_count_2: zikrToday?.count_value_2 || 0,
           quran_minutes: quranToday?.minutes_value || 0
         });
       }
@@ -457,7 +459,7 @@ const Dashboard = () => {
             </button>
 
             <button 
-              onClick={() => navigate('/member/mosque')}
+              onClick={() => navigate('/member/area')}
               className="flex flex-col items-center p-4 border rounded-lg hover:bg-gray-50"
             >
               <svg className="w-8 h-8 text-purple-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

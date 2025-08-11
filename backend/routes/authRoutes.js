@@ -56,10 +56,10 @@ router.post("/login", async (req, res) => {
     // Query user from database - ENHANCED to fetch all user information
     const [rows] = await pool.execute(
       `SELECT u.*, 
-              m.name as mosque_name,
-              CONCAT(UPPER(LEFT(COALESCE(u.area, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId
+              a.area_name, a.address as area_address,
+              CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId
        FROM users u
-       LEFT JOIN mosques m ON u.mosque_id = m.id
+       LEFT JOIN areas a ON u.area_id = a.area_id
        WHERE u.username = ?`,
       [username]
     );
@@ -164,7 +164,9 @@ router.post("/login", async (req, res) => {
         status: user.status,
         dateOfBirth: user.date_of_birth,
         address: user.address,
-        area: user.area,
+        areaId: user.area_id,
+        areaName: user.area_name,
+        areaAddress: user.area_address,
         mobility: user.mobility,
         onRent: user.living_on_rent === 1,
         zakathEligible: user.zakath_eligible === 1,
@@ -172,8 +174,6 @@ router.post("/login", async (req, res) => {
         MuallafathilQuloob: user.muallafathil_quloob === 1,
         joinedDate: user.joined_date,
         lastLogin: user.last_login,
-        mosqueId: user.mosque_id,
-        mosqueName: user.mosque_name,
         memberId: user.memberId,
       };
 
@@ -319,13 +319,36 @@ router.post("/resend-otp", async (req, res) => {
 // Register route
 router.post("/register", async (req, res) => {
   try {
-    const { username, email, password, role = "Member" } = req.body;
+    const { username, email, password, role = "Member", area_id } = req.body;
 
     if (!username || !email || !password) {
       return res.status(400).json({
         success: false,
         message: "Username, email and password are required",
       });
+    }
+
+    // For Founders, area_id is mandatory
+    if (role === "Founder" && !area_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Area selection is required for Founders",
+      });
+    }
+
+    // Verify area exists if area_id is provided
+    if (area_id) {
+      const [areaExists] = await pool.execute(
+        "SELECT area_id FROM areas WHERE area_id = ?",
+        [area_id]
+      );
+      
+      if (areaExists.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid area selected",
+        });
+      }
     }
 
     // Check if user already exists
@@ -347,8 +370,8 @@ router.post("/register", async (req, res) => {
 
     // Insert new user
     const [result] = await pool.execute(
-      "INSERT INTO users (username, email, password, role, status, joined_date) VALUES (?, ?, ?, ?, ?, CURDATE())",
-      [username, email, hashedPassword, role, "active"]
+      "INSERT INTO users (username, email, password, role, area_id, status, joined_date) VALUES (?, ?, ?, ?, ?, ?, CURDATE())",
+      [username, email, hashedPassword, role, area_id || null, "active"]
     );
 
     res.status(201).json({

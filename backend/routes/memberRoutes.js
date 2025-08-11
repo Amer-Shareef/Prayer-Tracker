@@ -17,10 +17,10 @@ router.get(
       let query = `
       SELECT u.id, u.full_name as fullName, u.username, u.email, u.phone, u.role, u.status, 
              u.joined_date, u.last_login, u.created_at, u.date_of_birth as dateOfBirth, 
-             u.address, u.area, u.mobility, u.living_on_rent as onRent, u.zakath_eligible as zakathEligible, 
+             u.address, u.area_id, u.mobility, u.living_on_rent as onRent, u.zakath_eligible as zakathEligible, 
              u.differently_abled as differentlyAbled, u.muallafathil_quloob as MuallafathilQuloob, 
-             m.name as mosque_name,
-             CONCAT(UPPER(LEFT(COALESCE(u.area, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId,
+             a.area_name, a.address as area_address,
+             CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId,
              COUNT(p.id) as total_prayers,
              COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) as prayed_count,
              CASE 
@@ -28,15 +28,15 @@ router.get(
                ELSE 0 
              END as attendance_rate
       FROM users u
-      LEFT JOIN mosques m ON u.mosque_id = m.id
+      LEFT JOIN areas a ON u.area_id = a.area_id
       LEFT JOIN prayers p ON u.id = p.user_id AND p.prayer_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
     `;
       let queryParams = [];
 
-      // If founder or WCM, only show members from their mosque
+      // If founder or WCM, only show members from their area
       // If superadmin, show all members
       if (user.role === "Founder" || user.role === "WCM") {
-        query += ` WHERE u.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)`;
+        query += ` WHERE u.area_id = (SELECT area_id FROM users WHERE id = ?)`;
         queryParams.push(user.id);
       } else if (user.role === "Member") {
         // Members should only see their own data (if this route is accessible to them)
@@ -171,25 +171,44 @@ router.post(
         }
       }
 
-      // Get mosque ID for new member
-      let mosqueId = null;
+      // Get area ID for new member - area_id is now mandatory
+      let areaId = null;
+      
+      // Validate that area_id is provided
+      if (!req.body.area_id) {
+        return res.status(400).json({
+          success: false,
+          message: "Area selection is required. Please select an area."
+        });
+      }
+      
+      areaId = req.body.area_id;
+      
+      // Verify the area exists
+      const [areaExists] = await pool.execute(
+        "SELECT area_id FROM areas WHERE area_id = ?",
+        [areaId]
+      );
+      
+      if (areaExists.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid area selected. Please select a valid area."
+        });
+      }
+
+      // For Founders and WCMs, verify they can only add members to their own area
       if (user.role === "Founder" || user.role === "WCM") {
-        // Founders and WCMs add members to their own mosque
         const [userData] = await pool.execute(
-          "SELECT mosque_id FROM users WHERE id = ?",
+          "SELECT area_id FROM users WHERE id = ?",
           [user.id]
         );
-        mosqueId = userData[0]?.mosque_id;
-      } else if (user.role === "SuperAdmin") {
-        // SuperAdmins can specify mosque_id in request body, or use their own if available
-        if (req.body.mosque_id) {
-          mosqueId = req.body.mosque_id;
-        } else {
-          const [userData] = await pool.execute(
-            "SELECT mosque_id FROM users WHERE id = ?",
-            [user.id]
-          );
-          mosqueId = userData[0]?.mosque_id;
+        
+        if (userData[0]?.area_id && userData[0].area_id !== areaId) {
+          return res.status(403).json({
+            success: false,
+            message: "You can only add members to your assigned area."
+          });
         }
       }
 
@@ -197,14 +216,14 @@ router.post(
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-      // Insert comprehensive member data with correct column names
+      // Insert comprehensive member data with area_id (mandatory)
       const [result] = await pool.execute(
         `INSERT INTO users (
-        full_name, username, email, phone, password, role, mosque_id, 
-        date_of_birth, address, area, mobility, living_on_rent, 
+        full_name, username, email, phone, password, role, area_id, 
+        date_of_birth, address, mobility, living_on_rent, 
         zakath_eligible, differently_abled, muallafathil_quloob,
         status, joined_date
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', CURDATE())`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', CURDATE())`,
         [
           fullName,
           username,
@@ -212,10 +231,9 @@ router.post(
           phone || null,
           hashedPassword,
           role,
-          mosqueId,
+          areaId,
           dateOfBirth || null,
           address || null,
-          area || null,
           mobility || null,
           onRent,
           zakathEligible,
@@ -226,15 +244,15 @@ router.post(
 
       console.log("✅ Member inserted with ID:", result.insertId);
 
-      // Fetch the created member with mosque info and proper field mapping
+      // Fetch the created member with area info and proper field mapping
       const [newMember] = await pool.execute(
         `SELECT u.id, u.full_name as fullName, u.username, u.email, u.phone, u.role, u.status, 
-              u.joined_date, u.created_at, u.date_of_birth as dateOfBirth, u.address, u.area, 
+              u.joined_date, u.created_at, u.date_of_birth as dateOfBirth, u.address, u.area_id,
               u.mobility, u.living_on_rent as onRent, u.zakath_eligible as zakathEligible, 
               u.differently_abled as differentlyAbled, u.muallafathil_quloob as MuallafathilQuloob, 
-              m.name as mosque_name
+              a.area_name, a.address as area_address
        FROM users u
-       LEFT JOIN mosques m ON u.mosque_id = m.id
+       LEFT JOIN areas a ON u.area_id = a.area_id
        WHERE u.id = ?`,
         [result.insertId]
       );
@@ -273,9 +291,9 @@ router.put(
       let checkParams = [id];
 
       if (user.role === "Founder" || user.role === "WCM") {
-        // Founders and WCMs can only edit members from their mosque
+        // Founders and WCMs can only edit members from their area
         checkQuery +=
-          " AND mosque_id = (SELECT mosque_id FROM users WHERE id = ?)";
+          " AND area_id = (SELECT area_id FROM users WHERE id = ?)";
         checkParams.push(user.id);
       }
       // SuperAdmin can edit any member (no additional WHERE clause)
@@ -306,9 +324,9 @@ router.put(
       // Fetch updated member
       const [updatedMember] = await pool.execute(
         `SELECT u.id, u.username, u.email, u.phone, u.role, u.status, u.joined_date, u.created_at,
-              m.name as mosque_name
+              a.area_name, a.address as area_address
        FROM users u
-       LEFT JOIN mosques m ON u.mosque_id = m.id
+       LEFT JOIN areas a ON u.area_id = a.area_id
        WHERE u.id = ?`,
         [id]
       );
@@ -344,9 +362,9 @@ router.delete(
       let checkParams = [id];
 
       if (user.role === "Founder" || user.role === "WCM") {
-        // Founders and WCMs can only delete members from their mosque
+        // Founders and WCMs can only delete members from their area
         checkQuery +=
-          " AND mosque_id = (SELECT mosque_id FROM users WHERE id = ?)";
+          " AND area_id = (SELECT area_id FROM users WHERE id = ?)";
         checkParams.push(user.id);
       }
       // SuperAdmin can delete any member (no additional WHERE clause)
@@ -398,17 +416,17 @@ router.get(
 
       let query = `
       SELECT u.id, u.full_name as fullName, u.username, u.email, u.phone, u.role, u.status, 
-             u.joined_date, u.last_login, u.created_at, u.mosque_id,
-             m.name as mosque_name
+             u.joined_date, u.last_login, u.created_at, u.area_id,
+             a.area_name, a.address as area_address
       FROM users u
-      LEFT JOIN mosques m ON u.mosque_id = m.id
+      LEFT JOIN areas a ON u.area_id = a.area_id
       WHERE u.role = 'Founder' AND u.status = 'active'
     `;
       let queryParams = [];
 
-      // If founder, only show founders from their mosque (excluding themselves)
+      // If founder, only show founders from their area (excluding themselves)
       if (user.role === "Founder" || user.role === "WCM") {
-        query += ` AND u.mosque_id = (SELECT mosque_id FROM users WHERE id = ?) AND u.id != ?`;
+        query += ` AND u.area_id = (SELECT area_id FROM users WHERE id = ?) AND u.id != ?`;
         queryParams.push(user.id, user.id);
       }
       // SuperAdmin can see all founders (no additional WHERE clause needed)

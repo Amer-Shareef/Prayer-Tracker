@@ -12,17 +12,17 @@ router.get("/users/profile", authenticateToken, async (req, res) => {
     const [userRows] = await pool.execute(
       `SELECT u.id, u.username, u.email, u.phone, u.role, u.status, 
               u.full_name as fullName, u.date_of_birth as dateOfBirth, 
-              u.address, u.area, u.mobility, 
+              u.address, u.area_id, u.mobility, 
               u.living_on_rent as onRent, 
               u.zakath_eligible as zakathEligible, 
               u.differently_abled as differentlyAbled, 
               u.muallafathil_quloob as MuallafathilQuloob,
               u.joined_date, u.last_login, u.created_at, u.updated_at,
               u.otp_verified, u.login_attempts,
-              m.name as mosque_name,
-              CONCAT(UPPER(LEFT(COALESCE(u.area, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId
+              a.area_name, a.address as area_address,
+              CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId
        FROM users u
-       LEFT JOIN mosques m ON u.mosque_id = m.id
+       LEFT JOIN areas a ON u.area_id = a.area_id
        WHERE u.id = ?`,
       [user.id]
     );
@@ -69,7 +69,7 @@ router.put("/users/profile", authenticateToken, async (req, res) => {
       phone: 'phone',
       dateOfBirth: 'date_of_birth',
       address: 'address',
-      area: 'area',
+      area_id: 'area_id',
       mobility: 'mobility',
       onRent: 'living_on_rent',
       zakathEligible: 'zakath_eligible',
@@ -82,11 +82,17 @@ router.put("/users/profile", authenticateToken, async (req, res) => {
 
     // Only include fields that are provided in the request body
     Object.keys(updateData).forEach(key => {
-      if (fieldMappings[key] && updateData[key] !== undefined) {
+      console.log(`🔍 Checking field: ${key}, value: ${updateData[key]}, mapping: ${fieldMappings[key]}`);
+      if (fieldMappings[key] && updateData[key] !== undefined && updateData[key] !== null) {
         updateFields.push(`${fieldMappings[key]} = ?`);
         updateValues.push(updateData[key]);
+        console.log(`✅ Added field: ${fieldMappings[key]} = ${updateData[key]}`);
+      } else {
+        console.log(`❌ Skipped field: ${key} - mapping exists: ${!!fieldMappings[key]}, value: ${updateData[key]}`);
       }
     });
+
+    console.log(`📊 Total fields to update: ${updateFields.length}`, updateFields);
 
     // If no valid fields to update, return error
     if (updateFields.length === 0) {
@@ -111,13 +117,13 @@ router.put("/users/profile", authenticateToken, async (req, res) => {
         id, username, email, phone, role, status, 
         full_name as fullName,
         date_of_birth as dateOfBirth,
-        address, area, mobility,
+        address, area_id, mobility,
         living_on_rent as onRent,
         zakath_eligible as zakathEligible,
         differently_abled as differentlyAbled,
         muallafathil_quloob as MuallafathilQuloob,
         joined_date, last_login, updated_at,
-        CONCAT(UPPER(LEFT(COALESCE(area, 'GEN'), 2)), LPAD(id, 4, '0')) as memberId
+        CONCAT(UPPER(LEFT(COALESCE(area_id, 'GEN'), 2)), LPAD(id, 4, '0')) as memberId
       FROM users 
       WHERE id = ?`,
       [user.id]

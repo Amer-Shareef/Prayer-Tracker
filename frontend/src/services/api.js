@@ -352,16 +352,32 @@ export const prayerService = {
   },
 };
 
-// Mosque service
+// Mosque service - DEPRECATED, replaced with Area service
 export const mosqueService = {
-  getMosques: () => api.get("/mosques"),
-  getMosqueById: (id) => api.get(`/mosques/${id}`),
-  createMosque: (data) => api.post("/mosques", data),
-  updateMosque: (id, data) => api.put(`/mosques/${id}`, data),
-  getAttendanceStats: (id, period = 30) =>
-    api.get(`/mosques/${id}/attendance?period=${period}`),
-  getGeneralAttendanceStats: (period = 30) =>
-    api.get(`/attendance/general?period=${period}`),
+  getMosques: () => {
+    console.warn("⚠️ mosqueService.getMosques() is deprecated. Using area service instead.");
+    return areaService.getAreas();
+  },
+  getMosqueById: (id) => {
+    console.warn("⚠️ mosqueService.getMosqueById() is deprecated. Using area service instead.");
+    return areaService.getAreaById(id);
+  },
+  createMosque: (data) => {
+    console.warn("⚠️ mosqueService.createMosque() is deprecated. Using area service instead.");
+    return areaService.createArea(data);
+  },
+  updateMosque: (id, data) => {
+    console.warn("⚠️ mosqueService.updateMosque() is deprecated. Using area service instead.");
+    return areaService.updateArea(id, data);
+  },
+  getAttendanceStats: (id, period = 30) => {
+    console.warn("⚠️ mosqueService.getAttendanceStats() is deprecated. Using area-based stats.");
+    return api.get(`/areas/${id}/attendance?period=${period}`);
+  },
+  getGeneralAttendanceStats: (period = 30) => {
+    console.warn("⚠️ mosqueService.getGeneralAttendanceStats() is deprecated. Using area-based stats.");
+    return api.get(`/attendance/general?period=${period}`);
+  },
 };
 
 // Member Management APIs
@@ -885,6 +901,18 @@ export const areaService = {
     }
   },
 
+  getAreaById: async (id) => {
+    try {
+      console.log("🔄 Getting area by ID:", id);
+      const response = await api.get(`/areas/${id}`);
+      console.log("✅ Area fetched:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to fetch area:", error);
+      throw error;
+    }
+  },
+
   createArea: async (areaData) => {
     try {
       console.log("➕ Creating area:", areaData);
@@ -893,6 +921,30 @@ export const areaService = {
       return response;
     } catch (error) {
       console.error("❌ Failed to create area:", error);
+      throw error;
+    }
+  },
+
+  updateArea: async (id, areaData) => {
+    try {
+      console.log("🔄 Updating area:", id, areaData);
+      const response = await api.put(`/areas/${id}`, areaData);
+      console.log("✅ Area updated:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to update area:", error);
+      throw error;
+    }
+  },
+
+  getAreaStats: async (id, period = 30) => {
+    try {
+      console.log("📊 Getting area stats:", id);
+      const response = await api.get(`/areas/${id}/stats?period=${period}`);
+      console.log("✅ Area stats fetched:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to fetch area stats:", error);
       throw error;
     }
   },

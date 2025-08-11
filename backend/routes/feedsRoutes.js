@@ -4,10 +4,10 @@ const { authenticateToken, authorizeRole } = require("../middleware/auth");
 
 const router = express.Router();
 
-// GET all feeds - FIXED version using direct query
+// GET all feeds - Area-based version
 router.get("/", authenticateToken, async (req, res) => {
   try {
-    console.log("📋 Fetching all feeds"); // Get mosque_id from the authenticated user
+    console.log("📋 Fetching all feeds for area-based system");
     const { user } = req;
 
     // Pagination parameters
@@ -21,35 +21,35 @@ router.get("/", authenticateToken, async (req, res) => {
     let countParams = [];
 
     if (user.role === "SuperAdmin") {
-      // SuperAdmin can see all feeds or filter by mosque_id if provided
-      if (req.query.mosque_id) {
-        const mosqueId = parseInt(req.query.mosque_id);
+      // SuperAdmin can see all feeds or filter by area_id if provided
+      if (req.query.area_id) {
+        const areaId = parseInt(req.query.area_id);
         queryString = `
           SELECT f.*, 
                  u.username as author_name,
                  u.full_name as author_full_name,
-                 m.name as mosque_name
+                 a.area_name as area_name
           FROM feeds f
           LEFT JOIN users u ON f.author_id = u.id
-          LEFT JOIN mosques m ON f.mosque_id = m.id
-          WHERE f.mosque_id = ? AND f.is_active = TRUE
+          LEFT JOIN areas a ON f.area_id = a.area_id
+          WHERE f.area_id = ? AND f.is_active = TRUE
           ORDER BY f.created_at DESC
           LIMIT ? OFFSET ?
         `;
-        queryParams = [mosqueId, limit, offset];
+        queryParams = [areaId, limit, offset];
         countQuery =
-          "SELECT COUNT(*) as total FROM feeds WHERE mosque_id = ? AND is_active = TRUE";
-        countParams = [mosqueId];
+          "SELECT COUNT(*) as total FROM feeds WHERE area_id = ? AND is_active = TRUE";
+        countParams = [areaId];
       } else {
         // Show all feeds for SuperAdmin
         queryString = `
           SELECT f.*, 
                  u.username as author_name,
                  u.full_name as author_full_name,
-                 m.name as mosque_name
+                 a.area_name as area_name
           FROM feeds f
           LEFT JOIN users u ON f.author_id = u.id
-          LEFT JOIN mosques m ON f.mosque_id = m.id
+          LEFT JOIN areas a ON f.area_id = a.area_id
           WHERE f.is_active = TRUE
           ORDER BY f.created_at DESC
           LIMIT ? OFFSET ?
@@ -60,42 +60,42 @@ router.get("/", authenticateToken, async (req, res) => {
         countParams = [];
       }
     } else {
-      // For Founder and Member, get mosque_id from user
-      let mosqueId;
-      if (req.query.mosque_id) {
-        mosqueId = parseInt(req.query.mosque_id);
+      // For Founder and Member, get area_id from user
+      let areaId;
+      if (req.query.area_id) {
+        areaId = parseInt(req.query.area_id);
       } else {
         const [userRows] = await pool.execute(
-          "SELECT mosque_id FROM users WHERE id = ?",
+          "SELECT area_id FROM users WHERE id = ?",
           [user.id]
         );
 
-        if (userRows.length === 0 || !userRows[0].mosque_id) {
+        if (userRows.length === 0 || !userRows[0].area_id) {
           return res.status(400).json({
             success: false,
-            message: "No mosque associated with this user",
+            message: "No area associated with this user",
           });
         }
 
-        mosqueId = userRows[0].mosque_id;
+        areaId = userRows[0].area_id;
       }
 
       queryString = `
         SELECT f.*, 
                u.username as author_name,
                u.full_name as author_full_name,
-               m.name as mosque_name
+               a.area_name as area_name
         FROM feeds f
         LEFT JOIN users u ON f.author_id = u.id
-        LEFT JOIN mosques m ON f.mosque_id = m.id
-        WHERE f.mosque_id = ? AND f.is_active = TRUE
+        LEFT JOIN areas a ON f.area_id = a.area_id
+        WHERE f.area_id = ? AND f.is_active = TRUE
         ORDER BY f.created_at DESC
         LIMIT ? OFFSET ?
       `;
-      queryParams = [mosqueId, limit, offset];
+      queryParams = [areaId, limit, offset];
       countQuery =
-        "SELECT COUNT(*) as total FROM feeds WHERE mosque_id = ? AND is_active = TRUE";
-      countParams = [mosqueId];
+        "SELECT COUNT(*) as total FROM feeds WHERE area_id = ? AND is_active = TRUE";
+      countParams = [areaId];
     }
 
     const [feeds] = await pool.query(queryString, queryParams);
@@ -132,10 +132,10 @@ router.get("/:id", authenticateToken, async (req, res) => {
 
     const [feeds] = await pool.execute(
       `
-      SELECT f.*, u.username AS author_name, u.full_name AS author_full_name, m.name AS mosque_name
+      SELECT f.*, u.username AS author_name, u.full_name AS author_full_name, a.area_name AS area_name
       FROM feeds f
       LEFT JOIN users u ON f.author_id = u.id
-      LEFT JOIN mosques m ON f.mosque_id = m.id
+      LEFT JOIN areas a ON f.area_id = a.area_id
       WHERE f.id = ?
     `,
       [id]
@@ -181,44 +181,44 @@ router.post(
           .json({ success: false, message: "Title and content are required" });
       }
 
-      let mosqueId;
+      let areaId;
 
       if (user.role === "SuperAdmin") {
-        // SuperAdmin can specify mosque_id in request body or use their own
-        if (req.body.mosque_id) {
-          mosqueId = req.body.mosque_id;
+        // SuperAdmin can specify area_id in request body or use their own
+        if (req.body.area_id) {
+          areaId = req.body.area_id;
         } else {
           const [userRows] = await pool.execute(
-            "SELECT mosque_id FROM users WHERE id = ?",
+            "SELECT area_id FROM users WHERE id = ?",
             [user.id]
           );
-          if (!userRows.length || !userRows[0].mosque_id) {
+          if (!userRows.length || !userRows[0].area_id) {
             return res.status(400).json({
               success: false,
               message:
-                "SuperAdmin must specify mosque_id or have a default mosque associated",
+                "SuperAdmin must specify area_id or have a default area associated",
             });
           }
-          mosqueId = userRows[0].mosque_id;
+          areaId = userRows[0].area_id;
         }
       } else {
-        // Founder uses their mosque
+        // Founder uses their area
         const [userRows] = await pool.execute(
-          "SELECT mosque_id FROM users WHERE id = ?",
+          "SELECT area_id FROM users WHERE id = ?",
           [user.id]
         );
-        if (!userRows.length || !userRows[0].mosque_id) {
+        if (!userRows.length || !userRows[0].area_id) {
           return res.status(400).json({
             success: false,
-            message: "No mosque associated with this user",
+            message: "No area associated with this user",
           });
         }
-        mosqueId = userRows[0].mosque_id;
+        areaId = userRows[0].area_id;
       }
 
       const [result] = await pool.execute(
         `
-      INSERT INTO feeds (title, content, priority, author_id, mosque_id, image_url, video_url, expires_at, send_notification)
+      INSERT INTO feeds (title, content, priority, author_id, area_id, image_url, video_url, expires_at, send_notification)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
         [
@@ -226,7 +226,7 @@ router.post(
           content,
           priority || "normal",
           user.id,
-          mosqueId,
+          areaId,
           image_url || null,
           video_url || null,
           expires_at || null,
@@ -236,10 +236,10 @@ router.post(
 
       const [newFeed] = await pool.execute(
         `
-      SELECT f.*, u.username AS author_name, u.full_name AS author_full_name, m.name AS mosque_name
+      SELECT f.*, u.username AS author_name, u.full_name AS author_full_name, a.area_name AS area_name
       FROM feeds f
       LEFT JOIN users u ON f.author_id = u.id
-      LEFT JOIN mosques m ON f.mosque_id = m.id
+      LEFT JOIN areas a ON f.area_id = a.area_id
       WHERE f.id = ?
     `,
         [result.insertId]
@@ -294,10 +294,10 @@ router.put(
         accessQuery = "SELECT f.* FROM feeds f WHERE f.id = ?";
         accessParams = [id];
       } else if (user.role === "Founder" || user.role === "WCM") {
-        // Founder and WCM can only edit feeds from their mosque
+        // Founder and WCM can only edit feeds from their area
         accessQuery = `
           SELECT f.* FROM feeds f
-          WHERE f.id = ? AND f.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)
+          WHERE f.id = ? AND f.area_id = (SELECT area_id FROM users WHERE id = ?)
         `;
         accessParams = [id, user.id];
       }
@@ -331,10 +331,10 @@ router.put(
 
       const [updatedFeed] = await pool.execute(
         `
-      SELECT f.*, u.username AS author_name, u.full_name AS author_full_name, m.name AS mosque_name
+      SELECT f.*, u.username AS author_name, u.full_name AS author_full_name, a.area_name AS area_name
       FROM feeds f
       LEFT JOIN users u ON f.author_id = u.id
-      LEFT JOIN mosques m ON f.mosque_id = m.id
+      LEFT JOIN areas a ON f.area_id = a.area_id
       WHERE f.id = ?
     `,
         [id]
@@ -374,10 +374,10 @@ router.delete(
         accessQuery = "SELECT f.* FROM feeds f WHERE f.id = ?";
         accessParams = [id];
       } else if (user.role === "Founder" || user.role === "WCM") {
-        // Founder and WCM can only delete feeds from their mosque
+        // Founder and WCM can only delete feeds from their area
         accessQuery = `
           SELECT f.* FROM feeds f
-          WHERE f.id = ? AND f.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)
+          WHERE f.id = ? AND f.area_id = (SELECT area_id FROM users WHERE id = ?)
         `;
         accessParams = [id, user.id];
       }

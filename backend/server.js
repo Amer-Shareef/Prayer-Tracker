@@ -48,7 +48,6 @@ const authRoutes = require("./routes/authRoutes");
 const memberRoutes = require("./routes/memberRoutes");
 const userRoutes = require("./routes/userRoutes");
 const prayerRoutes = require("./routes/prayerRoutes");
-const mosqueRoutes = require("./routes/mosqueRoutes");
 const announcementRoutes = require("./routes/announcementRoutes");
 const pickupRoutes = require("./routes/pickupRoutes");
 const adminRoutes = require("./routes/adminRoutes");
@@ -61,7 +60,6 @@ const areaRoutes = require("./routes/areaRoutes");
 // Use routes
 app.use("/api", authRoutes);
 app.use("/api", userRoutes);
-app.use("/api", mosqueRoutes);
 app.use("/api", prayerRoutes);
 app.use("/api", announcementRoutes);
 app.use("/api", pickupRoutes);

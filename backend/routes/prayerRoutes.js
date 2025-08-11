@@ -34,6 +34,7 @@ router.get("/prayers/all", authenticateToken, async (req, res) => {
         maghrib,
         isha,
         zikr_count,
+        zikr_count_2,
         quran_minutes
        FROM prayers 
        WHERE user_id = ? 
@@ -54,6 +55,7 @@ router.get("/prayers/all", authenticateToken, async (req, res) => {
         maghrib: prayer.maghrib,
         isha: prayer.isha,
         zikr_count: prayer.zikr_count,
+        zikr_count_2: prayer.zikr_count_2,
         quran_minutes: prayer.quran_minutes
       }))
     });

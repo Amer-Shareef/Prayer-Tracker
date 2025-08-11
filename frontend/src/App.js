@@ -13,7 +13,7 @@ import ProtectedRoute from "./utils/ProtectedRoute";
 
 // Member Pages
 import Dashboard from "./pages/member/Dashboard";
-import MyMosque from "./pages/member/MyMosque";
+import MyArea from "./pages/member/MyArea";
 import MyPrayers from "./pages/member/MyPrayers";
 import MyStats from "./pages/member/MyStats";
 import Profile from "./pages/member/Profile";
@@ -43,7 +43,7 @@ import SuperAdminDashboard from "./components/dashboard/SuperAdminDashboard";
 import SuperAdminDashboardComplete from "./components/dashboard/SuperAdminDashboardComplete";
 import AssignFounder from "./pages/superadmin/AssignFounder";
 import PromoteUser from "./pages/superadmin/PromoteUser";
-import ViewMosques from "./pages/superadmin/ViewMosques";
+import ViewAreas from "./pages/superadmin/ViewAreas";
 import SuperAdminManageMembers from "./pages/superadmin/SuperAdminManageMembers";
 import SuperAdminPostFeeds from "./pages/superadmin/SuperAdminPostFeeds";
 import SuperAdminViewAttendance from "./pages/superadmin/SuperAdminViewAttendance";
@@ -84,10 +84,10 @@ function App() {
             }
           />
           <Route
-            path="/member/mosque"
+            path="/member/area"
             element={
               <ProtectedRoute role="Member">
-                <MyMosque />
+                <MyArea />
               </ProtectedRoute>
             }
           />
@@ -302,10 +302,10 @@ function App() {
             }
           />{" "}
           <Route
-            path="/superadmin/view-mosques"
+            path="/superadmin/view-areas"
             element={
               <ProtectedRoute role="SuperAdmin">
-                <ViewMosques />
+                <ViewAreas />
               </ProtectedRoute>
             }
           />

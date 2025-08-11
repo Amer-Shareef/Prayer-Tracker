@@ -21,10 +21,11 @@ const getPrayers = async (req, res) => {
     connection = await pool.getConnection();
 
     let query = `
-      SELECT p.*, m.name as mosque_name,
+      SELECT p.*, a.area_name,
              DATE_FORMAT(p.prayer_date, '%Y-%m-%d') as formatted_date
       FROM prayers p
-      LEFT JOIN mosques m ON p.mosque_id = m.id
+      LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN areas a ON u.area_id = a.area_id
       WHERE p.user_id = ?
     `;
     let queryParams = [user.id];
@@ -106,6 +107,7 @@ const recordDailyPrayers = async (req, res) => {
       isha,
       notes,
       zikr_count,
+      zikr_count_2,
       quran_minutes,
     } = req.body;
 
@@ -125,13 +127,13 @@ const recordDailyPrayers = async (req, res) => {
 
     connection = await pool.getConnection();
 
-    // Get user's mosque
+    // Get user's area
     const [userData] = await connection.execute(
-      "SELECT mosque_id FROM users WHERE id = ?",
+      "SELECT area_id FROM users WHERE id = ?",
       [user.id]
     );
 
-    const mosqueId = userData[0]?.mosque_id;
+    const areaId = userData[0]?.area_id;
 
     // Check if record already exists for this date
     const [existingRecord] = await connection.execute(
@@ -187,6 +189,10 @@ const recordDailyPrayers = async (req, res) => {
         updateFields.push("zikr_count = ?");
         updateValues.push(zikr_count || 0);
       }
+      if (zikr_count_2 !== undefined) {
+        updateFields.push("zikr_count_2 = ?");
+        updateValues.push(zikr_count_2 || 0);
+      }
       if (quran_minutes !== undefined) {
         updateFields.push("quran_minutes = ?");
         updateValues.push(quran_minutes || 0);
@@ -210,12 +216,12 @@ const recordDailyPrayers = async (req, res) => {
       // Insert new record
       const [result] = await connection.execute(
         `INSERT INTO prayers (
-          user_id, mosque_id, prayer_date, fajr, dhuhr, asr, maghrib, isha,
-          daily_completion_rate, notes, zikr_count, quran_minutes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          user_id, area_id, prayer_date, fajr, dhuhr, asr, maghrib, isha,
+          daily_completion_rate, notes, zikr_count, zikr_count_2, quran_minutes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           user.id,
-          mosqueId,
+          areaId,
           prayer_date,
           fajrVal,
           dhuhrVal,
@@ -225,6 +231,7 @@ const recordDailyPrayers = async (req, res) => {
           completionRate.toFixed(2),
           notes || null,
           zikr_count || 0,
+          zikr_count_2 || 0,
           quran_minutes || 0,
         ]
       );
@@ -234,10 +241,11 @@ const recordDailyPrayers = async (req, res) => {
 
     // Fetch the updated/created prayer record
     const [prayer] = await connection.execute(
-      `SELECT p.*, m.name as mosque_name,
+      `SELECT p.*, a.area_name,
               DATE_FORMAT(p.prayer_date, '%Y-%m-%d') as formatted_date
        FROM prayers p
-       LEFT JOIN mosques m ON p.mosque_id = m.id
+       LEFT JOIN users u ON p.user_id = u.id
+       LEFT JOIN areas a ON u.area_id = a.area_id
        WHERE p.id = ?`,
       [prayerId]
     );
@@ -303,13 +311,13 @@ const updateIndividualPrayer = async (req, res) => {
 
     connection = await pool.getConnection();
 
-    // Get user's mosque
+    // Get user's area
     const [userData] = await connection.execute(
-      "SELECT mosque_id FROM users WHERE id = ?",
+      "SELECT area_id FROM users WHERE id = ?",
       [user.id]
     );
 
-    const mosqueId = userData[0]?.mosque_id;
+    const areaId = userData[0]?.area_id;
     const prayerColumn = prayer_type.toLowerCase();
     const prayedValue = prayed ? 1 : 0;
 
@@ -338,9 +346,9 @@ const updateIndividualPrayer = async (req, res) => {
       // Create new record with only this prayer marked
       const [result] = await connection.execute(
         `INSERT INTO prayers (
-          user_id, mosque_id, prayer_date, ${prayerColumn}, daily_completion_rate
+          user_id, area_id, prayer_date, ${prayerColumn}, daily_completion_rate
         ) VALUES (?, ?, ?, ?, ?)`,
-        [user.id, mosqueId, prayer_date, prayedValue, prayedValue * 20] // 20% for one prayer
+        [user.id, areaId, prayer_date, prayedValue, prayedValue * 20] // 20% for one prayer
       );
 
       prayerId = result.insertId;
@@ -367,10 +375,11 @@ const updateIndividualPrayer = async (req, res) => {
 
     // Fetch the updated prayer record
     const [prayer] = await connection.execute(
-      `SELECT p.*, m.name as mosque_name,
+      `SELECT p.*, a.area_name,
               DATE_FORMAT(p.prayer_date, '%Y-%m-%d') as formatted_date
        FROM prayers p
-       LEFT JOIN mosques m ON p.mosque_id = m.id
+       LEFT JOIN users u ON p.user_id = u.id  
+       LEFT JOIN areas a ON u.area_id = a.area_id
        WHERE p.id = ?`,
       [prayerId]
     );
@@ -421,6 +430,7 @@ const getPrayerStats = async (req, res) => {
         SUM(maghrib) as maghrib_count,
         SUM(isha) as isha_count,
         AVG(zikr_count) as avg_zikr,
+        AVG(zikr_count_2) as avg_zikr_2,
         AVG(quran_minutes) as avg_quran_minutes
        FROM prayers 
        WHERE user_id = ? AND prayer_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)`,
@@ -510,6 +520,7 @@ const getPrayerStats = async (req, res) => {
       prayer_breakdown: prayerTypeStats,
       spiritual_activities: {
         avg_zikr_count: parseFloat(stats.avg_zikr || 0).toFixed(1),
+        avg_zikr_count_2: parseFloat(stats.avg_zikr_2 || 0).toFixed(1),
         avg_quran_minutes: parseFloat(stats.avg_quran_minutes || 0).toFixed(1),
       },
     };

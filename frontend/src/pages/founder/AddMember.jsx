@@ -24,7 +24,7 @@ const AddMember = () => {
     role: 'Member',
     dateOfBirth: '',
     address: '',
-    area: '',
+    area_id: '',
     onRent: false,
     zakathEligible: false,
     differentlyAbled: false,
@@ -370,9 +370,9 @@ const AddMember = () => {
                     Area
                   </label>
                   <select
-                    id="area"
-                    name="area"
-                    value={formData.area}
+                    id="area_id"
+                    name="area_id"
+                    value={formData.area_id}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
@@ -381,8 +381,8 @@ const AddMember = () => {
                       <option value="">Loading areas...</option>
                     ) : (
                       areas.map((area) => (
-                        <option key={area.id} value={area.area_name || area.name || `Area ${area.id}`}>
-                          {area.area_name || area.name || `Area ${area.id}`}
+                        <option key={area.area_id} value={area.area_id}>
+                          {area.area_name || area.name || `Area ${area.area_id}`}
                           {area.description && ` - ${area.description}`}
                         </option>
                       ))

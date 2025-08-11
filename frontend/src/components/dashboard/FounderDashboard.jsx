@@ -3,15 +3,15 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import FounderLayout from "../layouts/FounderLayout";
 import feedService from "../../services/feedService"; // Import feed service
-import { mosqueService } from "../../services/api"; // Import mosque service
+import { areaService } from "../../services/api"; // Import area service
 
 const FounderDashboard = () => {
   const { user } = useAuth();
   
-  // Mosque information state
-  const [mosque, setMosque] = useState({
+  // Area information state
+  const [area, setArea] = useState({
     name: "Loading...",
-    address: "Loading mosque information...",
+    address: "Loading area information...",
     prayerTimes: {
       fajr: '4:43 AM',
       dhuhr: '12:15 PM',
@@ -48,7 +48,7 @@ const FounderDashboard = () => {
   });
 
   // Loading states
-  const [loadingMosqueData, setLoadingMosqueData] = useState(true);
+  const [loadingAreaData, setLoadingAreaData] = useState(true);
   const [attendanceError, setAttendanceError] = useState(null);
   
   // Feeds state with loading and error handling
@@ -61,26 +61,26 @@ const FounderDashboard = () => {
     hijri: '03 Muharram 1447'
   });
   
-  // Fetch mosque data and attendance statistics
+  // Fetch area data and attendance statistics
   useEffect(() => {
-    const fetchMosqueData = async () => {
-      setLoadingMosqueData(true);
+    const fetchAreaData = async () => {
+      setLoadingAreaData(true);
       setAttendanceError(null);
       
       try {
-        // First, get user's mosque information
-        console.log('🔍 Fetching mosque data for user:', user);
-        const mosquesResponse = await mosqueService.getMosques();
-        console.log('📊 Mosque API response:', mosquesResponse);
+        // First, get user's area information
+        console.log('🔍 Fetching area data for user:', user);
+        const areasResponse = await areaService.getAreas();
+        console.log('📊 Area API response:', areasResponse);
         
-        if (mosquesResponse.data.success && mosquesResponse.data.data.length > 0) {
-          const userMosque = mosquesResponse.data.data[0]; // Get first mosque for the user
+        if (areasResponse.data.success && areasResponse.data.data.length > 0) {
+          const userArea = areasResponse.data.data[0]; // Get first area for the user
           
-          // Update mosque info
-          setMosque({
-            name: userMosque.name || "Mosque",
-            address: userMosque.address || "Address not available",
-            prayerTimes: userMosque.today_prayer_times || {
+          // Update area info
+          setArea({
+            name: userArea.area_name || "Area",
+            address: userArea.address || "Address not available",
+            prayerTimes: userArea.today_prayer_times || {
               fajr: '4:43 AM',
               dhuhr: '12:15 PM',
               asr: '3:45 PM',
@@ -90,9 +90,9 @@ const FounderDashboard = () => {
             }
           });
           
-          // Fetch attendance statistics for this mosque
+          // Fetch attendance statistics for this area
           try {
-            const attendanceResponse = await mosqueService.getAttendanceStats(userMosque.id);
+            const attendanceResponse = await areaService.getAreaStats(userArea.area_id);
             
             if (attendanceResponse.data.success) {
               const stats = attendanceResponse.data.data;
@@ -129,74 +129,19 @@ const FounderDashboard = () => {
             setAttendanceError('Failed to load attendance statistics');
           }
         } else {
-          console.warn('⚠️ No mosque data found for user, trying general stats...');
-          console.log('📊 Full response:', mosquesResponse);
-          
-          // Try to get general attendance stats instead
-          try {
-            const generalStatsResponse = await mosqueService.getGeneralAttendanceStats();
-            
-            if (generalStatsResponse.data.success) {
-              const stats = generalStatsResponse.data.data;
-              
-              // Set mosque info from general stats
-              setMosque({
-                name: stats.mosque.name,
-                address: stats.mosque.address,
-                prayerTimes: {
-                  fajr: '4:43 AM',
-                  dhuhr: '12:15 PM',
-                  asr: '3:45 PM',
-                  maghrib: '6:23 PM',
-                  isha: '7:43 PM',
-                  jumuah: '1:30 PM'
-                }
-              });
-              
-              // Update attendance stats
-              setAttendanceStats({
-                today: {
-                  total: stats.today.total,
-                  percentage: stats.today.percentage,
-                  prayerBreakdown: {
-                    fajr: { count: stats.today.prayerBreakdown.fajr.count, percentage: stats.today.prayerBreakdown.fajr.percentage },
-                    dhuhr: { count: stats.today.prayerBreakdown.dhuhr.count, percentage: stats.today.prayerBreakdown.dhuhr.percentage },
-                    asr: { count: stats.today.prayerBreakdown.asr.count, percentage: stats.today.prayerBreakdown.asr.percentage },
-                    maghrib: { count: stats.today.prayerBreakdown.maghrib.count, percentage: stats.today.prayerBreakdown.maghrib.percentage },
-                    isha: { count: stats.today.prayerBreakdown.isha.count, percentage: stats.today.prayerBreakdown.isha.percentage }
-                  }
-                },
-                weekly: {
-                  total: stats.weekly.total,
-                  percentage: stats.weekly.percentage,
-                  trend: stats.weekly.percentage >= 70 ? 'up' : stats.weekly.percentage >= 50 ? 'stable' : 'down'
-                },
-                monthly: {
-                  total: stats.monthly.total,
-                  percentage: stats.monthly.percentage,
-                  trend: stats.monthly.percentage >= 70 ? 'up' : stats.monthly.percentage >= 50 ? 'stable' : 'down'
-                }
-              });
-              
-              console.log('✅ General attendance data loaded successfully:', stats);
-            } else {
-              setAttendanceError('No attendance data available');
-            }
-          } catch (generalError) {
-            console.error('❌ Error fetching general stats:', generalError);
-            setAttendanceError('No mosque data found');
-          }
+          console.warn('⚠️ No area data found for user');
+          setAttendanceError('No area associated with this user');
         }
       } catch (error) {
-        console.error('❌ Error fetching mosque data:', error);
-        setAttendanceError('Failed to load mosque information');
+        console.error('❌ Error fetching area data:', error);
+        setAttendanceError('Failed to load area information');
       } finally {
-        setLoadingMosqueData(false);
+        setLoadingAreaData(false);
       }
     };
     
     if (user) {
-      fetchMosqueData();
+      fetchAreaData();
     }
   }, [user]);
   
@@ -248,7 +193,7 @@ const FounderDashboard = () => {
             {user.role === "Founder" ? "Working Committee Dashboard" : "Super Admin Dashboard"}
           </h1>
           <p className="mt-1 text-sm text-gray-600">
-            {mosque.name} • {currentDate.gregorian} • {currentDate.hijri}
+            {area.name} • {currentDate.gregorian} • {currentDate.hijri}
           </p>
           {attendanceError && (
             <p className="mt-1 text-sm text-red-600">
@@ -267,7 +212,7 @@ const FounderDashboard = () => {
               </Link>
             </div>
             
-            {loadingMosqueData ? (
+            {loadingAreaData ? (
               <div className="flex items-center justify-center p-8">
                 <svg className="animate-spin h-8 w-8 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>

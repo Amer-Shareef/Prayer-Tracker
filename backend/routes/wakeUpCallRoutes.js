@@ -38,7 +38,7 @@ router.post("/wake-up-calls", dbHealthCheck, async (req, res) => {
     // Get user information
     const [userInfo] = await pool.execute(
       `
-      SELECT u.id, u.username, u.phone, u.mosque_id,
+      SELECT u.id, u.username, u.phone, u.area_id,
              CONCAT(UPPER(LEFT(COALESCE(u.area, 'GEN'), 2)), LPAD(u.id, 4, '0')) as member_id
       FROM users u 
       WHERE u.username = ? AND u.status = 'active'
@@ -86,7 +86,7 @@ router.post("/wake-up-calls", dbHealthCheck, async (req, res) => {
       await pool.execute(
         `
         INSERT INTO wake_up_calls 
-        (user_id, username, call_response, response_time, call_date, call_time, prayer_type, member_id, phone, mosque_id)
+        (user_id, username, call_response, response_time, call_date, call_time, prayer_type, member_id, phone, area_id)
         VALUES (?, ?, ?, ?, ?, ?, 'Fajr', ?, ?, ?)
       `,
         [
@@ -98,7 +98,7 @@ router.post("/wake-up-calls", dbHealthCheck, async (req, res) => {
           parsedCallTime,
           user.member_id,
           user.phone,
-          user.mosque_id,
+          user.area_id,
         ]
       );
 
@@ -108,9 +108,9 @@ router.post("/wake-up-calls", dbHealthCheck, async (req, res) => {
     // Get the final record to return
     const [finalRecord] = await pool.execute(
       `
-      SELECT wc.*, m.name as mosque_name
+      SELECT wc.*, a.area_name
       FROM wake_up_calls wc
-      LEFT JOIN mosques m ON wc.mosque_id = m.id
+      LEFT JOIN areas a ON wc.area_id = a.area_id
       WHERE wc.user_id = ? AND wc.call_date = ? AND wc.prayer_type = 'Fajr'
       ORDER BY wc.created_at DESC LIMIT 1
     `,
@@ -150,9 +150,9 @@ router.get(
       });
 
       let query = `
-      SELECT wc.*, m.name as mosque_name
+      SELECT wc.*, a.area_name
       FROM wake_up_calls wc
-      LEFT JOIN mosques m ON wc.mosque_id = m.id
+      LEFT JOIN areas a ON wc.area_id = a.area_id
       WHERE 1=1
     `;
       const queryParams = [];
