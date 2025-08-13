@@ -1,6 +1,6 @@
 const express = require("express");
 const { pool } = require("../config/database");
-const { authenticateToken, authorizeRole } = require("../middleware/auth");
+const { authorizeRole } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -32,7 +32,7 @@ router.get("/areas/test", async (req, res) => {
 });
 
 // GET /api/areas - Get all areas (for dropdown in member creation)
-router.get("/areas", authenticateToken, async (req, res) => {
+router.get("/areas",  async (req, res) => {
   try {
     console.log("📋 Fetching areas for dropdown");
 
@@ -59,7 +59,7 @@ router.get("/areas", authenticateToken, async (req, res) => {
 // POST /api/areas - Create new area (SuperAdmin only)
 router.post(
   "/areas",
-  authenticateToken,
+  
   authorizeRole(["SuperAdmin"]),
   async (req, res) => {
     try {
@@ -133,7 +133,7 @@ router.post(
 // PUT /api/areas/:id - Update existing area (SuperAdmin only)
 router.put(
   "/areas/:id",
-  authenticateToken,
+  
   authorizeRole(["SuperAdmin"]),
   async (req, res) => {
     try {
@@ -221,7 +221,7 @@ router.put(
 // DELETE /api/areas/:id - Delete area (SuperAdmin only)
 router.delete(
   "/areas/:id",
-  authenticateToken,
+  
   authorizeRole(["SuperAdmin"]),
   async (req, res) => {
     try {
@@ -281,7 +281,7 @@ router.delete(
 );
 
 // GET /api/areas/:id/stats - Get area statistics (attendance, members, etc.)
-router.get("/areas/:id/stats", authenticateToken, async (req, res) => {
+router.get("/areas/:id/stats",  async (req, res) => {
   try {
     const { id } = req.params;
     const period = parseInt(req.query.period) || 30;
