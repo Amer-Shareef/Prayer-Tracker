@@ -937,14 +937,26 @@ export const areaService = {
     }
   },
 
-  getAreaStats: async (id, period = 30) => {
+  getAreaStats: async (id, period = 31) => {
     try {
-      console.log("📊 Getting area stats:", id);
+      console.log("📊 Getting area stats:", id, "for", period, "days");
       const response = await api.get(`/areas/${id}/stats?period=${period}`);
       console.log("✅ Area stats fetched:", response.data);
       return response;
     } catch (error) {
       console.error("❌ Failed to fetch area stats:", error);
+      throw error;
+    }
+  },
+
+  getGlobalStats: async (period = 31) => {
+    try {
+      console.log("🌍 Getting global stats for all areas for", period, "days");
+      const response = await api.get(`/areas/global/stats?period=${period}`);
+      console.log("✅ Global stats fetched:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ Failed to fetch global stats:", error);
       throw error;
     }
   },

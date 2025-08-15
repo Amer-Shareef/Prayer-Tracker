@@ -21,15 +21,29 @@ router.get(
              u.differently_abled as differentlyAbled, u.muallafathil_quloob as MuallafathilQuloob, 
              a.area_name, a.address as area_address,
              CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId,
-             COUNT(p.id) as total_prayers,
              COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) as prayed_count,
              CASE 
-               WHEN COUNT(p.id) > 0 THEN ROUND((COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) / (COUNT(p.id) * 5)) * 100, 2)
-               ELSE 0 
+               WHEN DATEDIFF(CURDATE(), u.joined_date) >= 39 THEN 200
+               ELSE (DATEDIFF(CURDATE(), u.joined_date) + 1) * 5
+             END as total_prayers,
+             CASE 
+               WHEN DATEDIFF(CURDATE(), u.joined_date) >= 39 THEN 
+                 ROUND((COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) / 200) * 100, 2)
+               ELSE 
+                 CASE 
+                   WHEN (DATEDIFF(CURDATE(), u.joined_date) + 1) * 5 > 0 THEN 
+                     ROUND((COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) / ((DATEDIFF(CURDATE(), u.joined_date) + 1) * 5)) * 100, 2)
+                   ELSE 0 
+                 END
              END as attendance_rate
       FROM users u
       LEFT JOIN areas a ON u.area_id = a.area_id
-      LEFT JOIN prayers p ON u.id = p.user_id AND p.prayer_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+      LEFT JOIN prayers p ON u.id = p.user_id 
+        AND p.prayer_date >= CASE 
+          WHEN DATEDIFF(CURDATE(), u.joined_date) >= 39 THEN DATE_SUB(CURDATE(), INTERVAL 39 DAY)
+          ELSE u.joined_date
+        END
+        AND p.prayer_date <= CURDATE()
     `;
       let queryParams = [];
 

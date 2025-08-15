@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import SuperAdminLayout from "../layouts/SuperAdminLayout";
-import { feedsService, mosqueService } from "../../services/api";
+import { feedsService, areaService } from "../../services/api";
 
 const SuperAdminDashboardComplete = () => {
   const { user } = useAuth();
@@ -61,24 +61,24 @@ const SuperAdminDashboardComplete = () => {
     hijri: '03 Muharram 1447'
   });
   
-  // Fetch mosque data and attendance statistics
+  // Fetch global data and attendance statistics for SuperAdmin
   useEffect(() => {
-    const fetchMosqueData = async () => {
+    const fetchGlobalData = async () => {
       setLoadingMosqueData(true);
       setAttendanceError(null);
       
       try {
-        // First, get user's mosque information
-        const mosquesResponse = await mosqueService.getMosques();
+        // For SuperAdmin, fetch global statistics across all areas
+        const globalStatsResponse = await areaService.getGlobalStats();
         
-        if (mosquesResponse.data.success && mosquesResponse.data.data.length > 0) {
-          const userMosque = mosquesResponse.data.data[0]; // Get first mosque for the user
+        if (globalStatsResponse.data.success) {
+          const stats = globalStatsResponse.data.data;
           
-          // Update mosque info
+          // Update mosque info with global data
           setMosque({
-            name: userMosque.name || "Mosque",
-            address: userMosque.address || "Address not available",
-            prayerTimes: userMosque.today_prayer_times || {
+            name: "Global Stats (All Areas)",
+            address: `${stats.global.totalMembers} total members across ${stats.global.totalAreas} areas`,
+            prayerTimes: {
               fajr: '4:43 AM',
               dhuhr: '12:15 PM',
               asr: '3:45 PM',
@@ -88,74 +88,59 @@ const SuperAdminDashboardComplete = () => {
             }
           });
           
-          // Fetch attendance statistics for this mosque
-          try {
-            const attendanceResponse = await mosqueService.getAttendanceStats(userMosque.id);
-            
-            if (attendanceResponse.data.success) {
-              const stats = attendanceResponse.data.data;
-              
-              // Update attendance stats
-              setAttendanceStats({
-                today: {
-                  total: stats.today.total,
-                  percentage: stats.today.percentage
-                },
-                thisWeek: {
-                  total: stats.weekly.total,
-                  percentage: stats.weekly.percentage
-                },
-                thisMonth: {
-                  total: stats.monthly.total,
-                  percentage: stats.monthly.percentage
-                }
-              });
-              
-              // Update prayer breakdown stats
-              const breakdown = stats.today.prayerBreakdown;
-              setPrayerStats([
-                { name: 'Fajr', count: breakdown.fajr.count, percentage: breakdown.fajr.percentage },
-                { name: 'Dhuhr', count: breakdown.dhuhr.count, percentage: breakdown.dhuhr.percentage },
-                { name: 'Asr', count: breakdown.asr.count, percentage: breakdown.asr.percentage },
-                { name: 'Maghrib', count: breakdown.maghrib.count, percentage: breakdown.maghrib.percentage },
-                { name: 'Isha', count: breakdown.isha.count, percentage: breakdown.isha.percentage }
-              ]);
-              
-              console.log('✅ Attendance data loaded successfully:', stats);
+          // Update attendance stats
+          setAttendanceStats({
+            today: {
+              total: stats.today.total,
+              percentage: stats.today.percentage
+            },
+            thisWeek: {
+              total: stats.weekly.total,
+              percentage: stats.weekly.percentage
+            },
+            thisMonth: {
+              total: stats.monthly.total,
+              percentage: stats.monthly.percentage
             }
-          } catch (attendanceErr) {
-            console.error('❌ Error fetching attendance data:', attendanceErr);
-            setAttendanceError('Failed to load attendance statistics');
-            
-            // Keep default/fallback stats in case of attendance API error
-            setAttendanceStats({
-              today: { total: 0, percentage: 0 },
-              thisWeek: { total: 0, percentage: 0 },
-              thisMonth: { total: 0, percentage: 0 }
-            });
-            
-            setPrayerStats([
-              { name: 'Fajr', count: 0, percentage: 0 },
-              { name: 'Dhuhr', count: 0, percentage: 0 },
-              { name: 'Asr', count: 0, percentage: 0 },
-              { name: 'Maghrib', count: 0, percentage: 0 },
-              { name: 'Isha', count: 0, percentage: 0 }
-            ]);
-          }
-        } else {
-          console.warn('⚠️ No mosque data found for user');
-          setAttendanceError('No mosque data found');
+          });
+          
+          // Update prayer breakdown stats
+          const breakdown = stats.today.prayerBreakdown;
+          setPrayerStats([
+            { name: 'Fajr', count: breakdown.fajr.count, percentage: breakdown.fajr.percentage },
+            { name: 'Dhuhr', count: breakdown.dhuhr.count, percentage: breakdown.dhuhr.percentage },
+            { name: 'Asr', count: breakdown.asr.count, percentage: breakdown.asr.percentage },
+            { name: 'Maghrib', count: breakdown.maghrib.count, percentage: breakdown.maghrib.percentage },
+            { name: 'Isha', count: breakdown.isha.count, percentage: breakdown.isha.percentage }
+          ]);
+          
+          console.log('✅ Global stats loaded successfully:', stats);
         }
       } catch (error) {
-        console.error('❌ Error fetching mosque data:', error);
-        setAttendanceError('Failed to load mosque information');
+        console.error('❌ Error fetching global stats:', error);
+        setAttendanceError('Failed to load global statistics');
+        
+        // Keep default/fallback stats in case of error
+        setAttendanceStats({
+          today: { total: 0, percentage: 0 },
+          thisWeek: { total: 0, percentage: 0 },
+          thisMonth: { total: 0, percentage: 0 }
+        });
+        
+        setPrayerStats([
+          { name: 'Fajr', count: 0, percentage: 0 },
+          { name: 'Dhuhr', count: 0, percentage: 0 },
+          { name: 'Asr', count: 0, percentage: 0 },
+          { name: 'Maghrib', count: 0, percentage: 0 },
+          { name: 'Isha', count: 0, percentage: 0 }
+        ]);
       } finally {
         setLoadingMosqueData(false);
       }
     };
     
     if (user) {
-      fetchMosqueData();
+      fetchGlobalData();
     }
   }, [user]);
   

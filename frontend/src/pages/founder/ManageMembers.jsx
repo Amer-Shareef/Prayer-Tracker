@@ -22,6 +22,7 @@ function ManageMembers() {
   const [filterMobility, setFilterMobility] = useState('all');
   const [filterArea, setFilterArea] = useState('all');
   const [filterAdditionalInfo, setFilterAdditionalInfo] = useState('all');
+  const [expandedRows, setExpandedRows] = useState(new Set());
 
   // Fetch members and areas from database
   useEffect(() => {
@@ -96,6 +97,17 @@ function ManageMembers() {
       setError('Error updating member status');
       console.error('Error updating member status:', err);
     }
+  };
+
+  // Toggle row expansion
+  const toggleRowExpansion = (memberId) => {
+    const newExpandedRows = new Set(expandedRows);
+    if (newExpandedRows.has(memberId)) {
+      newExpandedRows.delete(memberId);
+    } else {
+      newExpandedRows.add(memberId);
+    }
+    setExpandedRows(newExpandedRows);
   };
 
   // Helper function to calculate age from date of birth
@@ -501,176 +513,192 @@ function ManageMembers() {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member ID</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Age</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Area</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact No</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mobility</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Additional Info</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prayer Attendance</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredMembers.map((member) => (
-                  <tr key={member.id} className="hover:bg-gray-50">
-                    {/* Member ID */}
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {member.memberId || '-'}
-                    </td>
-                    
-                    {/* Full Name */}
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {member.fullName || '-'}
-                    </td>
-                    
-                    {/* Age */}
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {calculateAge(member.dateOfBirth)}
-                    </td>
-                    
-                    {/* Area */}
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {member.area || '-'}
-                    </td>
-                    
-                    {/* Contact No */}
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {member.phone || '-'}
-                    </td>
-                    
-                    {/* Email */}
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {member.email || '-'}
-                    </td>
-                    
-                    {/* Address */}
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 max-w-xs truncate">
-                      {member.address || '-'}
-                    </td>
-                    
-                    {/* Mobility */}
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {member.mobility || '-'}
-                    </td>
-                    
-                    {/* Additional Info (Checkboxes) */}
-                    <td className="px-4 py-4 text-sm text-gray-900 max-w-xs">
-                      <div className="flex flex-col gap-1">
-                        {formatCheckedAttributesBadges(member)}
-                      </div>
-                    </td>
-                    
-                    {/* Prayer Attendance */}
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
-                          <div 
-                            className="bg-blue-600 h-2 rounded-full" 
-                            style={{ width: `${member.attendance_rate || 0}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-sm text-gray-900">{member.attendance_rate || 0}%</span>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {member.prayed_count || 0}/{member.total_prayers || 0}
-                      </div>
-                    </td>
-                    
-                    {/* Role */}
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        member.role === 'Member' ? 'bg-blue-100 text-blue-800' :
-                        member.role === 'WCM' ? 'bg-indigo-100 text-indigo-800' :
-                        member.role === 'Founder' ? 'bg-green-100 text-green-800' : 
-                        member.role === 'SuperAdmin' ? 'bg-purple-100 text-purple-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {member.role === 'Member' ? 'Member' :
-                         member.role === 'WCM' ? 'Working Committee Member' :
-                         member.role === 'Founder' ? 'Working Committee Admin' :
-                         member.role === 'SuperAdmin' ? 'Super Admin' :
-                         (member.role || '-')}
-                      </span>
-                    </td>
-                    
-                    {/* Status */}
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        member.status === 'active' ? 'bg-green-100 text-green-800' : 
-                        member.status === 'inactive' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {member.status ? member.status.charAt(0).toUpperCase() + member.status.slice(1) : '-'}
-                      </span>
-                    </td>
-                    
-                    {/* Joined */}
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {member.joined_date ? new Date(member.joined_date).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                      }) : '-'}
-                    </td>
-                    
-                    {/* Username */}
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {member.username || '-'}
-                    </td>
-                    
-                    {/* Actions */}
-                    <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        {/* Download PDF Report Button */}
-                        <button 
-                          className="text-green-600 hover:text-green-900"
-                          onClick={() => generateMemberPDF(member)}
-                          title="Download PDF Report"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                        </button>
+                {filteredMembers.map((member) => {
+                  const isExpanded = expandedRows.has(member.id);
+                  return (
+                    <React.Fragment key={member.id}>
+                      {/* Main Row */}
+                      <tr className="hover:bg-gray-50">
+                        {/* Member ID */}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {member.memberId || '-'}
+                        </td>
                         
-                        {/* Activate/Deactivate Button with Tick/Cross */}
-                        <button 
-                          className={`${member.status === 'active' ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}`}
-                          onClick={() => handleUpdateStatus(member.id, member.status === 'active' ? 'inactive' : 'active')}
-                          title={member.status === 'active' ? 'Deactivate Member' : 'Activate Member'}
-                        >
-                          {member.status === 'active' ? (
-                            // Cross/X icon for deactivate
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          ) : (
-                            // Tick/Check icon for activate
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </button>
+                        {/* Full Name */}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {member.fullName || '-'}
+                        </td>
                         
-                        {/* Delete Button */}
-                        <button 
-                          className="text-red-600 hover:text-red-900"
-                          onClick={() => handleDeleteMember(member.id)}
-                          title="Delete Member"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        {/* Prayer Attendance */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                              <div 
+                                className="bg-blue-600 h-2 rounded-full" 
+                                style={{ width: `${member.attendance_rate || 0}%` }}
+                              ></div>
+                            </div>
+                            <span className="text-sm text-gray-900">{member.attendance_rate || 0}%</span>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {member.prayed_count || 0}/{member.total_prayers || 0}
+                          </div>
+                        </td>
+                        
+                        {/* Role */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            member.role === 'Member' ? 'bg-blue-100 text-blue-800' :
+                            member.role === 'WCM' ? 'bg-indigo-100 text-indigo-800' :
+                            member.role === 'Founder' ? 'bg-green-100 text-green-800' : 
+                            member.role === 'SuperAdmin' ? 'bg-purple-100 text-purple-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {member.role === 'Member' ? 'Member' :
+                             member.role === 'WCM' ? 'Working Committee Member' :
+                             member.role === 'Founder' ? 'Working Committee Admin' :
+                             member.role === 'SuperAdmin' ? 'Super Admin' :
+                             (member.role || '-')}
+                          </span>
+                        </td>
+                        
+                        {/* Status */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            member.status === 'active' ? 'bg-green-100 text-green-800' : 
+                            member.status === 'inactive' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {member.status ? member.status.charAt(0).toUpperCase() + member.status.slice(1) : '-'}
+                          </span>
+                        </td>
+                        
+                        {/* Joined */}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {member.joined_date ? new Date(member.joined_date).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          }) : '-'}
+                        </td>
+                        
+                        {/* Actions */}
+                        <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex justify-end items-center space-x-2">
+                            {/* Download PDF Report Button */}
+                            <button 
+                              className="text-green-600 hover:text-green-900"
+                              onClick={() => generateMemberPDF(member)}
+                              title="Download PDF Report"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                            </button>
+                            
+                            {/* Activate/Deactivate Button with Tick/Cross */}
+                            <button 
+                              className={`${member.status === 'active' ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}`}
+                              onClick={() => handleUpdateStatus(member.id, member.status === 'active' ? 'inactive' : 'active')}
+                              title={member.status === 'active' ? 'Deactivate Member' : 'Activate Member'}
+                            >
+                              {member.status === 'active' ? (
+                                // Cross/X icon for deactivate
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              ) : (
+                                // Tick/Check icon for activate
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </button>
+                            
+                            {/* Delete Button */}
+                            <button 
+                              className="text-red-600 hover:text-red-900"
+                              onClick={() => handleDeleteMember(member.id)}
+                              title="Delete Member"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                            
+                            {/* Expand/Collapse Button */}
+                            <button
+                              onClick={() => toggleRowExpansion(member.id)}
+                              className="p-1 text-gray-400 hover:text-gray-600 focus:outline-none"
+                              title={isExpanded ? "Collapse details" : "Expand details"}
+                            >
+                              <svg 
+                                className={`w-4 h-4 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      
+                      {/* Expanded Details Row */}
+                      {isExpanded && (
+                        <tr className="bg-gray-50">
+                          <td colSpan="7" className="px-4 py-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                              <div>
+                                <span className="font-medium text-gray-700">Age:</span>
+                                <span className="ml-2 text-gray-900">{calculateAge(member.dateOfBirth)}</span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-700">Area:</span>
+                                <span className="ml-2 text-gray-900">{member.area || '-'}</span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-700">Contact No:</span>
+                                <span className="ml-2 text-gray-900">{member.phone || '-'}</span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-700">Email:</span>
+                                <span className="ml-2 text-gray-900">{member.email || '-'}</span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-700">Address:</span>
+                                <span className="ml-2 text-gray-900">{member.address || '-'}</span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-700">Username:</span>
+                                <span className="ml-2 text-gray-900">{member.username || '-'}</span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-700">Mobility:</span>
+                                <span className="ml-2 text-gray-900">{member.mobility || '-'}</span>
+                              </div>
+                              <div className="lg:col-span-2">
+                                <span className="font-medium text-gray-700">Additional Info:</span>
+                                <div className="ml-2 mt-1">
+                                  {formatCheckedAttributesBadges(member)}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>

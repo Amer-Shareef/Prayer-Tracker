@@ -18,7 +18,7 @@ const authenticateToken = async (req, res, next) => {
     
     // Get fresh user data from database
     const [users] = await pool.execute(
-      'SELECT id, username, email, role, mosque_id, status FROM users WHERE id = ?',
+      'SELECT id, username, email, role, mosque_id, area_id, status FROM users WHERE id = ?',
       [decoded.userId] // Fixed to match token payload
     );
 

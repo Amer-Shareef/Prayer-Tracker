@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import FounderLayout from "../layouts/FounderLayout";
 import feedService from "../../services/feedService"; // Import feed service
-import { areaService } from "../../services/api"; // Import area service
+import { areaService, userService } from "../../services/api"; // Import area and user services
 
 const FounderDashboard = () => {
   const { user } = useAuth();
@@ -57,8 +57,8 @@ const FounderDashboard = () => {
   const [feedsError, setFeedsError] = useState(null);
     
   const [currentDate, setCurrentDate] = useState({
-    gregorian: 'Thursday, June 29, 2025',
-    hijri: '03 Muharram 1447'
+    gregorian: 'Loading Todays Date...',
+    hijri: 'Loading Hijiri Date...'
   });
   
   // Fetch area data and attendance statistics
@@ -68,70 +68,138 @@ const FounderDashboard = () => {
       setAttendanceError(null);
       
       try {
-        // First, get user's area information
-        console.log('🔍 Fetching area data for user:', user);
-        const areasResponse = await areaService.getAreas();
-        console.log('📊 Area API response:', areasResponse);
+        // First, get fresh user profile to ensure we have latest area info
+        console.log('🔍 Fetching fresh user profile and area data');
         
-        if (areasResponse.data.success && areasResponse.data.data.length > 0) {
-          const userArea = areasResponse.data.data[0]; // Get first area for the user
-          
-          // Update area info
-          setArea({
-            name: userArea.area_name || "Area",
-            address: userArea.address || "Address not available",
-            prayerTimes: userArea.today_prayer_times || {
-              fajr: '4:43 AM',
-              dhuhr: '12:15 PM',
-              asr: '3:45 PM',
-              maghrib: '6:23 PM',
-              isha: '7:43 PM',
-              jumuah: '1:30 PM'
-            }
-          });
-          
-          // Fetch attendance statistics for this area
-          try {
-            const attendanceResponse = await areaService.getAreaStats(userArea.area_id);
+        try {
+          const profileResponse = await userService.getProfile();
+          if (profileResponse.data.success) {
+            const freshUser = profileResponse.data.data;
+            console.log('📋 Fresh user profile:', freshUser);
             
-            if (attendanceResponse.data.success) {
-              const stats = attendanceResponse.data.data;
+            const userAreaId = freshUser.areaId || freshUser.area_id;
+            if (userAreaId) {
+              console.log('📊 Found area_id:', userAreaId, 'fetching area stats');
               
-              // Update attendance stats
-              setAttendanceStats({
-                today: {
-                  total: stats.today.total,
-                  percentage: stats.today.percentage,
-                  prayerBreakdown: {
-                    fajr: { count: stats.today.prayerBreakdown.fajr.count, percentage: stats.today.prayerBreakdown.fajr.percentage },
-                    dhuhr: { count: stats.today.prayerBreakdown.dhuhr.count, percentage: stats.today.prayerBreakdown.dhuhr.percentage },
-                    asr: { count: stats.today.prayerBreakdown.asr.count, percentage: stats.today.prayerBreakdown.asr.percentage },
-                    maghrib: { count: stats.today.prayerBreakdown.maghrib.count, percentage: stats.today.prayerBreakdown.maghrib.percentage },
-                    isha: { count: stats.today.prayerBreakdown.isha.count, percentage: stats.today.prayerBreakdown.isha.percentage }
-                  }
-                },
-                weekly: {
-                  total: stats.weekly.total,
-                  percentage: stats.weekly.percentage,
-                  trend: stats.weekly.percentage >= 70 ? 'up' : stats.weekly.percentage >= 50 ? 'stable' : 'down'
-                },
-                monthly: {
-                  total: stats.monthly.total,
-                  percentage: stats.monthly.percentage,
-                  trend: stats.monthly.percentage >= 70 ? 'up' : stats.monthly.percentage >= 50 ? 'stable' : 'down'
+              // Fetch attendance statistics for founder's specific area
+              const attendanceResponse = await areaService.getAreaStats(userAreaId);
+          
+          if (attendanceResponse.data.success) {
+            const stats = attendanceResponse.data.data;
+            
+            // Update area info from stats response
+            setArea({
+              name: stats.area.name || "Area",
+              address: "Area information", // Can be enhanced later
+              prayerTimes: {
+                fajr: '4:43 AM',
+                dhuhr: '12:15 PM',
+                asr: '3:45 PM',
+                maghrib: '6:23 PM',
+                isha: '7:43 PM',
+                jumuah: '1:30 PM'
+              }
+            });
+            
+            // Update attendance stats
+            setAttendanceStats({
+              today: {
+                total: stats.today.total,
+                percentage: stats.today.percentage,
+                prayerBreakdown: {
+                  fajr: { count: stats.today.prayerBreakdown.fajr.count, percentage: stats.today.prayerBreakdown.fajr.percentage },
+                  dhuhr: { count: stats.today.prayerBreakdown.dhuhr.count, percentage: stats.today.prayerBreakdown.dhuhr.percentage },
+                  asr: { count: stats.today.prayerBreakdown.asr.count, percentage: stats.today.prayerBreakdown.asr.percentage },
+                  maghrib: { count: stats.today.prayerBreakdown.maghrib.count, percentage: stats.today.prayerBreakdown.maghrib.percentage },
+                  isha: { count: stats.today.prayerBreakdown.isha.count, percentage: stats.today.prayerBreakdown.isha.percentage }
                 }
-              });
-              
-              console.log('✅ Attendance data loaded successfully:', stats);
-            }
-          } catch (attendanceErr) {
-            console.error('❌ Error fetching attendance data:', attendanceErr);
+              },
+              weekly: {
+                total: stats.weekly.total,
+                percentage: stats.weekly.percentage,
+                trend: stats.weekly.percentage >= 70 ? 'up' : stats.weekly.percentage >= 50 ? 'stable' : 'down'
+              },
+              monthly: {
+                total: stats.monthly.total,
+                percentage: stats.monthly.percentage,
+                trend: stats.monthly.percentage >= 70 ? 'up' : stats.monthly.percentage >= 50 ? 'stable' : 'down'
+              }
+            });
+            
+            console.log('✅ Attendance data loaded successfully for area:', stats.area.name);
+          } else {
+            console.error('❌ Failed to fetch area stats:', attendanceResponse.data.message);
             setAttendanceError('Failed to load attendance statistics');
           }
         } else {
-          console.warn('⚠️ No area data found for user');
-          setAttendanceError('No area associated with this user');
+          console.warn('⚠️ Fresh user profile shows no area_id assigned. User profile:', freshUser);
+          setAttendanceError('No area associated with this user. Please contact admin to assign an area.');
         }
+      }
+    } catch (profileError) {
+      console.error('❌ Failed to fetch fresh user profile:', profileError);
+      
+      // Fallback: try with cached user data
+      console.log('🔄 Falling back to cached user data:', user);
+      const userAreaId = user?.areaId || user?.area_id;
+      if (userAreaId) {
+        console.log('📊 Using cached area_id:', userAreaId);
+        
+        try {
+          const attendanceResponse = await areaService.getAreaStats(userAreaId);
+          if (attendanceResponse.data.success) {
+            const stats = attendanceResponse.data.data;
+            
+            setArea({
+              name: stats.area.name || "Area",
+              address: "Area information",
+              prayerTimes: {
+                fajr: '4:43 AM',
+                dhuhr: '12:15 PM',
+                asr: '3:45 PM',
+                maghrib: '6:23 PM',
+                isha: '7:43 PM',
+                jumuah: '1:30 PM'
+              }
+            });
+            
+            setAttendanceStats({
+              today: {
+                total: stats.today.total,
+                percentage: stats.today.percentage,
+                prayerBreakdown: {
+                  fajr: { count: stats.today.prayerBreakdown.fajr.count, percentage: stats.today.prayerBreakdown.fajr.percentage },
+                  dhuhr: { count: stats.today.prayerBreakdown.dhuhr.count, percentage: stats.today.prayerBreakdown.dhuhr.percentage },
+                  asr: { count: stats.today.prayerBreakdown.asr.count, percentage: stats.today.prayerBreakdown.asr.percentage },
+                  maghrib: { count: stats.today.prayerBreakdown.maghrib.count, percentage: stats.today.prayerBreakdown.maghrib.percentage },
+                  isha: { count: stats.today.prayerBreakdown.isha.count, percentage: stats.today.prayerBreakdown.isha.percentage }
+                }
+              },
+              weekly: {
+                total: stats.weekly.total,
+                percentage: stats.weekly.percentage,
+                trend: stats.weekly.percentage >= 70 ? 'up' : stats.weekly.percentage >= 50 ? 'stable' : 'down'
+              },
+              monthly: {
+                total: stats.monthly.total,
+                percentage: stats.monthly.percentage,
+                trend: stats.monthly.percentage >= 70 ? 'up' : stats.monthly.percentage >= 50 ? 'stable' : 'down'
+              }
+            });
+            
+            console.log('✅ Fallback: Attendance data loaded with cached user data');
+          } else {
+            setAttendanceError('Failed to load attendance statistics');
+          }
+        } catch (statsError) {
+          console.error('❌ Failed to fetch area stats with cached data:', statsError);
+          setAttendanceError('Failed to load attendance statistics');
+        }
+      } else {
+        console.warn('⚠️ No area_id found in cached user data either');
+        setAttendanceError('No area associated with this user. Please contact admin.');
+      }
+    }
       } catch (error) {
         console.error('❌ Error fetching area data:', error);
         setAttendanceError('Failed to load area information');
