@@ -1,32 +1,11 @@
 const express = require("express");
 const { pool } = require("../config/database");
-const { authorizeRole } = require("../middleware/auth");
+const { authenticateToken, authorizeRole } = require("../middleware/auth");
 
 const router = express.Router();
 
-// TEST ROUTE - GET /api/areas/test - Get all areas without authentication (for testing)
+// GET /api/areas - Get all areas (no authentication required for members to see areas)
 router.get("/areas", async (req, res) => {
-  try {
-    console.log("📋 Fetching areas for dropdown");
-
-    const [areas] = await pool.execute(
-      "SELECT area_id, area_name, address, coordinates, description FROM areas ORDER BY area_name ASC"
-    );
-
-    console.log(`✅ Found ${areas.length} areas`);
-    res.json({ success: true, data: areas });
-  } catch (error) {
-    console.error("❌ Error fetching areas:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch areas",
-      error: error.message,
-    });
-  }
-});
-
-// GET /api/areas - Get all areas (for dropdown in member creation)
-router.get("/areas",  async (req, res) => {
   try {
     console.log("📋 Fetching areas for dropdown");
 
@@ -53,7 +32,7 @@ router.get("/areas",  async (req, res) => {
 // POST /api/areas - Create new area (SuperAdmin only)
 router.post(
   "/areas",
-  
+  authenticateToken,
   authorizeRole(["SuperAdmin"]),
   async (req, res) => {
     try {
@@ -127,7 +106,7 @@ router.post(
 // PUT /api/areas/:id - Update existing area (SuperAdmin only)
 router.put(
   "/areas/:id",
-  
+  authenticateToken,
   authorizeRole(["SuperAdmin"]),
   async (req, res) => {
     try {
@@ -215,7 +194,7 @@ router.put(
 // DELETE /api/areas/:id - Delete area (SuperAdmin only)
 router.delete(
   "/areas/:id",
-  
+  authenticateToken,
   authorizeRole(["SuperAdmin"]),
   async (req, res) => {
     try {

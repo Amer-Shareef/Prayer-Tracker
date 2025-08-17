@@ -45,6 +45,98 @@ const createTransporter = () => {
   }
 };
 
+// WHATSAPP OTP SERVICE
+const sendOtpWhatsApp = async (phoneNumber, otpCode) => {
+  try {
+    console.log(`📱 Sending OTP via WhatsApp to: ${phoneNumber}`);
+    console.log(`🔢 OTP Code: ${otpCode}`);
+    
+    // Validate WhatsApp configuration
+    if (!process.env.WHATSAPP_ACCESS_TOKEN) {
+      console.log('⚠️  WhatsApp access token not configured. Check .env file.');
+      throw new Error('WhatsApp access token missing');
+    }
+    
+    // Format phone number (remove any + or spaces)
+    const formattedPhone = phoneNumber.replace(/[\+\s\-]/g, '');
+    console.log(`📱 Formatted phone: ${formattedPhone}`);
+    
+    const whatsappPayload = {
+      messaging_product: "whatsapp",
+      to: formattedPhone,
+      type: "template",
+      template: {
+        name: "fajr_council_otp",
+        language: { code: "en_US" },
+        components: [
+          {
+            type: "body",
+            parameters: [
+              { type: "text", text: otpCode }
+            ]
+          },
+          {
+            type: "button",
+            sub_type: "url",
+            index: "0",
+            parameters: [
+              { type: "text", text: otpCode }
+            ]
+          }
+        ]
+      }
+    };
+    
+    console.log('📤 Sending WhatsApp message...');
+    const response = await fetch('https://graph.facebook.com/v22.0/781012455095743/messages', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(whatsappPayload)
+    });
+    
+    const result = await response.json();
+    
+    if (response.ok && result.messages && result.messages[0]) {
+      console.log('🎉 WHATSAPP OTP SENT SUCCESSFULLY!');
+      console.log(`📱 Message ID: ${result.messages[0].id}`);
+      console.log(`📬 WhatsApp sent to: ${formattedPhone}`);
+      
+      return {
+        success: true,
+        messageId: result.messages[0].id,
+        sentTo: formattedPhone,
+        sentAt: new Date().toISOString(),
+        whatsappMessage: true
+      };
+    } else {
+      console.error('❌ WhatsApp API error:', result);
+      throw new Error(result.error?.message || 'WhatsApp API error');
+    }
+    
+  } catch (error) {
+    console.error('❌ Failed to send WhatsApp OTP:', error);
+    
+    // Log OTP for fallback
+    console.log('='.repeat(60));
+    console.log(`📱 WHATSAPP FAILED BUT OTP GENERATED FOR: ${phoneNumber}`);
+    console.log(`🔐 OTP CODE: ${otpCode}`);
+    console.log(`⏰ EXPIRES: 10 minutes`);
+    console.log(`❌ ERROR: ${error.message}`);
+    console.log('='.repeat(60));
+    
+    return {
+      success: false,
+      error: error.message,
+      otpCode: otpCode,
+      fallbackMode: true,
+      whatsappFailed: true
+    };
+  }
+};
+
 // ENHANCED OTP EMAIL with detailed error logging
 const sendOtpEmail = async (email, username, otpCode) => {
   try {
@@ -373,5 +465,6 @@ This is an automated message from Prayer Tracker.
 
 module.exports = {
   sendOtpEmail,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendOtpWhatsApp
 };

@@ -13,7 +13,8 @@ const AreaPage = () => {
     area_name: '',
     address: '',
     description: '',
-    coordinates: ''
+    longitude: '',
+    latitude: ''
   });
 
   // Fetch areas from API
@@ -51,15 +52,27 @@ const AreaPage = () => {
     try {
       const token = localStorage.getItem('token');
       
+      // Combine longitude and latitude into coordinates for backend
+      const coordinates = formData.longitude && formData.latitude 
+        ? `${formData.latitude}, ${formData.longitude}` 
+        : '';
+      
+      const submissionData = {
+        area_name: formData.area_name,
+        address: formData.address,
+        description: formData.description,
+        coordinates: coordinates
+      };
+      
       if (editingArea) {
         // Update existing area
-        const response = await fetch(`http://localhost:5000/api/areas/${editingArea.id}`, {
+        const response = await fetch(`http://localhost:5000/api/areas/${editingArea.area_id || editingArea.id}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(formData)
+          body: JSON.stringify(submissionData)
         });
 
         if (response.ok) {
@@ -75,7 +88,7 @@ const AreaPage = () => {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(formData)
+          body: JSON.stringify(submissionData)
         });
 
         if (response.ok) {
@@ -92,26 +105,40 @@ const AreaPage = () => {
       area_name: '',
       address: '',
       description: '',
-      coordinates: ''
+      longitude: '',
+      latitude: ''
     });
   };
 
   const handleEdit = (area) => {
+    // Parse coordinates back to longitude and latitude
+    let longitude = '';
+    let latitude = '';
+    
+    if (area.coordinates) {
+      const coordsArray = area.coordinates.split(',').map(coord => coord.trim());
+      if (coordsArray.length === 2) {
+        latitude = coordsArray[0];
+        longitude = coordsArray[1];
+      }
+    }
+    
     setFormData({
       area_name: area.area_name || area.name || '',
       address: area.address || '',
       description: area.description || '',
-      coordinates: area.coordinates || ''
+      longitude: longitude,
+      latitude: latitude
     });
     setEditingArea(area);
     setShowEditModal(true);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (area) => {
     if (window.confirm('Are you sure you want to delete this area?')) {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:5000/api/areas/${id}`, {
+        const response = await fetch(`http://localhost:5000/api/areas/${area.area_id || area.id}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -196,14 +223,14 @@ const AreaPage = () => {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Area</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Coordinates</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {areas.map((area) => (
-                    <tr key={area.id} className="hover:bg-gray-50">
+                    <tr key={area.area_id || area.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
                           <div className="text-sm font-medium text-gray-900">
@@ -229,7 +256,7 @@ const AreaPage = () => {
                           Edit
                         </button>
                         <button
-                          onClick={() => handleDelete(area.id)}
+                          onClick={() => handleDelete(area)}
                           className="text-red-600 hover:text-red-900"
                         >
                           Delete
@@ -293,14 +320,27 @@ const AreaPage = () => {
 
                 <div className="mb-4">
                   <label className="block text-gray-700 font-medium mb-2">
-                    Coordinates
+                    Latitude
                   </label>
                   <input
                     type="text"
-                    value={formData.coordinates}
-                    onChange={(e) => setFormData({...formData, coordinates: e.target.value})}
+                    value={formData.latitude}
+                    onChange={(e) => setFormData({...formData, latitude: e.target.value})}
                     className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    placeholder="e.g., 6.9271° N, 79.8612° E"
+                    placeholder="e.g., 6.9271"
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-gray-700 font-medium mb-2">
+                    Longitude
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.longitude}
+                    onChange={(e) => setFormData({...formData, longitude: e.target.value})}
+                    className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="e.g., 79.8612"
                   />
                 </div>
 
@@ -315,7 +355,8 @@ const AreaPage = () => {
                         area_name: '',
                         address: '',
                         description: '',
-                        coordinates: ''
+                        longitude: '',
+                        latitude: ''
                       });
                     }}
                     className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
