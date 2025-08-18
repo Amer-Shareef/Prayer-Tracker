@@ -7,6 +7,7 @@ const { authenticateToken } = require("../middleware/auth"); // Add this import
 const {
   sendOtpEmail,
   sendPasswordResetEmail,
+  sendOtpSms
 } = require("../services/emailService");
 
 const router = express.Router();
@@ -38,88 +39,104 @@ const lockAccount = async (userId) => {
 // ENHANCED LOGIN ROUTE WITH OTP
 router.post("/login", async (req, res) => {
   try {
-    const { username, password, otpCode } = req.body;
+    const { username, password, phone, otpCode } = req.body;
 
-    console.log("🔐 Login attempt:", {
-      username,
-      hasPassword: !!password,
-      hasOtp: !!otpCode,
-    });
+    // Determine login method based on input
+    const isMobileLogin = phone && !username && !password;
+    const isDashboardLogin = username && password && !phone;
 
-    if (!username || !password) {
+    if (!isMobileLogin && !isDashboardLogin) {
       return res.status(400).json({
         success: false,
-        message: "Username and password are required",
+        message: "Login requires either a phone number or username and password",
       });
     }
 
-    // Query user from database - ENHANCED to fetch all user information
-    const [rows] = await pool.execute(
-      `SELECT u.*, 
-              a.area_name, a.address as area_address,
-              CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId
-       FROM users u
-       LEFT JOIN areas a ON u.area_id = a.area_id
-       WHERE u.username = ?`,
-      [username]
-    );
+    let user;
+    let loginIdentifier;
 
-    if (rows.length === 0) {
-      console.log("❌ User not found:", username);
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials",
-      });
-    }
+    if (isMobileLogin) {
+      // Mobile login: find user by phone
+      const [rows] = await pool.execute(
+        `SELECT u.*, 
+                a.area_name, a.address as area_address,
+                CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId
+         FROM users u
+         LEFT JOIN areas a ON u.area_id = a.area_id
+         WHERE u.phone = ?`,
+        [phone]
+      );
 
-    const user = rows[0];
+      if (rows.length === 0) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid phone number",
+        });
+      }
 
-    // Check if account is locked
-    if (isAccountLocked(user)) {
-      console.log("🔒 Account locked:", username);
-      return res.status(423).json({
-        success: false,
-        message:
-          "Account is temporarily locked due to multiple failed attempts. Please try again later.",
-        accountLocked: true,
-      });
-    }
+      user = rows[0];
+      loginIdentifier = phone;
+    } else {
+      // Dashboard login: find user by username and verify password
+      const [rows] = await pool.execute(
+        `SELECT u.*, 
+                a.area_name, a.address as area_address,
+                CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId
+         FROM users u
+         LEFT JOIN areas a ON u.area_id = a.area_id
+         WHERE u.username = ?`,
+        [username]
+      );
 
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password);
+      if (rows.length === 0) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid credentials",
+        });
+      }
 
-    if (!isValidPassword) {
-      console.log("❌ Invalid password for user:", username);
+      user = rows[0];
+      loginIdentifier = username;
 
-      // Increment login attempts
-      const newAttempts = (user.login_attempts || 0) + 1;
-      await pool.execute("UPDATE users SET login_attempts = ? WHERE id = ?", [
-        newAttempts,
-        user.id,
-      ]);
-
-      // Lock account after 5 failed attempts
-      if (newAttempts >= 5) {
-        await lockAccount(user.id);
+      // Check if account is locked
+      if (isAccountLocked(user)) {
         return res.status(423).json({
           success: false,
           message:
-            "Account locked due to multiple failed attempts. Please try again in 30 minutes.",
+            "Account is temporarily locked due to multiple failed attempts. Please try again later.",
           accountLocked: true,
         });
       }
 
-      return res.status(401).json({
-        success: false,
-        message: `Invalid credentials. ${5 - newAttempts} attempts remaining.`,
-      });
+      // Verify password for dashboard login
+      const isValidPassword = await bcrypt.compare(password, user.password);
+
+      if (!isValidPassword) {
+        const newAttempts = (user.login_attempts || 0) + 1;
+        await pool.execute("UPDATE users SET login_attempts = ? WHERE id = ?", [
+          newAttempts,
+          user.id,
+        ]);
+
+        if (newAttempts >= 5) {
+          await lockAccount(user.id);
+          return res.status(423).json({
+            success: false,
+            message:
+              "Account locked due to multiple failed attempts. Please try again in 30 minutes.",
+            accountLocked: true,
+          });
+        }
+
+        return res.status(401).json({
+          success: false,
+          message: `Invalid credentials. ${5 - newAttempts} attempts remaining.`,
+        });
+      }
     }
 
-    // If OTP is provided, verify it
+    // OTP verification (common for both flows)
     if (otpCode) {
-      console.log("🔐 Verifying OTP...");
-
-      // Check if OTP is valid and not expired
       if (!user.otp_code || user.otp_code !== otpCode) {
         return res.status(400).json({
           success: false,
@@ -134,13 +151,11 @@ router.post("/login", async (req, res) => {
         });
       }
 
-      // Clear OTP and reset login attempts
       await pool.execute(
         "UPDATE users SET otp_code = NULL, otp_expires = NULL, otp_verified = TRUE, login_attempts = 0, last_login = CURRENT_TIMESTAMP WHERE id = ?",
         [user.id]
       );
 
-      // Generate JWT token with all user info
       const token = jwt.sign(
         {
           userId: user.id,
@@ -148,12 +163,9 @@ router.post("/login", async (req, res) => {
           role: user.role,
         },
         process.env.JWT_SECRET,
-        { expiresIn: "30d" }
+        { expiresIn: "3m" }
       );
 
-      console.log("✅ Login successful with OTP for user:", username);
-
-      // Transform snake_case fields to camelCase for frontend consistency
       const userData = {
         id: user.id,
         username: user.username,
@@ -166,7 +178,6 @@ router.post("/login", async (req, res) => {
         address: user.address,
         areaId: user.area_id,
         areaName: user.area_name,
-        areaAddress: user.area_address,
         mobility: user.mobility,
         onRent: user.living_on_rent === 1,
         zakathEligible: user.zakath_eligible === 1,
@@ -185,41 +196,45 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    // If no OTP provided, send OTP to email
-    console.log("📧 Sending OTP to email:", user.email);
-
+    // Send OTP
     const otp = generateOtp();
     const otpExpires = new Date();
-    otpExpires.setMinutes(otpExpires.getMinutes() + 10); // OTP valid for 10 minutes
+    otpExpires.setMinutes(otpExpires.getMinutes() + 10);
 
-    // Store OTP in database
     await pool.execute(
       "UPDATE users SET otp_code = ?, otp_expires = ?, otp_verified = FALSE WHERE id = ?",
       [otp, otpExpires, user.id]
     );
 
-    // Send OTP email
-    const emailResult = await sendOtpEmail(user.email, user.username, otp);
+    let sendResult;
+    let maskedContact;
 
-    if (!emailResult.success) {
-      console.error("❌ Failed to send OTP email:", emailResult.error);
+    if (isMobileLogin) {
+      // Send SMS OTP for mobile login
+      sendResult = await sendOtpSms(user.phone, otp);
+      maskedContact = user.phone.replace(/(\d{3})\d{4}(\d{3})/, "$1****$2");
+    } else {
+      // Send email OTP for dashboard login
+      sendResult = await sendOtpEmail(user.email, user.username, otp);
+      maskedContact = user.email.replace(/(.{2})(.*)(@.*)/, "$1***$3");
+    }
+
+    if (!sendResult.success) {
       return res.status(500).json({
         success: false,
         message: "Failed to send verification code. Please try again.",
       });
     }
 
-    console.log("✅ OTP sent to email for user:", username);
-
     const response = {
       success: true,
-      message: "Verification code sent to your email. Please check your inbox.",
+      message: `Verification code sent to your ${isMobileLogin ? "phone" : "email"}. Please check your inbox.`,
       requiresOtp: true,
-      email: user.email.replace(/(.{2})(.*)(@.*)/, "$1***$3"), // Mask email for security
+      contact: maskedContact,
+      loginMethod: isMobileLogin ? "mobile" : "dashboard"
     };
 
-    // In development/test mode, include the OTP for easy testing
-    if (process.env.NODE_ENV === "development" || emailResult.testMode) {
+    if (process.env.NODE_ENV === "development" || sendResult.testMode) {
       response.testOtp = otp;
       response.testMessage = `For testing: Your OTP is ${otp}`;
     }
@@ -238,35 +253,52 @@ router.post("/login", async (req, res) => {
 // Resend OTP route
 router.post("/resend-otp", async (req, res) => {
   try {
-    const { username } = req.body;
+    const { username, phone } = req.body;
 
-    if (!username) {
+    // Determine resend method based on input
+    const isMobileResend = phone && !username;
+    const isDashboardResend = username && !phone;
+
+    if (!isMobileResend && !isDashboardResend) {
       return res.status(400).json({
         success: false,
-        message: "Username is required",
+        message: "Resend requires either a phone number or username",
       });
     }
 
-    const [users] = await pool.execute(
-      "SELECT * FROM users WHERE username = ?",
-      [username]
-    );
+    let user;
+    if (isMobileResend) {
+      const [users] = await pool.execute(
+        "SELECT * FROM users WHERE phone = ?",
+        [phone]
+      );
 
-    if (users.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
+      if (users.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+      user = users[0];
+    } else {
+      const [users] = await pool.execute(
+        "SELECT * FROM users WHERE username = ?",
+        [username]
+      );
+
+      if (users.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+      user = users[0];
     }
 
-    const user = users[0];
-
-    // Check if user has a pending OTP request (within last 2 minutes)
     if (user.otp_expires) {
       const timeSinceLastOtp =
         Date.now() - new Date(user.otp_expires).getTime() + 10 * 60 * 1000;
       if (timeSinceLastOtp < 2 * 60 * 1000) {
-        // 2 minutes
         return res.status(429).json({
           success: false,
           message: "Please wait before requesting a new verification code.",
@@ -274,21 +306,29 @@ router.post("/resend-otp", async (req, res) => {
       }
     }
 
-    // Generate new OTP
     const otp = generateOtp();
     const otpExpires = new Date();
     otpExpires.setMinutes(otpExpires.getMinutes() + 10);
 
-    // Update OTP in database
     await pool.execute(
       "UPDATE users SET otp_code = ?, otp_expires = ? WHERE id = ?",
       [otp, otpExpires, user.id]
     );
 
-    // Send OTP email
-    const emailResult = await sendOtpEmail(user.email, user.username, otp);
+    let sendResult;
+    let maskedContact;
 
-    if (!emailResult.success) {
+    if (isMobileResend) {
+      // Send SMS OTP
+      sendResult = await sendOtpSms(user.phone, otp);
+      maskedContact = user.phone.replace(/(\d{3})\d{4}(\d{3})/, "$1****$2");
+    } else {
+      // Send email OTP
+      sendResult = await sendOtpEmail(user.email, user.username, otp);
+      maskedContact = user.email.replace(/(.{2})(.*)(@.*)/, "$1***$3");
+    }
+
+    if (!sendResult.success) {
       return res.status(500).json({
         success: false,
         message: "Failed to send verification code. Please try again.",
@@ -297,11 +337,11 @@ router.post("/resend-otp", async (req, res) => {
 
     const response = {
       success: true,
-      message: "New verification code sent to your email.",
+      message: `New verification code sent to your ${isMobileResend ? "phone" : "email"}.`,
+      contact: maskedContact,
     };
 
-    // In development/test mode, include the OTP
-    if (process.env.NODE_ENV === "development" || emailResult.testMode) {
+    if (process.env.NODE_ENV === "development" || sendResult.testMode) {
       response.testOtp = otp;
     }
 

@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { pool } = require('../config/database'); // Fixed import - use database.js
+const { pool } = require('../config/database'); 
 
 // Verify JWT token
 const authenticateToken = async (req, res, next) => {

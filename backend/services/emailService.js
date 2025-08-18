@@ -45,6 +45,78 @@ const createTransporter = () => {
   }
 };
 
+// NOTIFY.LK SMS OTP SERVICE
+const sendOtpSms = async (phoneNumber, otpCode) => {
+  try {
+    console.log(`📱 Sending OTP via SMS to: ${phoneNumber}`);
+    console.log(`🔢 OTP Code: ${otpCode}`);
+    
+    // Validate Notify.lk configuration
+    if (!process.env.NOTIFYLK_USER_ID || !process.env.NOTIFYLK_API_KEY || !process.env.NOTIFYLK_SENDER_ID) {
+      console.log('⚠️ Notify.lk credentials not configured. Check .env file.');
+      throw new Error('Notify.lk credentials missing');
+    }
+    
+    const userId = process.env.NOTIFYLK_USER_ID;
+    const apiKey = process.env.NOTIFYLK_API_KEY;
+    const senderId = process.env.NOTIFYLK_SENDER_ID; // Your approved sender ID
+    
+    // Format phone number to Sri Lanka format (94XXXXXXXXX)
+    let formattedPhone = phoneNumber.replace(/[\s\-\+]/g, '');
+    if (!formattedPhone.startsWith('94')) {
+      formattedPhone = formattedPhone.replace(/^0+/, '94');
+    }
+    console.log(`📱 Formatted phone: ${formattedPhone}`);
+    
+    // Construct message with your app/brand name as recommended
+    const message = `Please use the code ${otpCode} to verify your FAJR Council account.`;
+    
+    // Build URL with query parameters
+    const url = new URL('https://app.notify.lk/api/v1/send');
+    url.searchParams.append('user_id', userId);
+    url.searchParams.append('api_key', apiKey);
+    url.searchParams.append('sender_id', senderId);
+    url.searchParams.append('to', formattedPhone);
+    url.searchParams.append('message', message);
+    
+    console.log('📤 Sending SMS message...');
+    const response = await fetch(url.toString(), {
+      method: 'GET'
+    });
+    
+    const result = await response.json();
+    
+    if (response.ok && result.status === 'success') {
+      console.log('🎉 SMS OTP SENT SUCCESSFULLY!');
+      console.log(`📱 SMS sent to: ${formattedPhone}`);
+      
+      return {
+        success: true,
+        sentTo: formattedPhone,
+        sentAt: new Date().toISOString(),
+        smsMessage: true
+      };
+    } else {
+      console.error('❌ Notify.lk API error:', result);
+      throw new Error(result.message || 'Notify.lk SMS API error');
+    }
+    
+  } catch (error) {
+    console.error('❌ Failed to send SMS OTP:', error);
+    
+    return {
+      success: false,
+      error: error.message,
+      otpCode: otpCode,
+      fallbackMode: true,
+      smsFailed: true
+    };
+  }
+};
+
+
+
+
 // WHATSAPP OTP SERVICE
 const sendOtpWhatsApp = async (phoneNumber, otpCode) => {
   try {
@@ -466,5 +538,6 @@ This is an automated message from Prayer Tracker.
 module.exports = {
   sendOtpEmail,
   sendPasswordResetEmail,
-  sendOtpWhatsApp
+  sendOtpWhatsApp,
+  sendOtpSms
 };

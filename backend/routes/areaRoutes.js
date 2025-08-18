@@ -10,7 +10,7 @@ router.get("/areas", async (req, res) => {
     console.log("📋 Fetching areas for dropdown");
 
     const [areas] = await pool.execute(
-      "SELECT area_id, area_name, address, coordinates, description FROM areas ORDER BY area_name ASC"
+      "SELECT * FROM areas ORDER BY area_name ASC"
     );
 
     console.log(`✅ Found ${areas.length} active areas`);
