@@ -11,7 +11,7 @@ const app = express();
 const getAllowedOrigins = () => {
   const origins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(",")
-    : ["http://13.60.193.171:3000", "http://13.60.193.171:3000"];
+    : ["http://localhost:3000", "http://13.60.193.171:3000"];
 
   console.log("🌐 Allowed CORS origins:", origins);
   return origins;
@@ -111,7 +111,7 @@ app.get("/api/health", async (req, res) => {
         uptime: process.uptime(),
         memory: process.memoryUsage(),
         version: process.version,
-        host: process.env.HOST || "13.60.193.171",
+        host: process.env.HOST || "localhost",
         port: process.env.PORT || 5000,
       },
       environment: process.env.NODE_ENV || "development",
@@ -169,7 +169,7 @@ app.get("/api/monitor", async (req, res) => {
 
 // Test connection on startup
 const PORT = process.env.PORT || 5000;
-const HOST = process.env.HOST || "13.60.193.171";
+const HOST = process.env.HOST || "localhost";
 
 app.listen(PORT, async () => {
   console.log(`🚀 Server running on http://${HOST}:${PORT}`);

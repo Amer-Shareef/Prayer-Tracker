@@ -23,7 +23,7 @@ export const ENV_CONFIG = {
 
   // Allowed hosts - Updated for EC2
   ALLOWED_HOSTS: process.env.REACT_APP_ALLOWED_HOSTS?.split(",") || [
-    "13.60.193.171",
+    "localhost",
     "13.60.193.171",
     "127.0.0.1",
   ],

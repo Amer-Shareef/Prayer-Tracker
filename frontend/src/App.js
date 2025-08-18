@@ -53,8 +53,6 @@ import SuperAdminMeetingsPage from "./pages/superadmin/SuperAdminMeetingsPage";
 import SuperAdminWakeUpCallPage from "./pages/superadmin/SuperAdminWakeUpCallPage";
 import SuperAdminKnowledgeProgramPage from "./pages/superadmin/SuperAdminKnowledgeProgramPage";
 
-// Test Page
-import TestPage from "./pages/TestPage";
 
 function App() {
   return (
@@ -373,8 +371,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-          {/* Test Page for debugging */}
-          <Route path="/test" element={<TestPage />} />
           {/* 404 Route */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

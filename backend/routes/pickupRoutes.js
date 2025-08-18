@@ -26,10 +26,10 @@ router.get(
 
       // Build query dynamically WITHOUT using LIMIT in prepared statement
       let query = `
-      SELECT pr.*, m.name as mosque_name
-      FROM pickup_requests pr
-      LEFT JOIN mosques m ON pr.mosque_id = m.id
-      WHERE pr.user_id = ?
+SELECT pr.*, a.area_name
+FROM pickup_requests pr
+LEFT JOIN areas a ON pr.area_id = a.area_id
+WHERE pr.user_id = ?
     `;
       const queryParams = [user.id];
 
@@ -103,7 +103,7 @@ router.post(
     try {
       const { user } = req;
       const {
-        mosque_id,
+        area_id,
         pickup_location,
         contact_number,
         special_instructions,
@@ -112,11 +112,11 @@ router.post(
         prayers, // Array of selected prayers ['fajr', 'dhuhr', etc.]
       } = req.body;
 
-      // Simplified validation - only pickup_location and mosque_id are mandatory
-      if (!pickup_location || !mosque_id) {
+      // Simplified validation - only pickup_location and area_id are mandatory
+      if (!pickup_location || !area_id) {
         return res.status(400).json({
           success: false,
-          message: "Pickup location and mosque_id are required",
+          message: "Pickup location and area_id are required",
         });
       }
 
@@ -170,33 +170,33 @@ router.post(
         });
       }
 
-      // Get user's mosque if not provided
-      let mosqueId = mosque_id;
-      if (!mosqueId) {
+      // Get user's area if not provided
+      let areaId = area_id;
+      if (!areaId) {
         const [userInfo] = await pool.execute(
-          "SELECT mosque_id FROM users WHERE id = ?",
+          "SELECT area_id FROM users WHERE id = ?",
           [user.id]
         );
-        mosqueId = userInfo[0]?.mosque_id;
+        areaId = userInfo[0]?.area_id;
       }
 
-      if (!mosqueId) {
+      if (!areaId) {
         return res.status(400).json({
           success: false,
           message:
-            "User is not assigned to any mosque and mosque_id not provided",
+            "User is not assigned to any area and area_id not provided",
         });
       }
 
       // Create the pickup request with simplified data
       const [result] = await pool.execute(
         `INSERT INTO pickup_requests 
-       (user_id, mosque_id, pickup_location, special_instructions, contact_number,
+       (user_id, area_id, pickup_location, special_instructions, contact_number,
         location_coordinates, days, prayers, status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)`,
         [
           user.id,
-          mosqueId,
+          areaId,
           pickup_location,
           special_instructions || null,
           contact_number || null,
@@ -210,29 +210,29 @@ router.post(
         ]
       );
 
-      // Log the history
-      await pool.execute(
-        `INSERT INTO pickup_request_history 
-       (pickup_request_id, changed_by, change_type, new_value, notes)
-       VALUES (?, ?, 'created', ?, 'Request created via mobile app')`,
-        [
-          result.insertId,
-          user.id,
-          JSON.stringify({
-            status: "pending",
-            pickup_location,
-            days: days,
-            prayers: prayers,
-          }),
-        ]
-      );
+      // Log the history (commenting out since pickup_request_history table may not exist)
+      // await pool.execute(
+      //   `INSERT INTO pickup_request_history 
+      //  (pickup_request_id, changed_by, change_type, new_value, notes)
+      //  VALUES (?, ?, 'created', ?, 'Request created via mobile app')`,
+      //   [
+      //     result.insertId,
+      //     user.id,
+      //     JSON.stringify({
+      //       status: "pending",
+      //       pickup_location,
+      //       days: days,
+      //       prayers: prayers,
+      //     }),
+      //   ]
+      // );
 
       // Get the created request with full details
       const [createdRequest] = await pool.execute(
-        `SELECT pr.*, u.username, u.email, u.phone, m.name as mosque_name
+        `SELECT pr.*, u.username, u.email, u.phone, a.area_name
        FROM pickup_requests pr
        LEFT JOIN users u ON pr.user_id = u.id
-       LEFT JOIN mosques m ON pr.mosque_id = m.id
+       LEFT JOIN areas a ON pr.area_id = a.area_id
        WHERE pr.id = ?`,
         [result.insertId]
       );
@@ -390,9 +390,9 @@ router.put(
 
       // Get updated request
       const [updatedRequest] = await pool.execute(
-        `SELECT pr.*, m.name as mosque_name
+        `SELECT pr.*, a.area_name
        FROM pickup_requests pr
-       LEFT JOIN mosques m ON pr.mosque_id = m.id
+       LEFT JOIN areas a ON pr.area_id = a.area_id
        WHERE pr.id = ?`,
         [id]
       );
@@ -424,7 +424,6 @@ router.put(
 // Delete/Cancel pickup request - FIXED to actually delete from database
 router.delete(
   "/pickup-requests/:id",
-  authenticateToken,
   dbHealthCheck,
   async (req, res) => {
     try {
@@ -694,25 +693,25 @@ router.put(
 router.get("/pickup-requests/all", authenticateToken, async (req, res) => {
   try {
     const { user } = req;
-    const { status, mosque_id } = req.query;
+    const { status, area_id } = req.query;
 
     console.log("Getting pickup requests for user:", {
       userId: user.id,
       userRole: user.role,
-      requestedMosqueId: mosque_id,
+      requestedAreaId: area_id,
     });
 
     let query = `
-        SELECT pr.*, 
-               m.name as mosque_name,
-               u.username as member_username,
+SELECT pr.*, 
+a.area_name as area_name,
+u.username as member_username,
                u.phone as member_phone,
                u.email as member_email,
                u.full_name as member_name,
                du.username as driver_username,
                du.phone as driver_phone
         FROM pickup_requests pr
-        LEFT JOIN mosques m ON pr.mosque_id = m.id
+        LEFT JOIN areas a ON pr.area_id = a.area_id
         LEFT JOIN users u ON pr.user_id = u.id
         LEFT JOIN users du ON pr.assigned_driver_id = du.id
         WHERE 1=1
@@ -721,16 +720,16 @@ router.get("/pickup-requests/all", authenticateToken, async (req, res) => {
 
     // Apply role-based filtering
     // if (user.role === "Member") {
-    //   console.log("Member accessing - showing only their mosque's requests");
-    //   // Members can see all requests from their mosque but with limited personal info
-    //   query += " AND pr.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)";
+    //   console.log("Member accessing - showing only their area's requests");
+    //   // Members can see all requests from their area but with limited personal info
+    //   query += " AND pr.area_id = (SELECT area_id FROM users WHERE id = ?)";
     //   queryParams.push(user.id);
 
     //   // For members, remove sensitive personal information
     //   query = `
     //       SELECT pr.id, pr.pickup_location, pr.status, pr.created_at, pr.days, pr.prayers,
     //              pr.special_instructions, pr.approved_at, pr.rejected_at,
-    //              m.name as mosque_name,
+    //              a.name as area_name,
     //              CASE WHEN pr.user_id = ? THEN u.username ELSE 'Anonymous Member' END as member_username,
     //              CASE WHEN pr.user_id = ? THEN u.phone ELSE NULL END as member_phone,
     //              CASE WHEN pr.user_id = ? THEN u.email ELSE NULL END as member_email,
@@ -738,10 +737,10 @@ router.get("/pickup-requests/all", authenticateToken, async (req, res) => {
     //              du.username as driver_username,
     //              du.phone as driver_phone
     //       FROM pickup_requests pr
-    //       LEFT JOIN mosques m ON pr.mosque_id = m.id
+    //       LEFT JOIN areas m ON pr.area_id = a.id
     //       LEFT JOIN users u ON pr.user_id = u.id
     //       LEFT JOIN users du ON pr.assigned_driver_id = du.id
-    //       WHERE pr.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)
+    //       WHERE pr.area_id = (SELECT area_id FROM users WHERE id = ?)
     //     `;
     //   queryParams.push(user.id, user.id, user.id, user.id, user.id);
     // } else
@@ -751,14 +750,14 @@ router.get("/pickup-requests/all", authenticateToken, async (req, res) => {
       user.role === "founder" ||
       user.role === "Member"
     ) {
-      console.log("Founder/WCM accessing - showing their mosque's requests");
-      query += " AND pr.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)";
+      console.log("Founder/WCM accessing - showing their area's requests");
+      query += " AND pr.area_id = (SELECT area_id FROM users WHERE id = ?)";
       queryParams.push(user.id);
     } else if (user.role === "SuperAdmin" || user.role === "superadmin") {
-      if (mosque_id) {
-        console.log("SuperAdmin specifying mosque_id:", mosque_id);
-        query += " AND pr.mosque_id = ?";
-        queryParams.push(mosque_id);
+      if (area_id) {
+        console.log("SuperAdmin specifying area_id:", area_id);
+        query += " AND pr.area_id = ?";
+        queryParams.push(area_id);
       } else {
         console.log("SuperAdmin seeing all requests");
       }
@@ -802,31 +801,31 @@ router.get(
   async (req, res) => {
     try {
       const { user } = req;
-      const { mosque_id } = req.query;
+      const { area_id } = req.query;
 
       console.log("Getting available drivers");
 
       let query = `
         SELECT u.id, u.username, u.full_name, u.phone, u.email, u.mobility,
-               m.name as mosque_name
+               a.area_name
         FROM users u
-        LEFT JOIN mosques m ON u.mosque_id = m.id
+        LEFT JOIN areas a ON u.area_id = a.area_id
         WHERE u.role = 'Member' 
         AND u.status = 'active'
         AND u.mobility IN ('Car', 'Motorbike', 'car', 'motorbike', 'Vehicle')
-        AND u.mosque_id IS NOT NULL
+        AND u.area_id IS NOT NULL
       `;
       const queryParams = [];
 
-      // Filter by mosque for founders and WCMs
+      // Filter by area for founders and WCMs
       if (user.role === "Founder" || user.role === "WCM") {
         query +=
-          " AND u.mosque_id = (SELECT mosque_id FROM users WHERE id = ?)";
+          " AND u.area_id = (SELECT area_id FROM users WHERE id = ?)";
         queryParams.push(user.id);
-      } else if (mosque_id) {
-        // SuperAdmin can specify mosque_id
-        query += " AND u.mosque_id = ?";
-        queryParams.push(mosque_id);
+      } else if (area_id) {
+        // SuperAdmin can specify area_id
+        query += " AND u.area_id = ?";
+        queryParams.push(area_id);
       }
 
       query += " ORDER BY u.full_name, u.username";
