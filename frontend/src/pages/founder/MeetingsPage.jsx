@@ -22,6 +22,7 @@ const MeetingsPage = () => {
   // Modals
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
   
@@ -33,6 +34,11 @@ const MeetingsPage = () => {
   
   const [completeForm, setCompleteForm] = useState({
     notes: ''
+  });
+
+  const [rescheduleForm, setRescheduleForm] = useState({
+    date: '',
+    time: ''
   });
 
   useEffect(() => {
@@ -100,6 +106,15 @@ const MeetingsPage = () => {
     setShowCompleteModal(true);
   };
 
+  const handleRescheduleMeeting = (meeting) => {
+    setSelectedMeeting(meeting);
+    setRescheduleForm({ 
+      date: meeting.scheduled_date ? meeting.scheduled_date.split('T')[0] : '', 
+      time: meeting.scheduled_time || '' 
+    });
+    setShowRescheduleModal(true);
+  };
+
   const handleDeleteMeeting = async (meeting) => {
     if (!window.confirm('Are you sure you want to delete this meeting?')) {
       return;
@@ -151,10 +166,7 @@ const MeetingsPage = () => {
         memberId: selectedMember.id,
         counsellorId: parseInt(scheduleForm.mentorId), // Ensure it's a number
         scheduledDate: scheduleForm.date,
-        scheduledTime: scheduleForm.time,
-        sessionType: 'phone_call',
-        priority: 'medium',
-        preSessionNotes: `Meeting scheduled for ${selectedMember.memberName || selectedMember.username} with mentor`
+        scheduledTime: scheduleForm.time
       };
 
       console.log('📤 Sending session data:', sessionData);
@@ -207,6 +219,39 @@ const MeetingsPage = () => {
     }
   };
 
+  const submitReschedule = async () => {
+    if (!rescheduleForm.date || !rescheduleForm.time) {
+      alert('Please select new date and time');
+      return;
+    }
+
+    try {
+      const updateData = {
+        status: 'rescheduled',
+        scheduledDate: rescheduleForm.date,
+        scheduledTime: rescheduleForm.time
+      };
+
+      console.log('📤 Sending reschedule data:', updateData);
+
+      const response = await meetingsService.updateCounsellingSession(selectedMeeting.id, updateData);
+      
+      if (response.data && response.data.success) {
+        alert('Meeting rescheduled successfully!');
+        setShowRescheduleModal(false);
+        setSelectedMeeting(null);
+        await fetchData(); // Refresh data
+      } else {
+        console.error('❌ Failed response:', response);
+        alert(`Failed to reschedule meeting: ${response.data?.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('❌ Error rescheduling:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Unknown error occurred';
+      alert(`Failed to reschedule meeting: ${errorMessage}`);
+    }
+  };
+
   // Helper function to calculate age from date of birth
   const calculateAge = (dateOfBirth) => {
     if (!dateOfBirth) return '-';
@@ -236,7 +281,7 @@ const MeetingsPage = () => {
   };
 
   // Filter meetings for different tabs
-  const getScheduledMeetings = () => meetings.filter(m => m.status === 'scheduled');
+  const getScheduledMeetings = () => meetings.filter(m => m.status === 'scheduled' || m.status === 'rescheduled');
   const getCompletedMeetings = () => meetings.filter(m => m.status === 'completed');
 
   if (loading) {
@@ -350,6 +395,12 @@ const MeetingsPage = () => {
                             className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
                           >
                             Mark Complete
+                          </button>
+                          <button
+                            onClick={() => handleRescheduleMeeting(meeting)}
+                            className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
+                          >
+                            Reschedule
                           </button>
                           <button
                             onClick={() => handleDeleteMeeting(meeting)}
@@ -603,6 +654,71 @@ const MeetingsPage = () => {
                     className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
                   >
                     Complete Meeting
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        
+
+        {/* Reschedule Modal */}
+        {showRescheduleModal && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen px-4">
+              <div className="fixed inset-0 bg-gray-500 opacity-75"></div>
+              <div className="bg-white rounded-lg p-6 max-w-md w-full relative">
+                <h3 className="text-lg font-medium mb-4">
+                  Reschedule Meeting - {selectedMeeting?.member_name || selectedMeeting?.member_username || 'Unknown Member'}
+                </h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Current Date & Time</label>
+                    <div className="mt-1 p-2 bg-gray-100 rounded-md text-sm text-gray-600">
+                      {selectedMeeting && (
+                        <>
+                          {new Date(selectedMeeting.scheduled_date).toLocaleDateString()} at {selectedMeeting.scheduled_time}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">New Date</label>
+                    <input
+                      type="date"
+                      value={rescheduleForm.date}
+                      onChange={(e) => setRescheduleForm({...rescheduleForm, date: e.target.value})}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">New Time</label>
+                    <input
+                      type="time"
+                      value={rescheduleForm.time}
+                      onChange={(e) => setRescheduleForm({...rescheduleForm, time: e.target.value})}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => setShowRescheduleModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={submitReschedule}
+                    className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700"
+                  >
+                    Reschedule Meeting
                   </button>
                 </div>
               </div>

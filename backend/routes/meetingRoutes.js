@@ -18,7 +18,7 @@ router.get("/members-for-counselling", async (req, res) => {
         u.full_name as memberName,
         u.phone,
         u.email,
-        CONCAT(UPPER(LEFT(COALESCE(u.area, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId,
+        CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId,
         COUNT(p.id) as totalPrayers,
         COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) as prayedCount,
         CASE 
@@ -27,9 +27,10 @@ router.get("/members-for-counselling", async (req, res) => {
         END as attendanceRate,
         MAX(p.prayer_date) as lastAttendance
       FROM users u
+      LEFT JOIN areas a ON u.area_id = a.area_id
       LEFT JOIN prayers p ON u.id = p.user_id AND p.prayer_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
       WHERE u.role = 'Member' 
-        AND u.mosque_id IS NOT NULL 
+        AND u.area_id IS NOT NULL 
         AND u.status = 'active'
       GROUP BY u.id
       HAVING attendanceRate < 70
@@ -99,9 +100,6 @@ router.post("/counselling-sessions", async (req, res) => {
       counsellorId,
       scheduledDate,
       scheduledTime,
-      sessionType = "phone_call",
-      priority = "medium",
-      preSessionNotes,
     } = req.body;
 
     console.log("🔍 Extracted data:", {
@@ -109,8 +107,6 @@ router.post("/counselling-sessions", async (req, res) => {
       counsellorId,
       scheduledDate,
       scheduledTime,
-      sessionType,
-      priority,
     });
 
     if (!memberId || !counsellorId || !scheduledDate || !scheduledTime) {
@@ -130,11 +126,11 @@ router.post("/counselling-sessions", async (req, res) => {
     const connection = await pool.getConnection();
     console.log("🔗 Database connection established");
 
-    // Get member details including mosque_id
+    // Get member details including area_id
     console.log("🔍 Looking up member:", memberId);
     const [memberDetails] = await connection.query(
       `
-      SELECT u.id, u.username, u.full_name, u.phone, u.email, u.mosque_id
+      SELECT u.id, u.username, u.full_name, u.phone, u.email, u.area_id
       FROM users u WHERE u.id = ?
     `,
       [memberId]
@@ -152,11 +148,11 @@ router.post("/counselling-sessions", async (req, res) => {
 
     const member = memberDetails[0];
 
-    // Verify counsellor exists and is from the same mosque
+    // Verify counsellor exists and is from the same area
     console.log("🔍 Looking up counsellor:", counsellorId);
     const [counsellorDetails] = await connection.query(
       `
-      SELECT u.id, u.username, u.full_name, u.mosque_id
+      SELECT u.id, u.username, u.full_name, u.area_id
       FROM users u WHERE u.id = ? AND u.role = 'Founder' AND u.status = 'active'
     `,
       [counsellorId]
@@ -174,18 +170,18 @@ router.post("/counselling-sessions", async (req, res) => {
 
     const counsellor = counsellorDetails[0];
 
-    // Check if counsellor is from the same mosque as the member
-    console.log("🏛️ Mosque check:", {
-      memberMosqueId: member.mosque_id,
-      counsellorMosqueId: counsellor.mosque_id,
-      match: counsellor.mosque_id === member.mosque_id,
+    // Check if counsellor is from the same area as the member
+    console.log("🏛️ Area check:", {
+      memberAreaId: member.area_id,
+      counsellorAreaId: counsellor.area_id,
+      match: counsellor.area_id === member.area_id,
     });
 
-    if (counsellor.mosque_id !== member.mosque_id) {
+    if (counsellor.area_id !== member.area_id) {
       connection.release();
       return res.status(403).json({
         success: false,
-        message: "Counsellor must be from the same mosque as the member",
+        message: "Counsellor must be from the same area as the member",
       });
     }
 
@@ -193,36 +189,30 @@ router.post("/counselling-sessions", async (req, res) => {
     console.log("💾 Creating counselling session with data:", {
       memberId: member.id,
       counsellorId,
-      mosqueId: member.mosque_id,
+      areaId: member.area_id,
       memberName: member.full_name || member.username,
       memberPhone: member.phone,
       memberEmail: member.email,
       scheduledDate,
       scheduledTime,
-      priority,
-      sessionType,
-      preSessionNotes,
     });
 
     const [result] = await connection.query(
       `
       INSERT INTO counselling_sessions 
-      (member_id, counsellor_id, mosque_id, member_name, member_phone, member_email,
-       scheduled_date, scheduled_time, priority, status, session_type, pre_session_notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?)
+      (member_id, counsellor_id, area_id, member_name, member_phone, member_email,
+       scheduled_date, scheduled_time, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
     `,
       [
         member.id,
         counsellorId,
-        member.mosque_id,
+        member.area_id,
         member.full_name || member.username,
         member.phone,
         member.email,
         scheduledDate,
         scheduledTime,
-        priority,
-        sessionType,
-        preSessionNotes,
       ]
     );
 
@@ -250,18 +240,48 @@ router.put("/counselling-sessions/:id", async (req, res) => {
   console.log("🔄 Updating counselling session");
   try {
     const { id } = req.params;
-    const { status, sessionNotes } = req.body;
+    const { status, sessionNotes, scheduledDate, scheduledTime } = req.body;
 
     const connection = await pool.getConnection();
 
-    const [result] = await connection.query(
-      `
+    // Build dynamic query based on what fields are provided
+    let updateFields = [];
+    let values = [];
+
+    if (status) {
+      updateFields.push("status = ?");
+      values.push(status);
+    }
+
+    if (sessionNotes) {
+      updateFields.push("session_notes = ?");
+      values.push(sessionNotes);
+    }
+
+    if (scheduledDate) {
+      updateFields.push("scheduled_date = ?");
+      values.push(scheduledDate);
+    }
+
+    if (scheduledTime) {
+      updateFields.push("scheduled_time = ?");
+      values.push(scheduledTime);
+    }
+
+    // Always update the timestamp
+    updateFields.push("updated_at = NOW()");
+    values.push(id); // Add ID for WHERE clause
+
+    const query = `
       UPDATE counselling_sessions 
-      SET status = ?, session_notes = ?, updated_at = NOW() 
+      SET ${updateFields.join(", ")} 
       WHERE id = ?
-    `,
-      [status, sessionNotes, id]
-    );
+    `;
+
+    console.log("🔄 Update query:", query);
+    console.log("🔄 Update values:", values);
+
+    const [result] = await connection.query(query, values);
 
     connection.release();
 
@@ -353,7 +373,7 @@ router.get("/all-members", async (req, res) => {
         u.full_name as memberName,
         u.phone,
         u.email,
-        CONCAT(UPPER(LEFT(COALESCE(u.area, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId,
+        CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId,
         COUNT(p.id) as totalPrayers,
         COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) as prayedCount,
         CASE 
@@ -362,9 +382,10 @@ router.get("/all-members", async (req, res) => {
         END as attendanceRate,
         MAX(p.prayer_date) as lastAttendance
       FROM users u
+      LEFT JOIN areas a ON u.area_id = a.area_id
       LEFT JOIN prayers p ON u.id = p.user_id AND p.prayer_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
       WHERE u.role = 'Member' 
-        AND u.mosque_id IS NOT NULL 
+        AND u.area_id IS NOT NULL 
         AND u.status = 'active'
       GROUP BY u.id
       ORDER BY u.full_name, u.username

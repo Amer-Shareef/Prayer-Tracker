@@ -246,10 +246,10 @@ function ManageMembers() {
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
     
-    // const prayerStats = [
-    //   ['Prayer Attendance Rate:', `${member.attendance_rate || 0}%`],
-    //   ['Prayers Completed:', `${member.prayed_count || 0} out of ${member.total_prayers || 0}`],
-    // ];
+    const prayerStats = [
+      ['Prayer Attendance Rate:', `${member.attendance_rate || 0}%`],
+      ['Prayers Completed:', `${member.prayed_count || 0} out of ${member.total_prayers || 0}`],
+    ];
 
     prayerStats.forEach(([label, value]) => {
       doc.setFont('helvetica', 'bold');

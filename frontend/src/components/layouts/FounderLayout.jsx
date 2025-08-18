@@ -35,7 +35,7 @@ const FounderLayout = ({ children }) => {
     },
     { 
       path: '/founder/meetings', 
-      label: 'Meetings & Counselling', 
+      label: 'Personal Meetings', 
       bgColor: 'bg-green-500',
       hoverColor: 'hover:bg-green-400',
       textColor: 'text-white',

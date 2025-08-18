@@ -79,7 +79,7 @@ const SuperAdminMeetingsPage = () => {
     <SuperAdminLayout>
       <div className="p-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Meetings & Counselling (All Mosques)</h1>
+          <h1 className="text-2xl font-bold text-gray-800">Personal Meetings (All Mosques)</h1>
           <p className="text-gray-600">Schedule and manage meetings across all mosques</p>
         </div>
 
