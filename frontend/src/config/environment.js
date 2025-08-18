@@ -2,15 +2,15 @@
 
 export const ENV_CONFIG = {
   // API Configuration - Updated for EC2
-  API_URL: process.env.REACT_APP_API_URL || "http://localhost:5000/api",
-  BACKEND_URL: process.env.REACT_APP_BACKEND_URL || "http://localhost:5000",
+  API_URL: process.env.REACT_APP_API_URL || "http://13.60.193.171:5000/api",
+  BACKEND_URL: process.env.REACT_APP_BACKEND_URL || "http://13.60.193.171:5000",
   HEALTH_CHECK_URL:
     process.env.REACT_APP_HEALTH_CHECK_URL ||
-    "http://localhost:5000/api/health",
+    "http://13.60.193.171:5000/api/health",
 
   // Frontend Configuration - Updated for EC2
-  FRONTEND_URL: process.env.REACT_APP_FRONTEND_URL || "http://localhost:3000",
-  HOST: process.env.REACT_APP_HOST || "localhost",
+  FRONTEND_URL: process.env.REACT_APP_FRONTEND_URL || "http://13.60.193.171:3000",
+  HOST: process.env.REACT_APP_HOST || "13.60.193.171",
   PORT: process.env.REACT_APP_PORT || 3000,
 
   // Environment
@@ -24,7 +24,7 @@ export const ENV_CONFIG = {
   // Allowed hosts - Updated for EC2
   ALLOWED_HOSTS: process.env.REACT_APP_ALLOWED_HOSTS?.split(",") || [
     "localhost",
-    "localhost",
+    "13.60.193.171",
     "127.0.0.1",
   ],
 };

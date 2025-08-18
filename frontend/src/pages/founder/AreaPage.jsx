@@ -26,7 +26,7 @@ const AreaPage = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/areas', {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/areas`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -66,7 +66,7 @@ const AreaPage = () => {
       
       if (editingArea) {
         // Update existing area
-        const response = await fetch(`http://localhost:5000/api/areas/${editingArea.area_id || editingArea.id}`, {
+        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/areas/${editingArea.area_id || editingArea.id}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -82,7 +82,7 @@ const AreaPage = () => {
         }
       } else {
         // Add new area
-        const response = await fetch('http://localhost:5000/api/areas', {
+        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/areas`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -138,7 +138,7 @@ const AreaPage = () => {
     if (window.confirm('Are you sure you want to delete this area?')) {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:5000/api/areas/${area.area_id || area.id}`, {
+        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/areas/${area.area_id || area.id}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
