@@ -107,7 +107,6 @@ router.post(
         pickup_location,
         contact_number,
         special_instructions,
-        location_coordinates,
         days, // Array of selected days ['monday', 'tuesday', etc.]
         prayers, // Array of selected prayers ['fajr', 'dhuhr', etc.]
       } = req.body;
@@ -192,15 +191,14 @@ router.post(
       const [result] = await pool.execute(
         `INSERT INTO pickup_requests 
        (user_id, area_id, pickup_location, special_instructions, contact_number,
-        location_coordinates, days, prayers, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)`,
+       days, prayers, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)`,
         [
           user.id,
           areaId,
           pickup_location,
           special_instructions || null,
           contact_number || null,
-          location_coordinates ? JSON.stringify(location_coordinates) : null,
           days
             ? JSON.stringify(days.map((d) => d.toLowerCase()))
             : JSON.stringify(["daily"]),
