@@ -26,7 +26,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ENHANCED response interceptor with automatic retry logic
+// ENHANCED response interceptor with automatic token refresh
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -35,12 +35,83 @@ api.interceptors.response.use(
     // Log error for debugging
     console.error("API Error:", error.response?.data || error.message);
 
-    if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      window.location.href = "/login";
-      return Promise.reject(error);
+    // Handle token expiry with automatic refresh
+    if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
+      console.log("🔒 Access token expired, attempting to refresh...");
+      
+      const refreshToken = localStorage.getItem("refreshToken");
+      
+      if (refreshToken) {
+        originalRequest._retry = true;
+        
+        try {
+          console.log("🔄 Calling refresh endpoint...");
+          
+          // Call refresh endpoint with refresh token in body
+          const refreshResponse = await axios.post(`${API_URL}/refresh`, {
+            refreshToken: refreshToken
+          }, {
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            withCredentials: true // This will send cookies too as backup
+          });
+          
+          if (refreshResponse.data.success && refreshResponse.data.token) {
+            const newToken = refreshResponse.data.token;
+            const newRefreshToken = refreshResponse.data.refreshToken;
+            
+            console.log("✅ Token refreshed successfully");
+            console.log("🔑 New access token expires in: 1 minute");
+            
+            // Update tokens in localStorage
+            localStorage.setItem("token", newToken);
+            if (newRefreshToken) {
+              localStorage.setItem("refreshToken", newRefreshToken);
+              console.log("🔄 Refresh token also updated");
+            }
+            
+            // Update the authorization header for the original request
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            
+            // Retry the original request with new token
+            console.log("🔄 Retrying original request with new token...");
+            return api(originalRequest);
+          } else {
+            throw new Error("Refresh response invalid");
+          }
+        } catch (refreshError) {
+          console.error("❌ Token refresh failed:", refreshError);
+          console.log("🚪 Refresh failed, redirecting to login page...");
+          
+          // Refresh failed, clear tokens and redirect to login
+          localStorage.removeItem("token");
+          localStorage.removeItem("refreshToken");
+          localStorage.removeItem("user");
+          localStorage.removeItem("role");
+          
+          // Only redirect if not already on login page
+          if (!window.location.pathname.includes('/login')) {
+            window.location.href = "/login";
+          }
+          
+          return Promise.reject(refreshError);
+        }
+      } else {
+        // No refresh token available, redirect to login
+        console.log("🚪 No refresh token available, redirecting to login...");
+        localStorage.removeItem("token");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("user");
+        localStorage.removeItem("role");
+        
+        // Only redirect if not already on login page
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = "/login";
+        }
+        
+        return Promise.reject(error);
+      }
     }
 
     // Handle database connection errors with automatic retry
@@ -50,7 +121,7 @@ api.interceptors.response.use(
       error.response?.data?.error === "CONNECTION_LOST" ||
       error.response?.data?.error === "CONNECTION_TIMEOUT" ||
       error.response?.data?.isRetryable === true ||
-      error.code === "ECONNABORTED" || // Timeout
+      error.code === "ECONNABORTED" ||
       error.code === "NETWORK_ERROR";
 
     if (isRetryableError && !originalRequest._retry) {
@@ -137,6 +208,9 @@ export const authService = {
       .post("/login", requestData)
       .then((response) => {
         console.log("✅ Login response received:", response.data);
+        if (response.data.success && response.data.refreshToken) {
+          console.log("🔄 Refresh token received and will be stored");
+        }
         return response;
       })
       .catch((error) => {
