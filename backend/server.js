@@ -4,6 +4,7 @@ dotenv.config();
 const express = require("express");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
+const cookieParser = require("cookie-parser");
 
 const app = express();
 
@@ -25,6 +26,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json());
+app.use(cookieParser());
 
 // Rate limiting
 const limiter = rateLimit({

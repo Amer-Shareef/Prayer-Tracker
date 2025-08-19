@@ -7,7 +7,7 @@ const { authenticateToken } = require("../middleware/auth"); // Add this import
 const {
   sendOtpEmail,
   sendPasswordResetEmail,
-  sendOtpSms
+  sendOtpSms,
 } = require("../services/emailService");
 
 const router = express.Router();
@@ -48,7 +48,8 @@ router.post("/login", async (req, res) => {
     if (!isMobileLogin && !isDashboardLogin) {
       return res.status(400).json({
         success: false,
-        message: "Login requires either a phone number or username and password",
+        message:
+          "Login requires either a phone number or username and password",
       });
     }
 
@@ -130,7 +131,9 @@ router.post("/login", async (req, res) => {
 
         return res.status(401).json({
           success: false,
-          message: `Invalid credentials. ${5 - newAttempts} attempts remaining.`,
+          message: `Invalid credentials. ${
+            5 - newAttempts
+          } attempts remaining.`,
         });
       }
     }
@@ -156,15 +159,35 @@ router.post("/login", async (req, res) => {
         [user.id]
       );
 
-      const token = jwt.sign(
+      // Issue access and refresh tokens
+      const accessToken = jwt.sign(
         {
           userId: user.id,
           username: user.username,
           role: user.role,
         },
         process.env.JWT_SECRET,
-        { expiresIn: "3m" }
+        { expiresIn: "90d" } // 15 minute access token
       );
+
+      const refreshToken = jwt.sign(
+        { userId: user.id },
+        process.env.JWT_SECRET,
+        { expiresIn: "120d" } // 7 day refresh token
+      );
+
+      // Set refresh token as httpOnly cookie (backup)
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days
+        path: "/api/auth",
+      });
+
+      console.log("✅ Login successful with OTP for user:", loginIdentifier);
+      console.log("🔑 Access token expires in: 15 minutes");
+      console.log("🔄 Refresh token expires in: 7 days");
 
       const userData = {
         id: user.id,
@@ -191,7 +214,8 @@ router.post("/login", async (req, res) => {
       return res.json({
         success: true,
         message: "Login successful",
-        token,
+        token: accessToken,
+        refreshToken: refreshToken,
         user: userData,
       });
     }
@@ -228,10 +252,12 @@ router.post("/login", async (req, res) => {
 
     const response = {
       success: true,
-      message: `Verification code sent to your ${isMobileLogin ? "phone" : "email"}. Please check your inbox.`,
+      message: `Verification code sent to your ${
+        isMobileLogin ? "phone" : "email"
+      }. Please check your inbox.`,
       requiresOtp: true,
       contact: maskedContact,
-      loginMethod: isMobileLogin ? "mobile" : "dashboard"
+      loginMethod: isMobileLogin ? "mobile" : "dashboard",
     };
 
     if (process.env.NODE_ENV === "development" || sendResult.testMode) {
@@ -248,6 +274,127 @@ router.post("/login", async (req, res) => {
       error: error.message,
     });
   }
+});
+
+// Refresh endpoint: issues new access token if refresh token is valid
+router.post("/refresh", async (req, res) => {
+  try {
+    console.log("🔄 Refresh token endpoint called");
+    console.log("📦 Full request body:", req.body);
+    console.log("🍪 Cookies:", req.cookies);
+    console.log("📋 Headers:", req.headers);
+    
+    // Try to get refresh token from multiple sources
+    let refreshToken;
+    
+    // Check if req.body exists and has refreshToken
+    if (req.body && req.body.refreshToken) {
+      refreshToken = req.body.refreshToken;
+      console.log("✅ Found refresh token in request body");
+    } else if (req.cookies && req.cookies.refreshToken) {
+      refreshToken = req.cookies.refreshToken;
+      console.log("✅ Found refresh token in cookies");
+    } else if (req.headers['x-refresh-token']) {
+      refreshToken = req.headers['x-refresh-token'];
+      console.log("✅ Found refresh token in headers");
+    }
+    
+    console.log("🔍 Looking for refresh token...");
+    console.log("📦 Request body has refreshToken:", !!(req.body && req.body.refreshToken));
+    console.log("🍪 Cookies has refreshToken:", !!(req.cookies && req.cookies.refreshToken));
+    console.log("📋 Headers has x-refresh-token:", !!req.headers['x-refresh-token']);
+    
+    if (!refreshToken) {
+      console.log("❌ No refresh token found in request");
+      return res.status(401).json({ 
+        success: false, 
+        message: "No refresh token provided" 
+      });
+    }
+    
+    console.log("✅ Refresh token found, verifying...");
+    console.log("🔑 Token preview:", refreshToken.substring(0, 20) + "...");
+    
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+      console.log("✅ Refresh token is valid for user ID:", decoded.userId);
+    } catch (err) {
+      console.log("❌ Invalid refresh token:", err.message);
+      return res.status(401).json({ 
+        success: false, 
+        message: "Invalid or expired refresh token" 
+      });
+    }
+    
+    // Verify user still exists and is active
+    console.log("🔍 Verifying user exists and is active...");
+    const [users] = await pool.execute(
+      "SELECT id, username, email, role, status FROM users WHERE id = ? AND status = 'active'",
+      [decoded.userId]
+    );
+    
+    if (users.length === 0) {
+      console.log("❌ User not found or inactive");
+      return res.status(401).json({ 
+        success: false, 
+        message: "User not found or inactive" 
+      });
+    }
+    
+    const user = users[0];
+    console.log("✅ User verified:", user.username);
+    
+    // Generate new access token
+    const newAccessToken = jwt.sign(
+      { 
+        userId: user.id, 
+        username: user.username, 
+        role: user.role 
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "90d" } // 1 minute for testing, change to 15m for production
+    );
+    
+    // Optionally generate new refresh token (rotate refresh tokens)
+    const newRefreshToken = jwt.sign(
+      { userId: user.id },
+      process.env.JWT_SECRET,
+      { expiresIn: "120d" } // 3 minutes for testing, change to 7d for production
+    );
+    
+    // Update refresh token cookie
+    res.cookie("refreshToken", newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 120 * 24 * 60 * 60 * 1000, // 120 days
+      path: "/api/auth",
+    });
+    
+    console.log("🔄 Access token refreshed successfully for user:", user.username);
+    console.log("🔑 New access token expires in: 90 days");
+    console.log("🔄 New refresh token expires in: 120 days");
+
+    return res.json({ 
+      success: true, 
+      token: newAccessToken,
+      refreshToken: newRefreshToken,
+      message: "Token refreshed successfully"
+    });
+  } catch (error) {
+    console.error("❌ Refresh token error:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Server error during token refresh" 
+    });
+  }
+});
+
+// Logout endpoint: clears refresh token cookie
+router.post("/logout", (req, res) => {
+  res.clearCookie("refreshToken", { path: "/api/auth" });
+  res.json({ success: true, message: "Logged out" });
 });
 
 // Resend OTP route
@@ -337,7 +484,9 @@ router.post("/resend-otp", async (req, res) => {
 
     const response = {
       success: true,
-      message: `New verification code sent to your ${isMobileResend ? "phone" : "email"}.`,
+      message: `New verification code sent to your ${
+        isMobileResend ? "phone" : "email"
+      }.`,
       contact: maskedContact,
     };
 
@@ -382,7 +531,7 @@ router.post("/register", async (req, res) => {
         "SELECT area_id FROM areas WHERE area_id = ?",
         [area_id]
       );
-      
+
       if (areaExists.length === 0) {
         return res.status(400).json({
           success: false,

@@ -64,7 +64,11 @@ const LoginPage = () => {
           // Complete login with comprehensive user data
           localStorage.setItem('token', response.data.token);
           localStorage.setItem('user', JSON.stringify(response.data.user));
-          login(response.data.user, response.data.token);
+          
+          // Pass refresh token to login function
+          login(response.data.user, response.data.token, response.data.refreshToken);
+          
+          console.log('🔑 Login successful with refresh token support');
           
           // Log the full user data received (except sensitive info)
           console.log('✅ Login successful, user data received:', {
