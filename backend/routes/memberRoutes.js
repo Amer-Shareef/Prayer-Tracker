@@ -465,4 +465,96 @@ router.get(
   }
 );
 
+// Get prayer statistics for a specific member
+router.get(
+  "/members/:id/prayer-stats",
+  authenticateToken,
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { startDate, endDate } = req.query;
+      const { user } = req;
+
+      console.log(`📊 Fetching prayer statistics for member ${id} from ${startDate} to ${endDate}`);
+
+      // Check if member exists and access permissions
+      let checkQuery = "SELECT * FROM users WHERE id = ?";
+      let checkParams = [id];
+
+      if (user.role === "Founder" || user.role === "WCM") {
+        // Founders and WCMs can only view stats for members from their area
+        checkQuery += " AND area_id = (SELECT area_id FROM users WHERE id = ?)";
+        checkParams.push(user.id);
+      }
+      // SuperAdmin can view any member's stats (no additional WHERE clause)
+
+      const [existingMember] = await pool.execute(checkQuery, checkParams);
+
+      if (existingMember.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Member not found or access denied",
+        });
+      }
+
+      // Build prayer query with date filters
+      let prayerQuery = `
+        SELECT 
+          prayer_date,
+          fajr,
+          dhuhr,
+          asr,
+          maghrib,
+          isha,
+          daily_completion_rate,
+          notes,
+          zikr_count,
+          zikr_count_2,
+          quran_minutes
+        FROM prayers 
+        WHERE user_id = ?
+      `;
+      let prayerParams = [id];
+
+      // Add date filters if provided
+      if (startDate) {
+        prayerQuery += " AND prayer_date >= ?";
+        prayerParams.push(startDate);
+      }
+      if (endDate) {
+        prayerQuery += " AND prayer_date <= ?";
+        prayerParams.push(endDate);
+      }
+
+      prayerQuery += " ORDER BY prayer_date ASC";
+
+      const [prayerData] = await pool.execute(prayerQuery, prayerParams);
+
+      console.log(`✅ Found ${prayerData.length} prayer records for member ${id}`);
+
+      res.json({
+        success: true,
+        data: prayerData,
+        member: {
+          id: existingMember[0].id,
+          fullName: existingMember[0].full_name,
+          username: existingMember[0].username
+        },
+        dateRange: {
+          startDate: startDate || 'All time',
+          endDate: endDate || 'All time'
+        }
+      });
+    } catch (error) {
+      console.error("❌ Error fetching member prayer statistics:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch prayer statistics",
+        error: error.message,
+      });
+    }
+  }
+);
+
 module.exports = router;

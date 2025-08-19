@@ -111,7 +111,7 @@ const TransportPage = () => {
           time: "4:30 AM", // Default Fajr time
           disabilityLevel: "None", // Default
           needsAssistance: false,
-          specialRequirements: request.special_instructions || 'Ring doorbell twice',
+          specialRequirements: request.special_instructions,
           status: request.status || 'pending',
           requestedAt: request.created_at,
           emergencyContact: request.contact_phone || request.contact_number || 'N/A',
