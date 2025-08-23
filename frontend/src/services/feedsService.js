@@ -85,6 +85,27 @@ const feedsService = {
       );
     }
   },
+
+  // Upload image to S3
+  uploadImage: async (formData) => {
+    try {
+      console.log("📤 Uploading image to S3");
+      const response = await api.post("/feeds/upload-image", formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      console.log("📥 Image uploaded:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Upload image error:", error);
+      throw (
+        error.response?.data || {
+          message: "An error occurred while uploading image",
+        }
+      );
+    }
+  },
 };
 
 export default feedsService;

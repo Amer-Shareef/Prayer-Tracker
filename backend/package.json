@@ -26,6 +26,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.872.0",
+    "@aws-sdk/s3-request-presigner": "^3.872.0",
     "axios": "^1.9.0",
     "bcrypt": "^5.1.0",
     "cookie-parser": "^1.4.7",
@@ -35,6 +37,8 @@
     "express-rate-limit": "^7.1.5",
     "jsonwebtoken": "^9.0.2",
     "jspdf-autotable": "^5.0.2",
+    "multer": "^2.0.2",
+    "multer-s3": "^3.0.1",
     "mysql2": "^3.14.1",
     "nodemailer": "^6.10.1"
   },

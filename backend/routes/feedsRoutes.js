@@ -1,8 +1,38 @@
 const express = require("express");
 const { pool } = require("../config/database");
 const { authenticateToken, authorizeRole } = require("../middleware/auth");
+const { upload, uploadToS3 } = require("../middleware/directS3Upload");
 
 const router = express.Router();
+
+// Upload image to S3 - Updated with direct S3 upload
+router.post(
+  "/upload-image",
+  authenticateToken,
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
+  upload.single('image'),
+  uploadToS3,
+  async (req, res) => {
+    try {
+      // Return the S3 URL for the uploaded image
+      res.json({
+        success: true,
+        message: "Image uploaded successfully",
+        data: {
+          image_url: req.s3Result.location,
+          filename: req.s3Result.key
+        }
+      });
+    } catch (error) {
+      console.error("❌ Error in upload response:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to process upload response",
+        error: error.message
+      });
+    }
+  }
+);
 
 // GET all feeds - Area-based version
 router.get("/", authenticateToken, async (req, res) => {

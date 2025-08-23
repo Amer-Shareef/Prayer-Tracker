@@ -27,6 +27,9 @@ const PostFeeds = () => {
   const [feeds, setFeeds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
 
   // Fetch feeds from API
   const fetchFeeds = async () => {
@@ -61,6 +64,8 @@ const PostFeeds = () => {
             setFormData({
               title: response.data.title,
               content: response.data.content,
+              image_url: response.data.image_url || '',
+              video_url: response.data.video_url || '',
               sendNotification: response.data.send_notification === 1,
               priority: response.data.priority || 'normal'
             });
@@ -99,6 +104,69 @@ const PostFeeds = () => {
       [name]: type === 'checkbox' ? checked : value
     }));
   };
+
+  // Handle file selection
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setApiError('Please select an image file');
+        return;
+      }
+      
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        setApiError('File size must be less than 5MB');
+        return;
+      }
+      
+      setSelectedFile(file);
+      setApiError('');
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Upload image to S3
+  const uploadImage = async () => {
+    if (!selectedFile) return null;
+    
+    setUploadingImage(true);
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append('image', selectedFile);
+      
+      const response = await feedsService.uploadImage(formDataUpload);
+      
+      if (response.success) {
+        return response.data.image_url;
+      } else {
+        throw new Error(response.message || 'Failed to upload image');
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      setApiError(error.message || 'Failed to upload image');
+      return null;
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Clear image selection
+  const clearImage = () => {
+    setSelectedFile(null);
+    setImagePreview(null);
+    setFormData(prev => ({ ...prev, image_url: '' }));
+    // Clear file input
+    const fileInput = document.getElementById('image-file');
+    if (fileInput) fileInput.value = '';
+  };
   
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -112,10 +180,23 @@ const PostFeeds = () => {
     setApiError('');
     
     try {
+      let imageUrl = formData.image_url;
+      
+      // Upload image if a file is selected
+      if (selectedFile) {
+        const uploadedImageUrl = await uploadImage();
+        if (uploadedImageUrl) {
+          imageUrl = uploadedImageUrl;
+        } else {
+          setLoading(false);
+          return; // Stop if image upload failed
+        }
+      }
+      
       const dataToSend = {
         title: formData.title,
         content: formData.content,
-        image_url: formData.image_url,
+        image_url: imageUrl,
         video_url: formData.video_url,
         send_notification: formData.sendNotification,
         priority: formData.priority || 'normal'
@@ -143,6 +224,9 @@ const PostFeeds = () => {
           sendNotification: false,
           priority: 'normal'
         });
+        
+        // Clear image selection
+        clearImage();
         
         setIsEditing(false);
         setSuccess(true);
@@ -378,23 +462,101 @@ const PostFeeds = () => {
                 )}
               </div>
 
-              {/* Image URL */}
+              {/* Image Upload */}
               <div className="mb-4">
-                <label className="block text-gray-700 font-medium mb-2" htmlFor="image_url">
-                  Image URL (Optional)
+                <label className="block text-gray-700 font-medium mb-2">
+                  Image (Optional)
                 </label>
-                <input
-                  type="url"
-                  id="image_url"
-                  name="image_url"
-                  value={formData.image_url}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="https://example.com/image.jpg"
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  Add an image URL to display with your feed
-                </p>
+                
+                {/* Image upload options */}
+                <div className="space-y-4">
+                  {/* File upload */}
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-2">Upload from computer:</label>
+                    <div className="flex items-center space-x-4">
+                      <input
+                        type="file"
+                        id="image-file"
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+                      />
+                      {selectedFile && (
+                        <button
+                          type="button"
+                          onClick={clearImage}
+                          className="text-red-600 hover:text-red-800 text-sm"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Supported formats: JPG, PNG, GIF. Max size: 5MB
+                    </p>
+                  </div>
+
+                  {/* Image preview */}
+                  {imagePreview && (
+                    <div className="mt-3">
+                      <label className="block text-sm text-gray-600 mb-2">Preview:</label>
+                      <div className="relative inline-block">
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
+                          className="max-w-xs max-h-48 rounded-lg border border-gray-300"
+                        />
+                        <button
+                          type="button"
+                          onClick={clearImage}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* OR divider */}
+                  <div className="flex items-center">
+                    <div className="flex-grow border-t border-gray-300"></div>
+                    <span className="flex-shrink mx-4 text-gray-400 text-sm">OR</span>
+                    <div className="flex-grow border-t border-gray-300"></div>
+                  </div>
+
+                  {/* Image URL input */}
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-2">Image URL:</label>
+                    <input
+                      type="url"
+                      id="image_url"
+                      name="image_url"
+                      value={formData.image_url}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      placeholder="https://example.com/image.jpg"
+                      disabled={selectedFile}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Add an image URL to display with your feed
+                    </p>
+                  </div>
+
+                  {/* Display existing image URL */}
+                  {formData.image_url && !selectedFile && (
+                    <div className="mt-3">
+                      <label className="block text-sm text-gray-600 mb-2">Current image:</label>
+                      <img
+                        src={formData.image_url}
+                        alt="Current"
+                        className="max-w-xs max-h-48 rounded-lg border border-gray-300"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Video URL */}
@@ -449,6 +611,7 @@ const PostFeeds = () => {
                       sendNotification: false,
                       priority: 'normal'
                     });
+                    clearImage();
                     setIsEditing(false);
                     if (editId) {
                       navigate('/founder/post-feeds');
@@ -463,15 +626,15 @@ const PostFeeds = () => {
                 <button
                   type="submit"
                   className="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700"
-                  disabled={loading}
+                  disabled={loading || uploadingImage}
                 >
-                  {loading ? (
+                  {loading || uploadingImage ? (
                     <span className="flex items-center">
                       <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      {isEditing ? 'Updating...' : 'Publishing...'}
+                      {uploadingImage ? 'Uploading Image...' : (isEditing ? 'Updating...' : 'Publishing...')}
                     </span>
                   ) : (
                     isEditing ? 'Update Feed' : 'Publish Feed'

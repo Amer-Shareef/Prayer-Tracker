@@ -1,8 +1,44 @@
 const express = require("express");
 const { pool } = require("../config/database"); // Fixed import - use database.js
 const { authenticateToken, authorizeRole } = require("../middleware/auth");
+const upload = require("../middleware/s3Upload");
 
 const router = express.Router();
+
+// Upload image for announcements to S3
+router.post(
+  "/announcements/upload-image",
+  authenticateToken,
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
+  upload.single('image'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "No image file provided"
+        });
+      }
+
+      // Return the S3 URL for the uploaded image
+      res.json({
+        success: true,
+        message: "Announcement image uploaded successfully",
+        data: {
+          image_url: req.file.location,
+          filename: req.file.key
+        }
+      });
+    } catch (error) {
+      console.error("❌ Error uploading announcement image:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to upload announcement image",
+        error: error.message
+      });
+    }
+  }
+);
 
 // Get announcements
 router.get("/announcements", authenticateToken, async (req, res) => {
