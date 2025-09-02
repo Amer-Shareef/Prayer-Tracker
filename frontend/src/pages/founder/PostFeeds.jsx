@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import FounderLayout from '../../components/layouts/FounderLayout';
 import feedsService from '../../services/feedsService';
+import { UploadButton, UploadDropzone } from '../../utils/uploadthing';
 
 const PostFeeds = () => {
   const location = useLocation();
@@ -27,9 +28,39 @@ const PostFeeds = () => {
   const [feeds, setFeeds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
-  const [selectedFile, setSelectedFile] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [videoThumbnail, setVideoThumbnail] = useState('');
+
+  // Helper function to extract YouTube video ID and generate thumbnail
+  const getYouTubeThumbnail = (url) => {
+    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const match = url.match(regex);
+    if (match) {
+      return `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`;
+    }
+    return '';
+  };
+
+  // Helper function to clear image data
+  const clearImageData = () => {
+    setUploadedImageUrl('');
+    setSelectedFile(null);
+    setFormData(prev => ({
+      ...prev,
+      image_url: ''
+    }));
+  };
+
+  // Helper function to clear video data
+  const clearVideoData = () => {
+    setVideoThumbnail('');
+    setFormData(prev => ({
+      ...prev,
+      video_url: ''
+    }));
+  };
 
   // Fetch feeds from API
   const fetchFeeds = async () => {
@@ -52,6 +83,21 @@ const PostFeeds = () => {
   };
 
   useEffect(() => {
+    console.log("🔍 PostFeeds component mounted");
+    console.log("🔧 UploadThing URL:", process.env.REACT_APP_BACKEND_URL || "http://localhost:5000");
+    
+    // Test UploadThing endpoint
+    const testEndpoint = async () => {
+      try {
+        const backendUrl = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+        const response = await fetch(`${backendUrl}/api/uploadthing`);
+        console.log("🧪 UploadThing endpoint test:", response.status, response.statusText);
+      } catch (error) {
+        console.error("🧪 UploadThing endpoint error:", error);
+      }
+    };
+    testEndpoint();
+    
     // Fetch feeds from API
     fetchFeeds();
     
@@ -69,6 +115,14 @@ const PostFeeds = () => {
               sendNotification: response.data.send_notification === 1,
               priority: response.data.priority || 'normal'
             });
+            setUploadedImageUrl(response.data.image_url || '');
+            
+            // Generate video thumbnail if video URL exists
+            if (response.data.video_url) {
+              const thumbnail = getYouTubeThumbnail(response.data.video_url);
+              setVideoThumbnail(thumbnail);
+            }
+            
             setIsEditing(true);
           }
         } catch (error) {
@@ -99,73 +153,74 @@ const PostFeeds = () => {
   // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+    
+    if (name === 'video_url') {
+      // Clear image data when video URL is entered
+      if (value.trim()) {
+        clearImageData();
+        // Generate YouTube thumbnail
+        const thumbnail = getYouTubeThumbnail(value);
+        setVideoThumbnail(thumbnail);
+      } else {
+        setVideoThumbnail('');
+      }
+    }
+    
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
   };
 
-  // Handle file selection
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        setApiError('Please select an image file');
-        return;
-      }
-      
-      // Validate file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
-        setApiError('File size must be less than 5MB');
-        return;
-      }
-      
-      setSelectedFile(file);
-      setApiError('');
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // Upload image to S3
-  const uploadImage = async () => {
-    if (!selectedFile) return null;
-    
-    setUploadingImage(true);
+  // Handle image upload completion
+  const handleImageUploadComplete = async (res) => {
     try {
-      const formDataUpload = new FormData();
-      formDataUpload.append('image', selectedFile);
+      console.log("🔄 File selected:", res);
+      setUploadingImage(false);
       
-      const response = await feedsService.uploadImage(formDataUpload);
-      
-      if (response.success) {
-        return response.data.image_url;
+      if (res && res.length > 0) {
+        const selectedFileInfo = res[0];
+        console.log("✅ File selected successfully:", selectedFileInfo);
+        
+        // Clear video data when image is selected
+        clearVideoData();
+        
+        // Store file locally until publish
+        setSelectedFile(selectedFileInfo);
+        setUploadedImageUrl(selectedFileInfo.url);
+        
+        setSuccessMessage("Image selected successfully! It will be uploaded when you publish the feed.");
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
       } else {
-        throw new Error(response.message || 'Failed to upload image');
+        console.warn("⚠️ No files selected:", res);
       }
     } catch (error) {
-      console.error('Error uploading image:', error);
-      setApiError(error.message || 'Failed to upload image');
-      return null;
-    } finally {
+      console.error("❌ Error selecting image:", error);
+      setApiError("Failed to select image: " + error.message);
       setUploadingImage(false);
     }
   };
 
-  // Clear image selection
-  const clearImage = () => {
-    setSelectedFile(null);
-    setImagePreview(null);
-    setFormData(prev => ({ ...prev, image_url: '' }));
-    // Clear file input
-    const fileInput = document.getElementById('image-file');
-    if (fileInput) fileInput.value = '';
+
+  // Handle image upload error
+  const handleImageUploadError = (error) => {
+    console.error("❌ Image upload error:", error);
+    setApiError("Image upload failed: " + (error?.message || error || "Unknown error"));
+    setUploadingImage(false);
+  };
+
+  // Handle image upload begin
+  const handleImageUploadBegin = () => {
+    console.log("📤 Starting image upload...");
+    console.log("� Backend URL:", process.env.REACT_APP_BACKEND_URL || "http://localhost:5000");
+    setUploadingImage(true);
+    setApiError('');
+  };
+
+  // Remove uploaded image
+  const removeUploadedImage = () => {
+    clearImageData();
   };
   
   // Handle form submission
@@ -182,14 +237,29 @@ const PostFeeds = () => {
     try {
       let imageUrl = formData.image_url;
       
-      // Upload image if a file is selected
-      if (selectedFile) {
-        const uploadedImageUrl = await uploadImage();
-        if (uploadedImageUrl) {
-          imageUrl = uploadedImageUrl;
-        } else {
+      // Upload selected file to UploadThing if there's one
+      if (selectedFile && !imageUrl) {
+        console.log("📤 Uploading selected file to UploadThing...");
+        try {
+          // Process the uploaded image URL through our backend
+          const uploadResponse = await feedsService.uploadImage(
+            selectedFile.url,
+            selectedFile.name,
+            selectedFile.size,
+            selectedFile.key
+          );
+          
+          if (uploadResponse.success) {
+            imageUrl = selectedFile.url;
+            console.log("✅ File uploaded successfully");
+          } else {
+            throw new Error(uploadResponse.message || "Failed to process uploaded image");
+          }
+        } catch (uploadError) {
+          console.error("❌ Upload failed:", uploadError);
+          setApiError("Failed to upload image: " + uploadError.message);
           setLoading(false);
-          return; // Stop if image upload failed
+          return;
         }
       }
       
@@ -225,8 +295,11 @@ const PostFeeds = () => {
           priority: 'normal'
         });
         
-        // Clear image selection
-        clearImage();
+        // Reset upload states
+        setUploadedImageUrl('');
+        setSelectedFile(null);
+        setVideoThumbnail('');
+        setUploadingImage(false);
         
         setIsEditing(false);
         setSuccess(true);
@@ -272,9 +345,15 @@ const PostFeeds = () => {
             setFormData({
               title: '',
               content: '',
+              image_url: '',
+              video_url: '',
               sendNotification: false,
               priority: 'normal'
             });
+            setUploadedImageUrl('');
+            setSelectedFile(null);
+            setVideoThumbnail('');
+            setUploadingImage(false);
             setIsEditing(false);
             navigate('/founder/post-feeds');
           }
@@ -462,101 +541,83 @@ const PostFeeds = () => {
                 )}
               </div>
 
-              {/* Image Upload */}
-              <div className="mb-4">
-                <label className="block text-gray-700 font-medium mb-2">
-                  Image (Optional)
+              {/* Image Upload Section */}
+              <div className="mb-6">
+                <label className="block text-gray-700 font-medium mb-3">
+                  Upload Image (Optional)
                 </label>
                 
-                {/* Image upload options */}
-                <div className="space-y-4">
-                  {/* File upload */}
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-2">Upload from computer:</label>
-                    <div className="flex items-center space-x-4">
-                      <input
-                        type="file"
-                        id="image-file"
-                        accept="image/*"
-                        onChange={handleFileSelect}
-                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
-                      />
-                      {selectedFile && (
-                        <button
-                          type="button"
-                          onClick={clearImage}
-                          className="text-red-600 hover:text-red-800 text-sm"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Supported formats: JPG, PNG, GIF. Max size: 5MB
-                    </p>
-                  </div>
-
-                  {/* Image preview */}
-                  {imagePreview && (
-                    <div className="mt-3">
-                      <label className="block text-sm text-gray-600 mb-2">Preview:</label>
-                      <div className="relative inline-block">
-                        <img
-                          src={imagePreview}
-                          alt="Preview"
-                          className="max-w-xs max-h-48 rounded-lg border border-gray-300"
-                        />
-                        <button
-                          type="button"
-                          onClick={clearImage}
-                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* OR divider */}
-                  <div className="flex items-center">
-                    <div className="flex-grow border-t border-gray-300"></div>
-                    <span className="flex-shrink mx-4 text-gray-400 text-sm">OR</span>
-                    <div className="flex-grow border-t border-gray-300"></div>
-                  </div>
-
-                  {/* Image URL input */}
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-2">Image URL:</label>
-                    <input
-                      type="url"
-                      id="image_url"
-                      name="image_url"
-                      value={formData.image_url}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                      placeholder="https://example.com/image.jpg"
-                      disabled={selectedFile}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Add an image URL to display with your feed
-                    </p>
-                  </div>
-
-                  {/* Display existing image URL */}
-                  {formData.image_url && !selectedFile && (
-                    <div className="mt-3">
-                      <label className="block text-sm text-gray-600 mb-2">Current image:</label>
+                {/* Show uploaded image or upload area */}
+                {uploadedImageUrl || formData.image_url ? (
+                  <div className="space-y-3">
+                    {/* Image preview */}
+                    <div className="relative inline-block">
                       <img
-                        src={formData.image_url}
-                        alt="Current"
-                        className="max-w-xs max-h-48 rounded-lg border border-gray-300"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                        }}
+                        src={uploadedImageUrl || formData.image_url}
+                        alt="Feed image"
+                        className="max-w-xs h-40 object-cover rounded-lg border border-gray-300"
                       />
+                      <button
+                        type="button"
+                        onClick={removeUploadedImage}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600"
+                        title="Remove image"
+                      >
+                        ×
+                      </button>
                     </div>
-                  )}
-                </div>
+                    
+                    {/* Option to upload a different image */}
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        onClick={removeUploadedImage}
+                        className="text-sm text-blue-600 hover:text-blue-800"
+                      >
+                        Upload different image
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Drag and Drop Upload area */}
+                    {uploadingImage ? (
+                      <div className="border-2 border-dashed border-green-300 bg-green-50 rounded-lg p-8">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+                          <p className="mt-3 text-sm text-gray-600">Selecting image...</p>
+                          <p className="text-xs text-gray-500">Please wait while we process your selection</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full">
+                        {/* Single UploadThing Dropzone with improved padding */}
+                        <div className="w-full border-2 border-dashed border-gray-300 rounded-lg py-12 px-8 text-center">
+                          <UploadDropzone
+                            endpoint="imageUploader"
+                            onClientUploadComplete={handleImageUploadComplete}
+                            onUploadError={handleImageUploadError}
+                            onUploadBegin={handleImageUploadBegin}
+                            appearance={{
+                              container: "w-full border-none",
+                              uploadIcon: "text-gray-400 w-16 h-16 mx-auto mb-6",
+                              label: "text-gray-700 text-lg font-medium mb-6 block",
+                              allowedContent: "text-gray-500 text-sm mb-6 block",
+                              button: "bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-lg font-medium transition-colors cursor-pointer mx-auto text-base",
+                            }}
+                            config={{
+                              mode: "manual",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <p className="text-sm text-gray-500 mt-2">
+                  Add an image to make your feed more engaging
+                </p>
               </div>
 
               {/* Video URL */}
@@ -564,39 +625,50 @@ const PostFeeds = () => {
                 <label className="block text-gray-700 font-medium mb-2" htmlFor="video_url">
                   Video URL (Optional)
                 </label>
-                <input
-                  type="url"
-                  id="video_url"
-                  name="video_url"
-                  value={formData.video_url}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="https://www.youtube.com/watch?v=..."
-                />
+                
+                {/* Video thumbnail preview */}
+                {videoThumbnail && (
+                  <div className="mb-3">
+                    <div className="relative inline-block">
+                      <img
+                        src={videoThumbnail}
+                        alt="Video thumbnail"
+                        className="max-w-xs h-40 object-cover rounded-lg border border-gray-300"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg">
+                        <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    id="video_url"
+                    name="video_url"
+                    value={formData.video_url}
+                    onChange={handleInputChange}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="https://www.youtube.com/watch?v=..."
+                  />
+                  {/* {formData.video_url && (
+                    <button
+                      type="button"
+                      onClick={clearImageData}
+                      className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors"
+                    >
+                      Upload
+                    </button>
+                  )} */}
+                </div>
                 <p className="text-sm text-gray-500 mt-1">
-                  Add a YouTube or video URL to embed with your feed
+                  Add a YouTube or video URL to embed with your feed. Uploading will clear any selected image.
                 </p>
               </div>
               
-              {/* Send Notification */}
-              <div className="mb-6">
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="sendNotification"
-                    name="sendNotification"
-                    checked={formData.sendNotification}
-                    onChange={handleInputChange}
-                    className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                  />
-                  <label className="ml-2 text-gray-700" htmlFor="sendNotification">
-                    Send notification to all mosque members
-                  </label>
-                </div>
-                <p className="text-sm text-gray-500 mt-1 ml-6">
-                  Members will receive a push notification about this feed
-                </p>
-              </div>
               
               {/* Submit Button */}
               <div className="flex justify-end">
@@ -611,7 +683,10 @@ const PostFeeds = () => {
                       sendNotification: false,
                       priority: 'normal'
                     });
-                    clearImage();
+                    setUploadedImageUrl('');
+                    setSelectedFile(null);
+                    setVideoThumbnail('');
+                    setUploadingImage(false);
                     setIsEditing(false);
                     if (editId) {
                       navigate('/founder/post-feeds');
@@ -626,15 +701,15 @@ const PostFeeds = () => {
                 <button
                   type="submit"
                   className="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700"
-                  disabled={loading || uploadingImage}
+                  disabled={loading}
                 >
-                  {loading || uploadingImage ? (
+                  {loading ? (
                     <span className="flex items-center">
                       <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      {uploadingImage ? 'Uploading Image...' : (isEditing ? 'Updating...' : 'Publishing...')}
+                      {isEditing ? 'Updating...' : 'Publishing...'}
                     </span>
                   ) : (
                     isEditing ? 'Update Feed' : 'Publish Feed'
@@ -722,6 +797,18 @@ const PostFeeds = () => {
                                 sendNotification: feed.send_notification === 1,
                                 priority: feed.priority || 'normal'
                               });
+                              setUploadedImageUrl(feed.image_url || '');
+                              setSelectedFile(null);
+                              
+                              // Generate video thumbnail if video URL exists
+                              if (feed.video_url) {
+                                const thumbnail = getYouTubeThumbnail(feed.video_url);
+                                setVideoThumbnail(thumbnail);
+                              } else {
+                                setVideoThumbnail('');
+                              }
+                              
+                              setUploadingImage(false);
                               navigate(`/founder/post-feeds?edit=${feed.id}`);
                               setActiveTab('editor');
                             }}

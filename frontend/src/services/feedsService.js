@@ -1,6 +1,28 @@
 import api from "./api";
 
 const feedsService = {
+  // Upload image to UploadThing and get URL
+  uploadImage: async (imageUrl, fileName, fileSize, fileKey) => {
+    try {
+      console.log("📤 Processing uploaded image:", { imageUrl, fileName, fileSize, fileKey });
+      const response = await api.post("/feeds/upload-image", {
+        imageUrl,
+        fileName,
+        fileSize,
+        fileKey,
+      });
+      console.log("📥 Image upload processed:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Image upload processing error:", error);
+      throw (
+        error.response?.data || {
+          message: "An error occurred while processing image upload",
+        }
+      );
+    }
+  },
+
   // Get all feeds
   getAllFeeds: async (params = {}) => {
     try {
@@ -81,27 +103,6 @@ const feedsService = {
       throw (
         error.response?.data || {
           message: "An error occurred while deleting feed",
-        }
-      );
-    }
-  },
-
-  // Upload image to S3
-  uploadImage: async (formData) => {
-    try {
-      console.log("📤 Uploading image to S3");
-      const response = await api.post("/feeds/upload-image", formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      console.log("📥 Image uploaded:", response.data);
-      return response.data;
-    } catch (error) {
-      console.error("❌ Upload image error:", error);
-      throw (
-        error.response?.data || {
-          message: "An error occurred while uploading image",
         }
       );
     }

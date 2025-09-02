@@ -1,34 +1,55 @@
+
+
 const express = require("express");
 const { pool } = require("../config/database");
 const { authenticateToken, authorizeRole } = require("../middleware/auth");
-const { upload, uploadToS3 } = require("../middleware/directS3Upload");
 
 const router = express.Router();
 
-// Upload image to S3 - Updated with direct S3 upload
+// UPLOAD IMAGE endpoint - Handle image upload URL from UploadThing
 router.post(
   "/upload-image",
   authenticateToken,
   authorizeRole(["Founder", "WCM", "SuperAdmin"]),
-  upload.single('image'),
-  uploadToS3,
   async (req, res) => {
     try {
-      // Return the S3 URL for the uploaded image
+      const { imageUrl, fileName, fileSize, fileKey } = req.body;
+      const { user } = req;
+
+      if (!imageUrl) {
+        return res.status(400).json({
+          success: false,
+          message: "Image URL is required",
+        });
+      }
+
+      console.log("📁 Image upload data received:", {
+        userId: user.id,
+        imageUrl,
+        fileName,
+        fileSize,
+        fileKey,
+      });
+
+      // You can optionally store upload metadata in a separate table
+      // For now, we'll just return the URL for the client to use in feed creation
+      
       res.json({
         success: true,
-        message: "Image uploaded successfully",
+        message: "Image URL processed successfully",
         data: {
-          image_url: req.s3Result.location,
-          filename: req.s3Result.key
-        }
+          url: imageUrl,
+          fileName,
+          fileSize,
+          fileKey,
+        },
       });
     } catch (error) {
-      console.error("❌ Error in upload response:", error);
+      console.error("❌ Error processing image upload:", error);
       res.status(500).json({
         success: false,
-        message: "Failed to process upload response",
-        error: error.message
+        message: "Failed to process image upload",
+        error: error.message,
       });
     }
   }

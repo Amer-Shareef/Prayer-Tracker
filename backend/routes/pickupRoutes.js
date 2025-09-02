@@ -4,7 +4,6 @@ const { authenticateToken, authorizeRole } = require("../middleware/auth");
 const { dbHealthCheck } = require("../middleware/dbHealthCheck"); // Added dbHealthCheck middleware
 
 const router = express.Router();
-
 // Get pickup requests for user - COMPLETELY REWRITTEN APPROACH
 router.get(
   "/pickup-requests",
@@ -22,6 +21,7 @@ router.get(
         limit,
         limitType: typeof limit,
         userId: user.id,
+        assignedDriverId: user.assigned_driver_id,
       });
 
       // Build query dynamically WITHOUT using LIMIT in prepared statement
@@ -29,9 +29,9 @@ router.get(
 SELECT pr.*, a.area_name
 FROM pickup_requests pr
 LEFT JOIN areas a ON pr.area_id = a.area_id
-WHERE pr.user_id = ?
+WHERE pr.user_id = ? OR pr.assigned_driver_id = ?
     `;
-      const queryParams = [user.id];
+      const queryParams = [user.id, user.id];
 
       // Add status filter
       if (status) {
@@ -107,6 +107,7 @@ router.post(
         pickup_location,
         contact_number,
         special_instructions,
+        location_coordinates,
         days, // Array of selected days ['monday', 'tuesday', etc.]
         prayers, // Array of selected prayers ['fajr', 'dhuhr', etc.]
       } = req.body;
@@ -182,8 +183,7 @@ router.post(
       if (!areaId) {
         return res.status(400).json({
           success: false,
-          message:
-            "User is not assigned to any area and area_id not provided",
+          message: "User is not assigned to any area and area_id not provided",
         });
       }
 
@@ -191,14 +191,15 @@ router.post(
       const [result] = await pool.execute(
         `INSERT INTO pickup_requests 
        (user_id, area_id, pickup_location, special_instructions, contact_number,
-       days, prayers, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)`,
+        location_coordinates, days, prayers, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)`,
         [
           user.id,
           areaId,
           pickup_location,
           special_instructions || null,
           contact_number || null,
+          location_coordinates ? JSON.stringify(location_coordinates) : null,
           days
             ? JSON.stringify(days.map((d) => d.toLowerCase()))
             : JSON.stringify(["daily"]),
@@ -210,7 +211,7 @@ router.post(
 
       // Log the history (commenting out since pickup_request_history table may not exist)
       // await pool.execute(
-      //   `INSERT INTO pickup_request_history 
+      //   `INSERT INTO pickup_request_history
       //  (pickup_request_id, changed_by, change_type, new_value, notes)
       //  VALUES (?, ?, 'created', ?, 'Request created via mobile app')`,
       //   [
@@ -422,6 +423,7 @@ router.put(
 // Delete/Cancel pickup request - FIXED to actually delete from database
 router.delete(
   "/pickup-requests/:id",
+  authenticateToken,
   dbHealthCheck,
   async (req, res) => {
     try {
@@ -817,8 +819,7 @@ router.get(
 
       // Filter by area for founders and WCMs
       if (user.role === "Founder" || user.role === "WCM") {
-        query +=
-          " AND u.area_id = (SELECT area_id FROM users WHERE id = ?)";
+        query += " AND u.area_id = (SELECT area_id FROM users WHERE id = ?)";
         queryParams.push(user.id);
       } else if (area_id) {
         // SuperAdmin can specify area_id
