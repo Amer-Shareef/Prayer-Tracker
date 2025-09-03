@@ -55,6 +55,57 @@ router.post(
   }
 );
 
+// GET all feeds - No restrictions, returns all feeds
+router.get("/all", authenticateToken, async (req, res) => {
+  try {
+    console.log("📋 Fetching all feeds without restrictions");
+
+    // Pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50; // Higher default limit for admin use
+    const offset = (page - 1) * limit;
+
+    const queryString = `
+      SELECT f.*, 
+             u.username as author_name,
+             u.full_name as author_full_name,
+             a.area_name as area_name
+      FROM feeds f
+      LEFT JOIN users u ON f.author_id = u.id
+      LEFT JOIN areas a ON f.area_id = a.area_id
+      WHERE f.is_active = TRUE
+      ORDER BY f.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const countQuery = "SELECT COUNT(*) as total FROM feeds WHERE is_active = TRUE";
+
+    const [feeds] = await pool.query(queryString, [limit, offset]);
+    const [countResult] = await pool.execute(countQuery);
+
+    const totalFeeds = countResult[0].total;
+    const totalPages = Math.ceil(totalFeeds / limit);
+
+    res.json({
+      success: true,
+      data: feeds,
+      pagination: {
+        total: totalFeeds,
+        page,
+        limit,
+        totalPages,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error fetching all feeds:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch all feeds",
+      error: error.message,
+    });
+  }
+});
+
 // GET all feeds - Area-based version
 router.get("/", authenticateToken, async (req, res) => {
   try {
