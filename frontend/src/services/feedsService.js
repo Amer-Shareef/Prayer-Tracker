@@ -1,6 +1,28 @@
 import api from "./api";
 
 const feedsService = {
+  // Upload image to UploadThing and get URL
+  uploadImage: async (imageUrl, fileName, fileSize, fileKey) => {
+    try {
+      console.log("📤 Processing uploaded image:", { imageUrl, fileName, fileSize, fileKey });
+      const response = await api.post("/feeds/upload-image", {
+        imageUrl,
+        fileName,
+        fileSize,
+        fileKey,
+      });
+      console.log("📥 Image upload processed:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Image upload processing error:", error);
+      throw (
+        error.response?.data || {
+          message: "An error occurred while processing image upload",
+        }
+      );
+    }
+  },
+
   // Get all feeds
   getAllFeeds: async (params = {}) => {
     try {

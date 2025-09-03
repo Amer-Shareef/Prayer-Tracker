@@ -1,8 +1,110 @@
+
+
 const express = require("express");
 const { pool } = require("../config/database");
 const { authenticateToken, authorizeRole } = require("../middleware/auth");
 
 const router = express.Router();
+
+// UPLOAD IMAGE endpoint - Handle image upload URL from UploadThing
+router.post(
+  "/upload-image",
+  authenticateToken,
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
+  async (req, res) => {
+    try {
+      const { imageUrl, fileName, fileSize, fileKey } = req.body;
+      const { user } = req;
+
+      if (!imageUrl) {
+        return res.status(400).json({
+          success: false,
+          message: "Image URL is required",
+        });
+      }
+
+      console.log("📁 Image upload data received:", {
+        userId: user.id,
+        imageUrl,
+        fileName,
+        fileSize,
+        fileKey,
+      });
+
+      // You can optionally store upload metadata in a separate table
+      // For now, we'll just return the URL for the client to use in feed creation
+      
+      res.json({
+        success: true,
+        message: "Image URL processed successfully",
+        data: {
+          url: imageUrl,
+          fileName,
+          fileSize,
+          fileKey,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error processing image upload:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to process image upload",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// GET all feeds - No restrictions, returns all feeds
+router.get("/all", authenticateToken, async (req, res) => {
+  try {
+    console.log("📋 Fetching all feeds without restrictions");
+
+    // Pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50; // Higher default limit for admin use
+    const offset = (page - 1) * limit;
+
+    const queryString = `
+      SELECT f.*, 
+             u.username as author_name,
+             u.full_name as author_full_name,
+             a.area_name as area_name
+      FROM feeds f
+      LEFT JOIN users u ON f.author_id = u.id
+      LEFT JOIN areas a ON f.area_id = a.area_id
+      WHERE f.is_active = TRUE
+      ORDER BY f.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const countQuery = "SELECT COUNT(*) as total FROM feeds WHERE is_active = TRUE";
+
+    const [feeds] = await pool.query(queryString, [limit, offset]);
+    const [countResult] = await pool.execute(countQuery);
+
+    const totalFeeds = countResult[0].total;
+    const totalPages = Math.ceil(totalFeeds / limit);
+
+    res.json({
+      success: true,
+      data: feeds,
+      pagination: {
+        total: totalFeeds,
+        page,
+        limit,
+        totalPages,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error fetching all feeds:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch all feeds",
+      error: error.message,
+    });
+  }
+});
 
 // GET all feeds - Area-based version
 router.get("/", authenticateToken, async (req, res) => {

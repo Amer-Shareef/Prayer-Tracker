@@ -476,6 +476,19 @@ export const memberAPI = {
     const response = await api.delete(`/members/${id}`);
     return response.data;
   },
+  getMemberPrayerStats: async (memberId, params = {}) => {
+    try {
+      console.log(`📊 Fetching prayer statistics for member ${memberId} with params:`, params);
+      const queryParams = new URLSearchParams(params).toString();
+      const url = `/members/${memberId}/prayer-stats${queryParams ? `?${queryParams}` : ""}`;
+      const response = await api.get(url);
+      console.log("✅ Member prayer statistics loaded:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Failed to fetch member prayer statistics:", error);
+      throw error;
+    }
+  },
 };
 
 // Announcement service

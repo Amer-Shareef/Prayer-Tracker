@@ -1,3 +1,6 @@
+const { createRouteHandler } = require("uploadthing/express");
+const { uploadRouter } = require("./middleware/uploadthing");
+
 const dotenv = require("dotenv");
 dotenv.config();
 
@@ -41,6 +44,14 @@ app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
+
+app.use(
+  "/api/uploadthing",
+  createRouteHandler({
+    router: uploadRouter,
+    config: { env: { UPLOADTHING_TOKEN: process.env.UPLOADTHING_TOKEN } },
+  }),
+);
 
 // Import database config
 const { testConnection } = require("./config/database");

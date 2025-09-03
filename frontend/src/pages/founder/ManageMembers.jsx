@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FounderLayout from '../../components/layouts/FounderLayout';
 import { memberAPI, areaService } from '../../services/api';
-import jsPDF from 'jspdf';
+import generateMemberReport from './GeneratePdf';
 
 function ManageMembers() {
   const navigate = useNavigate();
@@ -121,148 +121,6 @@ function ManageMembers() {
       age--;
     }
     return age;
-  };
-
-  // PDF Generation Function
-  const generateMemberPDF = (member) => {
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.width;
-    const pageHeight = doc.internal.pageSize.height;
-    const margin = 20;
-    let yPosition = margin;
-
-    // Header
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Member Information Report', pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 20;
-
-    // Member ID and Date
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Member ID: ${member.memberId || 'N/A'}`, margin, yPosition);
-    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, pageWidth - margin - 50, yPosition);
-    yPosition += 20;
-
-    // Add a line separator
-    doc.setLineWidth(0.5);
-    doc.line(margin, yPosition, pageWidth - margin, yPosition);
-    yPosition += 15;
-
-    // Personal Information Section
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Personal Information', margin, yPosition);
-    yPosition += 10;
-
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    
-    const personalInfo = [
-      ['Member Name:', member.fullName || 'N/A'],
-      ['Username:', member.username || 'N/A'],
-      ['Age:', calculateAge(member.dateOfBirth).toString()],
-      ['Date of Birth:', member.dateOfBirth ? new Date(member.dateOfBirth).toLocaleDateString() : 'N/A'],
-      ['Email:', member.email || 'N/A'],
-      ['Phone Number:', member.phone || 'N/A'],
-      ['Address:', member.address || 'N/A'],
-      ['Area:', member.area || 'N/A'],
-      ['Mobility:', member.mobility || 'N/A']
-    ];
-
-    personalInfo.forEach(([label, value]) => {
-      doc.setFont('helvetica', 'bold');
-      doc.text(label, margin, yPosition);
-      doc.setFont('helvetica', 'normal');
-      // Handle long text wrapping
-      const textLines = doc.splitTextToSize(value, pageWidth - margin - 80);
-      doc.text(textLines, margin + 70, yPosition);
-      yPosition += Math.max(10, textLines.length * 5);
-    });
-
-    yPosition += 10;
-
-    // Account Information Section
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Account Information', margin, yPosition);
-    yPosition += 10;
-
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    
-    const accountInfo = [
-      ['Role:', member.role === 'Member' ? 'Member' :
-               member.role === 'WCM' ? 'Working Committee Member' :
-               member.role === 'Founder' ? 'Working Committee Admin' :
-               member.role === 'SuperAdmin' ? 'Super Admin' :
-               (member.role || 'N/A')],
-      ['Status:', member.status ? member.status.charAt(0).toUpperCase() + member.status.slice(1) : 'N/A'],
-      ['Joined Date:', member.joined_date ? new Date(member.joined_date).toLocaleDateString() : 'N/A']
-    ];
-
-    accountInfo.forEach(([label, value]) => {
-      doc.setFont('helvetica', 'bold');
-      doc.text(label, margin, yPosition);
-      doc.setFont('helvetica', 'normal');
-      doc.text(value, margin + 70, yPosition);
-      yPosition += 10;
-    });
-
-    yPosition += 10;
-
-    // Additional Information Section
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Additional Information', margin, yPosition);
-    yPosition += 10;
-
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    
-    const additionalInfo = [
-      ['Living on Rent:', member.onRent ? 'Yes' : 'No'],
-      ['Zakath Eligible:', member.zakathEligible ? 'Yes' : 'No'],
-      ['Differently Abled:', member.differentlyAbled ? 'Yes' : 'No'],
-      ['Muallafathil Quloob (New Convert):', member.MuallafathilQuloob ? 'Yes' : 'No']
-    ];
-
-    additionalInfo.forEach(([label, value]) => {
-      doc.setFont('helvetica', 'bold');
-      doc.text(label, margin, yPosition);
-      doc.setFont('helvetica', 'normal');
-      doc.text(value, margin + 70, yPosition);
-      yPosition += 10;
-    });
-
-    yPosition += 10;
-
-    // Prayer Statistics Section
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Prayer Statistics (Last 30 Days)', margin, yPosition);
-    yPosition += 10;
-
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    
-    const prayerStats = [
-      ['Prayer Attendance Rate:', `${member.attendance_rate || 0}%`],
-      ['Prayers Completed:', `${member.prayed_count || 0} out of ${member.total_prayers || 0}`],
-    ];
-
-    prayerStats.forEach(([label, value]) => {
-      doc.setFont('helvetica', 'bold');
-      doc.text(label, margin, yPosition);
-      doc.setFont('helvetica', 'normal');
-      doc.text(value, margin + 70, yPosition);
-      yPosition += 10;
-    });
-
-
-    // Save the PDF
-    const fileName = `Member_Report_${member.username || member.memberId || 'Unknown'}_${new Date().toISOString().split('T')[0]}.pdf`;
-    doc.save(fileName);
   };
 
   // Helper function to format checked attributes as badges
@@ -596,7 +454,7 @@ function ManageMembers() {
                             {/* Download PDF Report Button */}
                             <button 
                               className="text-green-600 hover:text-green-900"
-                              onClick={() => generateMemberPDF(member)}
+                                                                onClick={() => generateMemberReport(member)}
                               title="Download PDF Report"
                             >
                               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
