@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import FounderLayout from '../../components/layouts/FounderLayout';
 import feedsService from '../../services/feedsService';
-import { UploadButton, UploadDropzone } from '../../utils/uploadthing';
+import { UploadButton, UploadDropzone, uploadFiles } from '../../utils/uploadthing';
 
 const PostFeeds = () => {
   const location = useLocation();
@@ -32,6 +32,7 @@ const PostFeeds = () => {
   const [uploadedImageUrl, setUploadedImageUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [videoThumbnail, setVideoThumbnail] = useState('');
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
 
   // Helper function to extract YouTube video ID and generate thumbnail
   const getYouTubeThumbnail = (url) => {
@@ -47,6 +48,7 @@ const PostFeeds = () => {
   const clearImageData = () => {
     setUploadedImageUrl('');
     setSelectedFile(null);
+    setSelectedImageFile(null);
     setFormData(prev => ({
       ...prev,
       image_url: ''
@@ -62,12 +64,38 @@ const PostFeeds = () => {
     }));
   };
 
+  // Handle image file selection (preview only)
+  const handleImageFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Show alert if video URL exists
+      if (formData.video_url.trim()) {
+        const confirmed = window.confirm(
+          "You have a video URL entered. Selecting an image will remove the video URL. Do you want to continue?"
+        );
+        if (!confirmed) {
+          e.target.value = ''; // Clear the file input
+          return;
+        }
+      }
+      
+      // Clear video data
+      clearVideoData();
+      
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setSelectedImageFile(file);
+      setUploadedImageUrl(previewUrl);
+    }
+  };
+
   // Fetch feeds from API
   const fetchFeeds = async () => {
     try {
       setLoading(true);
       setApiError('');
       
+      // Use getAllFeeds which calls the /all endpoint (no 10-item limit)
       const response = await feedsService.getAllFeeds();
       if (response.success) {
         setFeeds(response.data);
@@ -155,6 +183,16 @@ const PostFeeds = () => {
     const { name, value, type, checked } = e.target;
     
     if (name === 'video_url') {
+      // Show alert if image is selected
+      if (value.trim() && (uploadedImageUrl || selectedImageFile)) {
+        const confirmed = window.confirm(
+          "You have an image selected. Entering a video URL will remove the selected image. Do you want to continue?"
+        );
+        if (!confirmed) {
+          return;
+        }
+      }
+      
       // Clear image data when video URL is entered
       if (value.trim()) {
         clearImageData();
@@ -172,55 +210,28 @@ const PostFeeds = () => {
     }));
   };
 
-  // Handle image upload completion
-  const handleImageUploadComplete = async (res) => {
-    try {
-      console.log("🔄 File selected:", res);
-      setUploadingImage(false);
-      
-      if (res && res.length > 0) {
-        const selectedFileInfo = res[0];
-        console.log("✅ File selected successfully:", selectedFileInfo);
-        
-        // Clear video data when image is selected
-        clearVideoData();
-        
-        // Store file locally until publish
-        setSelectedFile(selectedFileInfo);
-        setUploadedImageUrl(selectedFileInfo.url);
-        
-        setSuccessMessage("Image selected successfully! It will be uploaded when you publish the feed.");
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
-      } else {
-        console.warn("⚠️ No files selected:", res);
-      }
-    } catch (error) {
-      console.error("❌ Error selecting image:", error);
-      setApiError("Failed to select image: " + error.message);
-      setUploadingImage(false);
-    }
-  };
-
-
-  // Handle image upload error
-  const handleImageUploadError = (error) => {
-    console.error("❌ Image upload error:", error);
-    setApiError("Image upload failed: " + (error?.message || error || "Unknown error"));
-    setUploadingImage(false);
-  };
-
-  // Handle image upload begin
-  const handleImageUploadBegin = () => {
-    console.log("📤 Starting image upload...");
-    console.log("� Backend URL:", process.env.REACT_APP_BACKEND_URL || "http://localhost:5000");
-    setUploadingImage(true);
-    setApiError('');
-  };
-
   // Remove uploaded image
   const removeUploadedImage = () => {
     clearImageData();
+    // Clear the file input if it exists
+    const fileInput = document.getElementById('imageFileInput');
+    if (fileInput) {
+      fileInput.value = '';
+    }
+  };
+
+  // Generate filename with ddmmyy_timestamp format
+  const generateFileName = (originalFile) => {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    const timestamp = now.getTime();
+    
+    // Get file extension
+    const extension = originalFile.name.split('.').pop() || 'png';
+    
+    return `${day}${month}${year}_${timestamp}.${extension}`;
   };
   
   // Handle form submission
@@ -237,29 +248,44 @@ const PostFeeds = () => {
     try {
       let imageUrl = formData.image_url;
       
-      // Upload selected file to UploadThing if there's one
-      if (selectedFile && !imageUrl) {
-        console.log("📤 Uploading selected file to UploadThing...");
+      // Upload selected image file to UploadThing if there's one
+      if (selectedImageFile && !imageUrl) {
+        console.log("📤 Uploading selected image to UploadThing...");
+        setUploadingImage(true);
+        
         try {
-          // Process the uploaded image URL through our backend
-          const uploadResponse = await feedsService.uploadImage(
-            selectedFile.url,
-            selectedFile.name,
-            selectedFile.size,
-            selectedFile.key
-          );
+          // Generate new filename
+          const newFileName = generateFileName(selectedImageFile);
           
-          if (uploadResponse.success) {
-            imageUrl = selectedFile.url;
-            console.log("✅ File uploaded successfully");
+          // Create a new file with the new name
+          const renamedFile = new File([selectedImageFile], newFileName, {
+            type: selectedImageFile.type,
+          });
+          
+          console.log("📤 Uploading file:", newFileName);
+          
+          // Use the proper UploadThing helper function
+          const uploadResult = await uploadFiles("imageUploader", {
+            files: [renamedFile],
+          });
+          
+          console.log("📤 UploadThing result:", uploadResult);
+          
+          if (uploadResult && uploadResult.length > 0 && uploadResult[0].url) {
+            imageUrl = uploadResult[0].url;
+            console.log("✅ File uploaded successfully with new name:", newFileName);
+            console.log("✅ Upload URL:", imageUrl);
           } else {
-            throw new Error(uploadResponse.message || "Failed to process uploaded image");
+            throw new Error('Upload failed: No URL returned');
           }
         } catch (uploadError) {
           console.error("❌ Upload failed:", uploadError);
           setApiError("Failed to upload image: " + uploadError.message);
           setLoading(false);
+          setUploadingImage(false);
           return;
+        } finally {
+          setUploadingImage(false);
         }
       }
       
@@ -298,8 +324,15 @@ const PostFeeds = () => {
         // Reset upload states
         setUploadedImageUrl('');
         setSelectedFile(null);
+        setSelectedImageFile(null);
         setVideoThumbnail('');
         setUploadingImage(false);
+        
+        // Clear file input
+        const fileInput = document.getElementById('imageFileInput');
+        if (fileInput) {
+          fileInput.value = '';
+        }
         
         setIsEditing(false);
         setSuccess(true);
@@ -352,8 +385,16 @@ const PostFeeds = () => {
             });
             setUploadedImageUrl('');
             setSelectedFile(null);
+            setSelectedImageFile(null);
             setVideoThumbnail('');
             setUploadingImage(false);
+            
+            // Clear file input
+            const fileInput = document.getElementById('imageFileInput');
+            if (fileInput) {
+              fileInput.value = '';
+            }
+            
             setIsEditing(false);
             navigate('/founder/post-feeds');
           }
@@ -580,43 +621,40 @@ const PostFeeds = () => {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {/* Drag and Drop Upload area */}
-                    {uploadingImage ? (
-                      <div className="border-2 border-dashed border-green-300 bg-green-50 rounded-lg p-8">
-                        <div className="text-center">
-                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-                          <p className="mt-3 text-sm text-gray-600">Selecting image...</p>
-                          <p className="text-xs text-gray-500">Please wait while we process your selection</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="w-full">
-                        {/* Single UploadThing Dropzone with improved padding */}
-                        <div className="w-full border-2 border-dashed border-gray-300 rounded-lg py-12 px-8 text-center">
-                          <UploadDropzone
-                            endpoint="imageUploader"
-                            onClientUploadComplete={handleImageUploadComplete}
-                            onUploadError={handleImageUploadError}
-                            onUploadBegin={handleImageUploadBegin}
-                            appearance={{
-                              container: "w-full border-none",
-                              uploadIcon: "text-gray-400 w-16 h-16 mx-auto mb-6",
-                              label: "text-gray-700 text-lg font-medium mb-6 block",
-                              allowedContent: "text-gray-500 text-sm mb-6 block",
-                              button: "bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-lg font-medium transition-colors cursor-pointer mx-auto text-base",
-                            }}
-                            config={{
-                              mode: "manual",
-                            }}
+                    {/* File Input for Image Selection (Preview Only) */}
+                    <div className="w-full border-2 border-dashed border-gray-300 rounded-lg py-12 px-8 text-center">
+                      <div className="space-y-4">
+                        <svg className="w-16 h-16 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <div>
+                          <label htmlFor="imageFileInput" className="text-gray-700 text-lg font-medium block mb-2">
+                            Choose Image File
+                          </label>
+                          <p className="text-gray-500 text-sm mb-4">Select an image to preview (will upload when you publish)</p>
+                          <input
+                            id="imageFileInput"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageFileSelect}
+                            disabled={uploadingImage || loading}
+                            className="block w-full text-sm text-gray-500
+                              file:mr-4 file:py-3 file:px-6
+                              file:rounded-lg file:border-0
+                              file:text-sm file:font-medium
+                              file:bg-green-500 file:text-white
+                              hover:file:bg-green-600
+                              file:cursor-pointer cursor-pointer
+                              disabled:opacity-50 disabled:cursor-not-allowed"
                           />
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
                 
                 <p className="text-sm text-gray-500 mt-2">
-                  Add an image to make your feed more engaging
+                  Select an image to preview. It will be uploaded when you publish the feed with filename format: ddmmyy_timestamp.extension
                 </p>
               </div>
 
@@ -685,8 +723,16 @@ const PostFeeds = () => {
                     });
                     setUploadedImageUrl('');
                     setSelectedFile(null);
+                    setSelectedImageFile(null);
                     setVideoThumbnail('');
                     setUploadingImage(false);
+                    
+                    // Clear file input
+                    const fileInput = document.getElementById('imageFileInput');
+                    if (fileInput) {
+                      fileInput.value = '';
+                    }
+                    
                     setIsEditing(false);
                     if (editId) {
                       navigate('/founder/post-feeds');
@@ -700,16 +746,16 @@ const PostFeeds = () => {
                 
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700"
-                  disabled={loading}
+                  className="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading || uploadingImage}
                 >
-                  {loading ? (
+                  {loading || uploadingImage ? (
                     <span className="flex items-center">
                       <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      {isEditing ? 'Updating...' : 'Publishing...'}
+                      {uploadingImage ? 'Uploading Image...' : (isEditing ? 'Updating...' : 'Publishing...')}
                     </span>
                   ) : (
                     isEditing ? 'Update Feed' : 'Publish Feed'
@@ -799,6 +845,13 @@ const PostFeeds = () => {
                               });
                               setUploadedImageUrl(feed.image_url || '');
                               setSelectedFile(null);
+                              setSelectedImageFile(null);
+                              
+                              // Clear file input
+                              const fileInput = document.getElementById('imageFileInput');
+                              if (fileInput) {
+                                fileInput.value = '';
+                              }
                               
                               // Generate video thumbnail if video URL exists
                               if (feed.video_url) {

@@ -23,8 +23,25 @@ const feedsService = {
     }
   },
 
-  // Get all feeds
+  // Get all feeds (unlimited - uses /all endpoint)
   getAllFeeds: async (params = {}) => {
+    try {
+      console.log("📤 Fetching all feeds with params:", params);
+      const response = await api.get("/feeds/all", { params });
+      console.log("📥 All feeds received:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Get all feeds error:", error);
+      throw (
+        error.response?.data || {
+          message: "An error occurred while fetching all feeds",
+        }
+      );
+    }
+  },
+
+  // Get feeds (area-based with pagination)
+  getFeeds: async (params = {}) => {
     try {
       console.log("📤 Fetching feeds with params:", params);
       const response = await api.get("/feeds", { params });

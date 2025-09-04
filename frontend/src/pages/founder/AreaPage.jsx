@@ -1,44 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import FounderLayout from '../../components/layouts/FounderLayout';
 import { useAuth } from '../../context/AuthContext';
+import { areaService } from '../../services/areaService';
 
 const AreaPage = () => {
   const { user } = useAuth();
   const [areas, setAreas] = useState([]);
+  const [subAreas, setSubAreas] = useState({});
+  const [expandedAreas, setExpandedAreas] = useState(new Set());
   const [loading, setLoading] = useState(false);
+  const [subAreaLoading, setSubAreaLoading] = useState({});
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showSubAreaModal, setShowSubAreaModal] = useState(false);
+  const [showEditSubAreaModal, setShowEditSubAreaModal] = useState(false);
   const [editingArea, setEditingArea] = useState(null);
+  const [editingSubArea, setEditingSubArea] = useState(null);
+  const [currentAreaId, setCurrentAreaId] = useState(null);
   const [formData, setFormData] = useState({
     area_name: '',
     address: '',
-    description: '',
-    longitude: '',
-    latitude: ''
+    description: ''
+  });
+  const [subAreaFormData, setSubAreaFormData] = useState({
+    address: ''
   });
 
   // Fetch areas from API
   useEffect(() => {
+    // Debug: Check authentication
+    const token = localStorage.getItem('token');
+    console.log('🔍 Debug - Token:', token ? 'Present' : 'Missing');
+    console.log('🔍 Debug - User:', user);
+    
     fetchAreas();
   }, []);
 
   const fetchAreas = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/areas`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setAreas(data.data || []);
-      } else {
-        console.error('Failed to fetch areas');
-      }
+      const response = await areaService.getAllAreas();
+      setAreas(response.data || []);
     } catch (error) {
       console.error('Error fetching areas:', error);
     } finally {
@@ -46,56 +48,59 @@ const AreaPage = () => {
     }
   };
 
+  const fetchSubAreas = async (areaId) => {
+    setSubAreaLoading(prev => ({ ...prev, [areaId]: true }));
+    try {
+      const response = await areaService.getSubAreas(areaId);
+      setSubAreas(prev => ({
+        ...prev,
+        [areaId]: response.data.subAreas || []
+      }));
+    } catch (error) {
+      console.error('Error fetching sub-areas:', error);
+    } finally {
+      setSubAreaLoading(prev => ({ ...prev, [areaId]: false }));
+    }
+  };
+
+  const toggleAreaExpansion = async (areaId) => {
+    const newExpanded = new Set(expandedAreas);
+    
+    if (expandedAreas.has(areaId)) {
+      newExpanded.delete(areaId);
+    } else {
+      newExpanded.add(areaId);
+      // Fetch sub-areas if not already loaded
+      if (!subAreas[areaId]) {
+        await fetchSubAreas(areaId);
+      }
+    }
+    
+    setExpandedAreas(newExpanded);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     try {
-      const token = localStorage.getItem('token');
-      
-      // Combine longitude and latitude into coordinates for backend
-      const coordinates = formData.longitude && formData.latitude 
-        ? `${formData.latitude}, ${formData.longitude}` 
-        : '';
-      
       const submissionData = {
         area_name: formData.area_name,
         address: formData.address,
-        description: formData.description,
-        coordinates: coordinates
+        description: formData.description
       };
       
       if (editingArea) {
         // Update existing area
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/areas/${editingArea.area_id || editingArea.id}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(submissionData)
-        });
-
-        if (response.ok) {
-          await fetchAreas(); // Refresh the list
-          setShowEditModal(false);
-          setEditingArea(null);
-        }
+        await areaService.updateArea(editingArea.area_id || editingArea.id, submissionData);
+        setShowEditModal(false);
+        setEditingArea(null);
       } else {
         // Add new area
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/areas`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(submissionData)
-        });
-
-        if (response.ok) {
-          await fetchAreas(); // Refresh the list
-          setShowAddModal(false);
-        }
+        await areaService.createArea(submissionData);
+        setShowAddModal(false);
       }
+      
+      await fetchAreas(); // Refresh the list
     } catch (error) {
       console.error('Error saving area:', error);
     }
@@ -104,31 +109,47 @@ const AreaPage = () => {
     setFormData({
       area_name: '',
       address: '',
-      description: '',
-      longitude: '',
-      latitude: ''
+      description: ''
     });
   };
 
-  const handleEdit = (area) => {
-    // Parse coordinates back to longitude and latitude
-    let longitude = '';
-    let latitude = '';
+  const handleSubAreaSubmit = async (e) => {
+    e.preventDefault();
     
-    if (area.coordinates) {
-      const coordsArray = area.coordinates.split(',').map(coord => coord.trim());
-      if (coordsArray.length === 2) {
-        latitude = coordsArray[0];
-        longitude = coordsArray[1];
+    // Debug: Check authentication before making request
+    const token = localStorage.getItem('token');
+    console.log('🔍 Debug - Creating sub-area with token:', token ? 'Present' : 'Missing');
+    console.log('🔍 Debug - Current area ID:', currentAreaId);
+    console.log('🔍 Debug - Address:', subAreaFormData.address);
+    
+    try {
+      if (editingSubArea) {
+        // Update existing sub-area
+        await areaService.updateSubArea(currentAreaId, editingSubArea.id, subAreaFormData.address);
+        setShowEditSubAreaModal(false);
+        setEditingSubArea(null);
+      } else {
+        // Create new sub-area
+        await areaService.createSubArea(currentAreaId, subAreaFormData.address);
+        setShowSubAreaModal(false);
       }
+      
+      // Refresh sub-areas for this area
+      await fetchSubAreas(currentAreaId);
+      
+      // Reset form
+      setSubAreaFormData({ address: '' });
+      setCurrentAreaId(null);
+    } catch (error) {
+      console.error('Error saving sub-area:', error);
     }
-    
+  };
+
+  const handleEdit = (area) => {
     setFormData({
       area_name: area.area_name || area.name || '',
       address: area.address || '',
-      description: area.description || '',
-      longitude: longitude,
-      latitude: latitude
+      description: area.description || ''
     });
     setEditingArea(area);
     setShowEditModal(true);
@@ -137,35 +158,37 @@ const AreaPage = () => {
   const handleDelete = async (area) => {
     if (window.confirm('Are you sure you want to delete this area?')) {
       try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/areas/${area.area_id || area.id}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (response.ok) {
-          await fetchAreas(); // Refresh the list
-        }
+        await areaService.deleteArea(area.area_id || area.id);
+        await fetchAreas(); // Refresh the list
       } catch (error) {
         console.error('Error deleting area:', error);
       }
     }
   };
 
-  const getStatusBadge = (status) => {
-    const colors = {
-      'active': 'bg-green-100 text-green-800',
-      'inactive': 'bg-red-100 text-red-800'
-    };
-    
-    return (
-      <span className={`px-2 py-1 ${colors[status]} text-xs rounded-full`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </span>
-    );
+  const handleDeleteSubArea = async (areaId, subAreaId) => {
+    if (window.confirm('Are you sure you want to delete this sub-area?')) {
+      try {
+        await areaService.deleteSubArea(areaId, subAreaId);
+        await fetchSubAreas(areaId); // Refresh sub-areas
+      } catch (error) {
+        console.error('Error deleting sub-area:', error);
+      }
+    }
+  };
+
+  const handleEditSubArea = (areaId, subArea) => {
+    setCurrentAreaId(areaId);
+    setEditingSubArea(subArea);
+    setSubAreaFormData({ address: subArea.address });
+    setShowEditSubAreaModal(true);
+  };
+
+  const openAddSubAreaModal = (areaId) => {
+    setCurrentAreaId(areaId);
+    setSubAreaFormData({ address: '' });
+    setEditingSubArea(null);
+    setShowSubAreaModal(true);
   };
 
   // Only show to SuperAdmin users
@@ -223,46 +246,110 @@ const AreaPage = () => {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Area</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Expand</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {areas.map((area) => (
-                    <tr key={area.area_id || area.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {area.area_name || area.name || 'N/A'}
+                    <React.Fragment key={area.area_id || area.id}>
+                      {/* Main Area Row */}
+                      <tr className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {area.area_name || area.name || 'N/A'}
+                            </div>
+                            <div className="text-sm text-gray-500">{area.description}</div>
                           </div>
-                          <div className="text-sm text-gray-500">{area.description}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {area.address || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {area.coordinates || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge('active')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => handleEdit(area)}
-                          className="text-purple-600 hover:text-purple-900 mr-3"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(area)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {area.address || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <button
+                            onClick={() => handleEdit(area)}
+                            className="text-purple-600 hover:text-purple-900 mr-3"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(area)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <button
+                            onClick={() => toggleAreaExpansion(area.area_id || area.id)}
+                            className="text-gray-400 hover:text-gray-600 transition-transform duration-200"
+                            style={{
+                              transform: expandedAreas.has(area.area_id || area.id) ? 'rotate(180deg)' : 'rotate(0deg)'
+                            }}
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        </td>
+                      </tr>
+
+                      {/* Sub-areas Section */}
+                      {expandedAreas.has(area.area_id || area.id) && (
+                        <tr>
+                          <td colSpan="4" className="px-6 py-4 bg-gray-50">
+                            <div className="ml-8">
+                              <h4 className="text-sm font-medium text-gray-700 mb-3">Sub-areas</h4>
+                              
+                              {subAreaLoading[area.area_id || area.id] ? (
+                                <div className="flex justify-center py-4">
+                                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+                                </div>
+                              ) : (
+                                <>
+                                  {subAreas[area.area_id || area.id]?.length > 0 ? (
+                                    <div className="space-y-2 mb-3">
+                                      {subAreas[area.area_id || area.id].map((subArea) => (
+                                        <div
+                                          key={subArea.id}
+                                          className="flex justify-between items-center bg-white p-3 rounded border"
+                                        >
+                                          <span className="text-sm text-gray-700">{subArea.address}</span>
+                                          <div className="flex space-x-2">
+                                            <button
+                                              onClick={() => handleEditSubArea(area.area_id || area.id, subArea)}
+                                              className="text-purple-600 hover:text-purple-900 text-xs"
+                                            >
+                                              Edit
+                                            </button>
+                                            <button
+                                              onClick={() => handleDeleteSubArea(area.area_id || area.id, subArea.id)}
+                                              className="text-red-600 hover:text-red-900 text-xs"
+                                            >
+                                              Delete
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-gray-500 mb-3">No sub-areas found</p>
+                                  )}
+                                  
+                                  <button
+                                    onClick={() => openAddSubAreaModal(area.area_id || area.id)}
+                                    className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                                  >
+                                    + Add Sub Area
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
@@ -270,7 +357,7 @@ const AreaPage = () => {
           </div>
         )}
 
-        {/* Add/Edit Modal */}
+        {/* Add/Edit Area Modal */}
         {(showAddModal || showEditModal) && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
             <div className="bg-white rounded-lg p-6 max-w-md w-full">
@@ -318,32 +405,6 @@ const AreaPage = () => {
                   />
                 </div>
 
-                <div className="mb-4">
-                  <label className="block text-gray-700 font-medium mb-2">
-                    Latitude
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.latitude}
-                    onChange={(e) => setFormData({...formData, latitude: e.target.value})}
-                    className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    placeholder="e.g., 6.9271"
-                  />
-                </div>
-
-                <div className="mb-4">
-                  <label className="block text-gray-700 font-medium mb-2">
-                    Longitude
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.longitude}
-                    onChange={(e) => setFormData({...formData, longitude: e.target.value})}
-                    className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    placeholder="e.g., 79.8612"
-                  />
-                </div>
-
                 <div className="flex gap-3 justify-end">
                   <button
                     type="button"
@@ -354,9 +415,7 @@ const AreaPage = () => {
                       setFormData({
                         area_name: '',
                         address: '',
-                        description: '',
-                        longitude: '',
-                        latitude: ''
+                        description: ''
                       });
                     }}
                     className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
@@ -368,6 +427,97 @@ const AreaPage = () => {
                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                   >
                     {editingArea ? 'Update' : 'Create'} Area
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Add Sub-Area Modal */}
+        {showSubAreaModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-lg font-bold mb-4">Add New Sub-Area</h3>
+              
+              <form onSubmit={handleSubAreaSubmit}>
+                <div className="mb-4">
+                  <label className="block text-gray-700 font-medium mb-2">
+                    Sub-Area Address
+                  </label>
+                  <textarea
+                    value={subAreaFormData.address}
+                    onChange={(e) => setSubAreaFormData({address: e.target.value})}
+                    className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows="3"
+                    placeholder="Enter the address of the sub-area"
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSubAreaModal(false);
+                      setCurrentAreaId(null);
+                      setSubAreaFormData({ address: '' });
+                    }}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    Add Sub-Area
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Sub-Area Modal */}
+        {showEditSubAreaModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-lg font-bold mb-4">Edit Sub-Area</h3>
+              
+              <form onSubmit={handleSubAreaSubmit}>
+                <div className="mb-4">
+                  <label className="block text-gray-700 font-medium mb-2">
+                    Sub-Area Address
+                  </label>
+                  <textarea
+                    value={subAreaFormData.address}
+                    onChange={(e) => setSubAreaFormData({address: e.target.value})}
+                    className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    rows="3"
+                    placeholder="Enter the address of the sub-area"
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEditSubAreaModal(false);
+                      setCurrentAreaId(null);
+                      setEditingSubArea(null);
+                      setSubAreaFormData({ address: '' });
+                    }}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                  >
+                    Update Sub-Area
                   </button>
                 </div>
               </form>
