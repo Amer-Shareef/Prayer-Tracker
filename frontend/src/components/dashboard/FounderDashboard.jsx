@@ -63,6 +63,37 @@ const FounderDashboard = () => {
   
   // Fetch area data and attendance statistics
   useEffect(() => {
+  const today = new Date();
+
+  // Gregorian date
+  const gregorianDate = today.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  });
+
+  // Hijri date (using built-in Intl API)
+  let hijriDate;
+  try {
+    hijriDate = new Intl.DateTimeFormat("en-TN-u-ca-islamic", {
+      year: "numeric",
+      month: "long",
+      day: "numeric"
+    }).format(today);
+  } catch (error) {
+    console.warn("Hijri date not supported in this browser.");
+    hijriDate = "Hijri date not supported";
+  }
+
+  setCurrentDate({
+    gregorian: gregorianDate,
+    hijri: hijriDate
+  });
+
+
+
+    
     const fetchAreaData = async () => {
       setLoadingAreaData(true);
       setAttendanceError(null);

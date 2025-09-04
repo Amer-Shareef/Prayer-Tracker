@@ -29,6 +29,334 @@ router.get("/areas", async (req, res) => {
   }
 });
 
+// GET /api/areas/subareas - Get all sub-areas for a specific area (all authenticated users, area_id in query)
+router.get("/areas/subareas", authenticateToken, async (req, res) => {
+  try {
+    const { area_id } = req.query;
+
+    console.log(`📋 Fetching sub-areas for area ID: ${area_id}`);
+
+    // Validation
+    if (!area_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Area ID is required as query parameter",
+      });
+    }
+
+    // Check if area exists
+    const [areaExists] = await pool.execute(
+      "SELECT area_id, area_name FROM areas WHERE area_id = ?",
+      [area_id]
+    );
+
+    if (areaExists.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Area not found",
+      });
+    }
+
+    // Get all sub-areas for this area
+    const [subAreas] = await pool.execute(
+      "SELECT * FROM sub_areas WHERE area_id = ? ORDER BY created_at ASC",
+      [area_id]
+    );
+
+    console.log(`✅ Found ${subAreas.length} sub-areas for area: ${areaExists[0].area_name}`);
+
+    res.json({
+      success: true,
+      data: {
+        area: areaExists[0],
+        subAreas: subAreas,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error fetching sub-areas:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch sub-areas",
+      error: error.message,
+    });
+  }
+});
+
+// POST /api/areas/subareas - Create new sub-area (SuperAdmin only, area_id in body)
+router.post(
+  "/areas/subareas",
+  authenticateToken,
+  authorizeRole(["SuperAdmin"]),
+  async (req, res) => {
+    try {
+      const { area_id, address } = req.body;
+
+      console.log(`➕ Creating new sub-area for area ID: ${area_id}`, {
+        address,
+      });
+
+      // Validation
+      if (!area_id) {
+        return res.status(400).json({
+          success: false,
+          message: "Area ID is required",
+        });
+      }
+
+      if (!address || !address.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Address is required",
+        });
+      }
+
+      // Check if area exists
+      const [areaExists] = await pool.execute(
+        "SELECT area_id, area_name FROM areas WHERE area_id = ?",
+        [area_id]
+      );
+
+      if (areaExists.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Area not found",
+        });
+      }
+
+      // Check if sub-area with same address already exists in this area
+      const [existing] = await pool.execute(
+        "SELECT id FROM sub_areas WHERE area_id = ? AND address = ?",
+        [area_id, address.trim()]
+      );
+
+      if (existing.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Sub-area with this address already exists in this area",
+        });
+      }
+
+      // Insert new sub-area
+      const [result] = await pool.execute(
+        "INSERT INTO sub_areas (area_id, address, created_at, updated_at) VALUES (?, ?, NOW(), NOW())",
+        [area_id, address.trim()]
+      );
+
+      // Fetch the created sub-area
+      const [newSubArea] = await pool.execute(
+        "SELECT * FROM sub_areas WHERE id = ?",
+        [result.insertId]
+      );
+
+      console.log(`✅ Sub-area created successfully with ID: ${result.insertId} for area: ${areaExists[0].area_name}`);
+
+      res.status(201).json({
+        success: true,
+        message: "Sub-area created successfully",
+        data: {
+          area: areaExists[0],
+          subArea: newSubArea[0],
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error creating sub-area:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to create sub-area",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// PUT /api/areas/subareas - Update existing sub-area (SuperAdmin only, area_id and subarea_id in body)
+router.put(
+  "/areas/subareas",
+  authenticateToken,
+  authorizeRole(["SuperAdmin"]),
+  async (req, res) => {
+    try {
+      const { area_id, subarea_id, address } = req.body;
+
+      console.log(`✏️ Updating sub-area ID: ${subarea_id} in area ID: ${area_id}`, {
+        address,
+      });
+
+      // Validation
+      if (!area_id) {
+        return res.status(400).json({
+          success: false,
+          message: "Area ID is required",
+        });
+      }
+
+      if (!subarea_id) {
+        return res.status(400).json({
+          success: false,
+          message: "Sub-area ID is required",
+        });
+      }
+
+      if (!address || !address.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Address is required",
+        });
+      }
+
+      // Check if area exists
+      const [areaExists] = await pool.execute(
+        "SELECT area_id, area_name FROM areas WHERE area_id = ?",
+        [area_id]
+      );
+
+      if (areaExists.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Area not found",
+        });
+      }
+
+      // Check if sub-area exists and belongs to the specified area
+      const [existing] = await pool.execute(
+        "SELECT id FROM sub_areas WHERE id = ? AND area_id = ?",
+        [subarea_id, area_id]
+      );
+
+      if (existing.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Sub-area not found in this area",
+        });
+      }
+
+      // Check if another sub-area with same address already exists in this area (excluding current sub-area)
+      const [duplicateCheck] = await pool.execute(
+        "SELECT id FROM sub_areas WHERE area_id = ? AND address = ? AND id != ?",
+        [area_id, address.trim(), subarea_id]
+      );
+
+      if (duplicateCheck.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Sub-area with this address already exists in this area",
+        });
+      }
+
+      // Update sub-area
+      await pool.execute(
+        "UPDATE sub_areas SET address = ?, updated_at = NOW() WHERE id = ? AND area_id = ?",
+        [address.trim(), subarea_id, area_id]
+      );
+
+      // Fetch the updated sub-area
+      const [updatedSubArea] = await pool.execute(
+        "SELECT * FROM sub_areas WHERE id = ?",
+        [subarea_id]
+      );
+
+      console.log(`✅ Sub-area updated successfully: ID ${subarea_id} in area: ${areaExists[0].area_name}`);
+
+      res.json({
+        success: true,
+        message: "Sub-area updated successfully",
+        data: {
+          area: areaExists[0],
+          subArea: updatedSubArea[0],
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error updating sub-area:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to update sub-area",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// DELETE /api/areas/subareas - Delete sub-area (SuperAdmin only, area_id and subarea_id in body)
+router.delete(
+  "/areas/subareas",
+  authenticateToken,
+  authorizeRole(["SuperAdmin"]),
+  async (req, res) => {
+    try {
+      const { area_id, subarea_id } = req.body;
+
+      console.log(`🗑️ Deleting sub-area ID: ${subarea_id} from area ID: ${area_id}`);
+
+      // Validation
+      if (!area_id) {
+        return res.status(400).json({
+          success: false,
+          message: "Area ID is required",
+        });
+      }
+
+      if (!subarea_id) {
+        return res.status(400).json({
+          success: false,
+          message: "Sub-area ID is required",
+        });
+      }
+
+      // Check if area exists
+      const [areaExists] = await pool.execute(
+        "SELECT area_id, area_name FROM areas WHERE area_id = ?",
+        [area_id]
+      );
+
+      if (areaExists.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Area not found",
+        });
+      }
+
+      // Check if sub-area exists and belongs to the specified area
+      const [existing] = await pool.execute(
+        "SELECT id, address FROM sub_areas WHERE id = ? AND area_id = ?",
+        [subarea_id, area_id]
+      );
+
+      if (existing.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Sub-area not found in this area",
+        });
+      }
+
+      // Delete the sub-area
+      await pool.execute("DELETE FROM sub_areas WHERE id = ? AND area_id = ?", [subarea_id, area_id]);
+
+      console.log(
+        `✅ Sub-area deleted successfully: ID ${subarea_id} (${existing[0].address}) from area: ${areaExists[0].area_name}`
+      );
+
+      res.json({
+        success: true,
+        message: "Sub-area deleted successfully",
+        data: { 
+          area: areaExists[0],
+          deletedSubArea: {
+            id: parseInt(subarea_id),
+            address: existing[0].address
+          }
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error deleting sub-area:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to delete sub-area",
+        error: error.message,
+      });
+    }
+  }
+);
+
 // POST /api/areas - Create new area (SuperAdmin only)
 router.post(
   "/areas",
