@@ -525,6 +525,10 @@ function ManageMembers() {
                                 <span className="ml-2 text-gray-900">{member.area || '-'}</span>
                               </div>
                               <div>
+                                <span className="font-medium text-gray-700">Sub-area:</span>
+                                <span className="ml-2 text-gray-900">{member.subarea || '-'}</span>
+                              </div>
+                              <div>
                                 <span className="font-medium text-gray-700">Contact No:</span>
                                 <span className="ml-2 text-gray-900">{member.phone || '-'}</span>
                               </div>

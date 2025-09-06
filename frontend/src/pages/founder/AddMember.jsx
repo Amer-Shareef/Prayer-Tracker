@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FounderLayout from '../../components/layouts/FounderLayout';
-import { memberAPI, areaService } from '../../services/api';
+import { memberAPI } from '../../services/api';
+import { areaService } from '../../services/areaService';
 import { useAuth } from '../../context/AuthContext';
 
 const AddMember = () => {
@@ -13,7 +14,9 @@ const AddMember = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [areas, setAreas] = useState([]);
+  const [subAreas, setSubAreas] = useState([]);
   const [loadingAreas, setLoadingAreas] = useState(true);
+  const [loadingSubAreas, setLoadingSubAreas] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
     username: '',
@@ -25,6 +28,7 @@ const AddMember = () => {
     dateOfBirth: '',
     address: '',
     area_id: '',
+    subarea_id: '',
     onRent: false,
     zakathEligible: false,
     differentlyAbled: false,
@@ -38,33 +42,16 @@ const AddMember = () => {
     const fetchAreas = async () => {
       try {
         setLoadingAreas(true);
-        const response = await areaService.getAreas();
-        console.log('🏞️ Areas API Response:', response.data);
-        if (response.data.success) {
-          setAreas(response.data.data);
-          console.log('✅ Areas loaded:', response.data.data);
+        const response = await areaService.getAllAreas();
+        console.log('🏞️ Areas API Response:', response);
+        if (response.success) {
+          setAreas(response.data);
+          console.log('✅ Areas loaded:', response.data);
         } else {
-          console.error('Failed to fetch areas:', response.data.message);
+          console.error('Failed to fetch areas:', response.message);
         }
       } catch (err) {
         console.error('Error fetching areas:', err);
-        // Fallback: try direct fetch if service fails
-        try {
-          const token = localStorage.getItem('token');
-          const directResponse = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/areas`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          if (directResponse.ok) {
-            const data = await directResponse.json();
-            console.log('🔄 Direct fetch areas data:', data);
-            setAreas(data.data || []);
-          }
-        } catch (directErr) {
-          console.error('Direct fetch also failed:', directErr);
-        }
       } finally {
         setLoadingAreas(false);
       }
@@ -72,6 +59,32 @@ const AddMember = () => {
 
     fetchAreas();
   }, []);
+
+  // Fetch sub-areas when area is selected
+  const fetchSubAreas = async (areaId) => {
+    if (!areaId) {
+      setSubAreas([]);
+      return;
+    }
+
+    try {
+      setLoadingSubAreas(true);
+      const response = await areaService.getSubAreas(areaId);
+      console.log('🏘️ Sub-areas API Response:', response);
+      if (response.success) {
+        setSubAreas(response.data.subAreas || []);
+        console.log('✅ Sub-areas loaded:', response.data.subAreas);
+      } else {
+        console.error('Failed to fetch sub-areas:', response.message);
+        setSubAreas([]);
+      }
+    } catch (err) {
+      console.error('Error fetching sub-areas:', err);
+      setSubAreas([]);
+    } finally {
+      setLoadingSubAreas(false);
+    }
+  };
 
   // Get allowed roles based on current user's role
   const getAllowedRoles = () => {
@@ -111,10 +124,28 @@ const AddMember = () => {
   // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value
-    });
+    
+    // If area is changed, reset sub-area and fetch new sub-areas
+    if (name === 'area_id') {
+      setFormData({
+        ...formData,
+        [name]: value,
+        subarea_id: '' // Reset sub-area when area changes
+      });
+      
+      // Fetch sub-areas for the selected area
+      if (value) {
+        fetchSubAreas(value);
+      } else {
+        setSubAreas([]);
+      }
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
+    }
+    
     // Clear errors when user starts typing
     if (error) setError('');
     if (success) setSuccess('');
@@ -387,6 +418,34 @@ const AddMember = () => {
                         </option>
                       ))
                     )}
+                  </select>
+                </div>
+
+                {/* Sub-area */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="subarea_id">
+                    Sub-area <span className="text-gray-500">(Optional)</span>
+                  </label>
+                  <select
+                    id="subarea_id"
+                    name="subarea_id"
+                    value={formData.subarea_id}
+                    onChange={handleInputChange}
+                    disabled={!formData.area_id || loadingSubAreas}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    <option value="">
+                      {!formData.area_id 
+                        ? 'Select area first' 
+                        : loadingSubAreas 
+                        ? 'Loading sub-areas...' 
+                        : 'Select sub-area (optional)'}
+                    </option>
+                    {!loadingSubAreas && subAreas.map((subArea) => (
+                      <option key={subArea.id} value={subArea.id}>
+                        {subArea.address}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
