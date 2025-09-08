@@ -114,7 +114,7 @@ router.get("/", authenticateToken, async (req, res) => {
 
     // Pagination parameters
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = parseInt(req.query.limit) || 15; // #Change for Production - For testing: 5, For production: 10 or higher
     const offset = (page - 1) * limit;
 
     let queryString;
