@@ -26,9 +26,11 @@ router.get(
 
       // Build query dynamically WITHOUT using LIMIT in prepared statement
       let query = `
-SELECT pr.*, a.area_name
+SELECT pr.*, a.area_name, u.full_name as member_name, u.phone as member_phone, du.full_name as driver_name, du.phone as driver_phone
 FROM pickup_requests pr
 LEFT JOIN areas a ON pr.area_id = a.area_id
+LEFT JOIN users u ON pr.user_id = u.id
+LEFT JOIN users du ON pr.assigned_driver_id = du.id
 WHERE pr.user_id = ? OR pr.assigned_driver_id = ?
     `;
       const queryParams = [user.id, user.id];
@@ -94,6 +96,110 @@ WHERE pr.user_id = ? OR pr.assigned_driver_id = ?
   }
 );
 
+// GET /api/pickup-requests/all - Get all pickup requests (accessible to all authenticated users)
+router.get("/pickup-requests/all", authenticateToken, async (req, res) => {
+  try {
+    const { user } = req;
+    const { status, area_id } = req.query;
+
+    console.log("Getting pickup requests for user:", {
+      userId: user.id,
+      userRole: user.role,
+      requestedAreaId: area_id,
+    });
+
+    let query = `
+SELECT pr.*, 
+a.area_name as area_name,
+u.username as member_username,
+               u.phone as member_phone,
+
+               u.full_name as member_name,
+               du.username as driver_username,
+               du.phone as driver_phone,
+               du.full_name as driver_name
+        FROM pickup_requests pr
+        LEFT JOIN areas a ON pr.area_id = a.area_id
+        LEFT JOIN users u ON pr.user_id = u.id
+        LEFT JOIN users du ON pr.assigned_driver_id = du.id
+        WHERE 1=1
+      `;
+    const queryParams = [];
+
+    // Apply role-based filtering
+    // if (user.role === "Member") {
+    //   console.log("Member accessing - showing only their area's requests");
+    //   // Members can see all requests from their area but with limited personal info
+    //   query += " AND pr.area_id = (SELECT area_id FROM users WHERE id = ?)";
+    //   queryParams.push(user.id);
+
+    //   // For members, remove sensitive personal information
+    //   query = `
+    //       SELECT pr.id, pr.pickup_location, pr.status, pr.created_at, pr.days, pr.prayers,
+    //              pr.special_instructions, pr.approved_at, pr.rejected_at,
+    //              a.name as area_name,
+    //              CASE WHEN pr.user_id = ? THEN u.username ELSE 'Anonymous Member' END as member_username,
+    //              CASE WHEN pr.user_id = ? THEN u.phone ELSE NULL END as member_phone,
+    //              CASE WHEN pr.user_id = ? THEN u.email ELSE NULL END as member_email,
+    //              CASE WHEN pr.user_id = ? THEN u.full_name ELSE 'Anonymous Member' END as member_name,
+    //              du.username as driver_username,
+    //              du.phone as driver_phone
+    //       FROM pickup_requests pr
+    //       LEFT JOIN areas m ON pr.area_id = a.id
+    //       LEFT JOIN users u ON pr.user_id = u.id
+    //       LEFT JOIN users du ON pr.assigned_driver_id = du.id
+    //       WHERE pr.area_id = (SELECT area_id FROM users WHERE id = ?)
+    //     `;
+    //   queryParams.push(user.id, user.id, user.id, user.id, user.id);
+    // } else
+    if (
+      user.role === "Founder" ||
+      user.role === "WCM" ||
+      user.role === "founder" ||
+      user.role === "Member"
+    ) {
+      console.log("Founder/WCM accessing - showing their area's requests");
+      query += " AND pr.area_id = (SELECT area_id FROM users WHERE id = ?)";
+      queryParams.push(user.id);
+    } else if (user.role === "SuperAdmin" || user.role === "superadmin") {
+      if (area_id) {
+        console.log("SuperAdmin specifying area_id:", area_id);
+        query += " AND pr.area_id = ?";
+        queryParams.push(area_id);
+      } else {
+        console.log("SuperAdmin seeing all requests");
+      }
+    }
+
+    // Filter by status if provided
+    if (status) {
+      query += " AND pr.status = ?";
+      queryParams.push(status);
+    }
+
+    query += " ORDER BY pr.created_at DESC";
+
+    console.log("Query:", query);
+    console.log("Query params:", queryParams);
+
+    const [requests] = await pool.execute(query, queryParams);
+
+    console.log(`✅ Found ${requests.length} pickup requests for ${user.role}`);
+
+    res.json({
+      success: true,
+      data: requests,
+      total: requests.length,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching pickup requests:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch pickup requests",
+      error: error.message,
+    });
+  }
+});
 // Create pickup request - ENHANCED for mobile workflow
 router.post(
   "/pickup-requests",
@@ -688,110 +794,6 @@ router.put(
     }
   }
 );
-
-// GET /api/pickup-requests/all - Get all pickup requests (accessible to all authenticated users)
-router.get("/pickup-requests/all", authenticateToken, async (req, res) => {
-  try {
-    const { user } = req;
-    const { status, area_id } = req.query;
-
-    console.log("Getting pickup requests for user:", {
-      userId: user.id,
-      userRole: user.role,
-      requestedAreaId: area_id,
-    });
-
-    let query = `
-SELECT pr.*, 
-a.area_name as area_name,
-u.username as member_username,
-               u.phone as member_phone,
-               u.email as member_email,
-               u.full_name as member_name,
-               du.username as driver_username,
-               du.phone as driver_phone
-        FROM pickup_requests pr
-        LEFT JOIN areas a ON pr.area_id = a.area_id
-        LEFT JOIN users u ON pr.user_id = u.id
-        LEFT JOIN users du ON pr.assigned_driver_id = du.id
-        WHERE 1=1
-      `;
-    const queryParams = [];
-
-    // Apply role-based filtering
-    // if (user.role === "Member") {
-    //   console.log("Member accessing - showing only their area's requests");
-    //   // Members can see all requests from their area but with limited personal info
-    //   query += " AND pr.area_id = (SELECT area_id FROM users WHERE id = ?)";
-    //   queryParams.push(user.id);
-
-    //   // For members, remove sensitive personal information
-    //   query = `
-    //       SELECT pr.id, pr.pickup_location, pr.status, pr.created_at, pr.days, pr.prayers,
-    //              pr.special_instructions, pr.approved_at, pr.rejected_at,
-    //              a.name as area_name,
-    //              CASE WHEN pr.user_id = ? THEN u.username ELSE 'Anonymous Member' END as member_username,
-    //              CASE WHEN pr.user_id = ? THEN u.phone ELSE NULL END as member_phone,
-    //              CASE WHEN pr.user_id = ? THEN u.email ELSE NULL END as member_email,
-    //              CASE WHEN pr.user_id = ? THEN u.full_name ELSE 'Anonymous Member' END as member_name,
-    //              du.username as driver_username,
-    //              du.phone as driver_phone
-    //       FROM pickup_requests pr
-    //       LEFT JOIN areas m ON pr.area_id = a.id
-    //       LEFT JOIN users u ON pr.user_id = u.id
-    //       LEFT JOIN users du ON pr.assigned_driver_id = du.id
-    //       WHERE pr.area_id = (SELECT area_id FROM users WHERE id = ?)
-    //     `;
-    //   queryParams.push(user.id, user.id, user.id, user.id, user.id);
-    // } else
-    if (
-      user.role === "Founder" ||
-      user.role === "WCM" ||
-      user.role === "founder" ||
-      user.role === "Member"
-    ) {
-      console.log("Founder/WCM accessing - showing their area's requests");
-      query += " AND pr.area_id = (SELECT area_id FROM users WHERE id = ?)";
-      queryParams.push(user.id);
-    } else if (user.role === "SuperAdmin" || user.role === "superadmin") {
-      if (area_id) {
-        console.log("SuperAdmin specifying area_id:", area_id);
-        query += " AND pr.area_id = ?";
-        queryParams.push(area_id);
-      } else {
-        console.log("SuperAdmin seeing all requests");
-      }
-    }
-
-    // Filter by status if provided
-    if (status) {
-      query += " AND pr.status = ?";
-      queryParams.push(status);
-    }
-
-    query += " ORDER BY pr.created_at DESC";
-
-    console.log("Query:", query);
-    console.log("Query params:", queryParams);
-
-    const [requests] = await pool.execute(query, queryParams);
-
-    console.log(`✅ Found ${requests.length} pickup requests for ${user.role}`);
-
-    res.json({
-      success: true,
-      data: requests,
-      total: requests.length,
-    });
-  } catch (error) {
-    console.error("❌ Error fetching pickup requests:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch pickup requests",
-      error: error.message,
-    });
-  }
-});
 
 // GET /api/pickup-requests/available-drivers - Get members who can be assigned as drivers
 router.get(

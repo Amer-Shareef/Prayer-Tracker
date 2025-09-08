@@ -15,12 +15,12 @@ const calculateAge = (dateOfBirth) => {
   return age;
 };
 
-// Helper function to format date as DD-MM-YYYY
+// Helper function to format date as DD-MMM-YYYY (01-Jul-2025)
 const formatDate = (date) => {
   const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}-${month}-${year}`;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = months[date.getMonth()];
+  return `${day}-${month}`;
 };
 
 // Function to get real prayer statistics from database
@@ -92,13 +92,13 @@ const processPrayerDataIntoDays = (prayerData, memberJoinDate = null) => {
       return prayerDate.toDateString() === date.toDateString();
     });
     
-    const fajr = dayPrayer?.fajr ? 'X' : '-';
-    const dhuhr = dayPrayer?.dhuhr ? 'X' : '-';
-    const asr = dayPrayer?.asr ? 'X' : '-';
-    const maghrib = dayPrayer?.maghrib ? 'X' : '-';
-    const isha = dayPrayer?.isha ? 'X' : '-';
-    const total = (dayPrayer?.fajr ? 1 : 0) + (dayPrayer?.dhuhr ? 1 : 0) + (dayPrayer?.asr ? 1 : 0) + (dayPrayer?.maghrib ? 1 : 0) + (dayPrayer?.isha ? 1 : 0);
-    const rate = ((total / 5) * 100).toFixed(1);
+    const fajr = dayPrayer?.fajr ? 'O' : '-';
+    const dhuhr = dayPrayer?.dhuhr ? 'O' : '-';
+    const asr = dayPrayer?.asr ? 'O' : '-';
+    const maghrib = dayPrayer?.maghrib ? 'O' : '-';
+    const isha = dayPrayer?.isha ? 'O' : '-';
+    const zikr = (dayPrayer?.zikr_count || 0) + (dayPrayer?.zikr_count_2 || 0);
+    const quran = dayPrayer?.quran_minutes || 0;
     
     days.push({
       date: formatDate(date),
@@ -107,8 +107,8 @@ const processPrayerDataIntoDays = (prayerData, memberJoinDate = null) => {
       asr,
       maghrib,
       isha,
-      total,
-      rate: `${rate}%`
+      zikr,
+      quran
     });
   }
   
@@ -141,15 +141,16 @@ const generateFallbackPrayerStats = (memberJoinDate = null) => {
     const asrAttended = Math.random() > 0.2; // 80% attendance  
     const maghribAttended = Math.random() > 0.1; // 90% attendance
     const ishaAttended = Math.random() > 0.3; // 70% attendance
+    const zikrDone = Math.random() > 0.5; // 50% zikr done
+    const quranRead = Math.random() > 0.6; // 40% quran read
     
-    const fajr = fajrAttended ? 'X' : '-';
-    const dhuhr = dhuhrAttended ? 'X' : '-';
-    const asr = asrAttended ? 'X' : '-';
-    const maghrib = maghribAttended ? 'X' : '-';
-    const isha = ishaAttended ? 'X' : '-';
-    
-    const total = (fajrAttended ? 1 : 0) + (dhuhrAttended ? 1 : 0) + (asrAttended ? 1 : 0) + (maghribAttended ? 1 : 0) + (ishaAttended ? 1 : 0);
-    const rate = ((total / 5) * 100).toFixed(1);
+    const fajr = fajrAttended ? 'O' : '-';
+    const dhuhr = dhuhrAttended ? 'O' : '-';
+    const asr = asrAttended ? 'O' : '-';
+    const maghrib = maghribAttended ? 'O' : '-';
+    const isha = ishaAttended ? 'O' : '-';
+    const zikr = Math.floor(Math.random() * 20); // Random zikr count 0-19
+    const quran = Math.floor(Math.random() * 60); // Random quran minutes 0-59
     
     days.push({
       date: formatDate(date),
@@ -158,8 +159,8 @@ const generateFallbackPrayerStats = (memberJoinDate = null) => {
       asr,
       maghrib,
       isha,
-      total,
-      rate: `${rate}%`
+      zikr,
+      quran
     });
   }
   
@@ -231,7 +232,7 @@ yPosition = 55; // Start content lower, since header is taller
 
 
   // Member Information Section (Compact)
-  doc.setFontSize(13); // Slightly smaller
+  doc.setFontSize(15); // Increased font size
   doc.setTextColor(accentColor);
   doc.setFont('helvetica', 'bold');
   doc.text('Personal & Account Information', margin, yPosition);
@@ -241,13 +242,13 @@ yPosition = 55; // Start content lower, since header is taller
   const memberInfo = [
     ['Member ID', member.memberId || 'N/A'],
     ['Full Name', member.fullName || 'N/A'],
-    ['Username', member.username || 'N/A'],
     ['Age', calculateAge(member.dateOfBirth).toString()],
     ['Date of Birth', member.dateOfBirth ? new Date(member.dateOfBirth).toLocaleDateString() : 'N/A'],
     ['Email', member.email || 'N/A'],
     ['Phone', member.phone || 'N/A'],
     ['Address', member.address || 'N/A'],
-    ['Area', member.area || 'N/A'],
+    ['Area', member.subarea || 'N/A'],
+    ['Mahallah', member.area || 'N/A'],
     ['Mobility', member.mobility || 'N/A'],
     ['Role', member.role === 'Member' ? 'Member' :
              member.role === 'WCM' ? 'Working Committee Member' :
@@ -269,19 +270,12 @@ yPosition = 55; // Start content lower, since header is taller
 
   autoTable(doc, {
     startY: yPosition,
-    head: [['Field', 'Value', 'Field', 'Value']],
     body: leftColumn.map((item, index) => [
       item[0], item[1],
       rightColumn[index] ? rightColumn[index][0] : '',
       rightColumn[index] ? rightColumn[index][1] : ''
     ]),
     theme: 'grid',
-    headStyles: { 
-      fillColor: lightGreen, // Green instead of blue
-      textColor: 255, 
-      fontStyle: 'bold',
-      fontSize: 9
-    },
     bodyStyles: { 
       fontSize: 8,
       cellPadding: 1.5 // Reduced padding
@@ -309,7 +303,7 @@ yPosition = 55; // Start content lower, since header is taller
     const joinDate = new Date(member.joined_date);
     const currentDate = new Date();
     const daysSinceJoined = Math.floor((currentDate - joinDate) / (1000 * 60 * 60 * 24));
-    return daysSinceJoined < 40 ? `Prayer Statistics - Past ${daysSinceJoined + 1} Days (Since Joining)` : 'Prayer Statistics - Past 40 Days';
+    return daysSinceJoined < 40 ? `Prayer Statistics - Past ${daysSinceJoined + 1} Days (Since Joining)` : 'Prayer Statistics';
   })() : 'Prayer Statistics - Past 40 Days';
   
   doc.text(daysText, margin, yPosition);
@@ -328,6 +322,7 @@ yPosition = 55; // Start content lower, since header is taller
       // Process statistics in chunks of 20 days per page for better readability
       const daysPerPage = 20;
       let currentDayIndex = 0;
+      let isFirstTable = true; // Track if this is the first table
 
       while (currentDayIndex < prayerStats.length) {
         const dayChunk = prayerStats.slice(currentDayIndex, currentDayIndex + daysPerPage);
@@ -336,6 +331,7 @@ yPosition = 55; // Start content lower, since header is taller
         if (yPosition > pageHeight - 80) {
           doc.addPage();
           yPosition = margin;
+          isFirstTable = false; // No longer the first table after page break
           
           // Add section header on new page
           doc.setFontSize(13);
@@ -348,26 +344,20 @@ yPosition = 55; // Start content lower, since header is taller
         // Create table for this chunk of days
         const tableData = dayChunk.map(day => [
           day.date,
-          day.fajr,
-          day.dhuhr,
-          day.asr,
-          day.maghrib,
-          day.isha,
-          `${day.total}/5`,
-          day.rate
+          day.fajr === 'O' ? 'O' : '-',
+          day.dhuhr === 'O' ? 'O' : '-',
+          day.asr === 'O' ? 'O' : '-',
+          day.maghrib === 'O' ? 'O' : '-',
+          day.isha === 'O' ? 'O' : '-',
+          day.zikr,
+          day.quran
         ]);
 
-        autoTable(doc, {
+        // Only show header on the first table
+        const tableConfig = {
           startY: yPosition,
-          head: [['Date', 'Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha', 'Total', 'Rate']],
           body: tableData,
           theme: 'striped',
-          headStyles: { 
-            fillColor: lightGreen,
-            textColor: 255, 
-            fontStyle: 'bold',
-            fontSize: 9
-          },
           bodyStyles: { 
             fontSize: 8,
             cellPadding: 2,
@@ -380,64 +370,31 @@ yPosition = 55; // Start content lower, since header is taller
             3: { cellWidth: 18, halign: 'center' }, // Asr
             4: { cellWidth: 20, halign: 'center' }, // Maghrib
             5: { cellWidth: 18, halign: 'center' }, // Isha
-            6: { cellWidth: 20, halign: 'center' }, // Total
-            7: { cellWidth: 20, halign: 'center' }, // Rate
+            6: { cellWidth: 18, halign: 'center' }, // Zikr
+            7: { cellWidth: 20, halign: 'center' }, // Quran
           },
           alternateRowStyles: { fillColor: veryLightGreen },
           margin: { left: margin, right: margin }
-        });
+        };
+
+        // Add header only for the first table
+        if (isFirstTable) {
+          tableConfig.head = [['Date', 'Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha', 'Zikr', 'Quran']];
+          tableConfig.headStyles = {
+            fillColor: lightGreen,
+            textColor: 255, 
+            fontStyle: 'bold',
+            fontSize: 9
+          };
+          isFirstTable = false; // Mark that we've shown the header
+        }
+
+        autoTable(doc, tableConfig);
 
         yPosition = doc.lastAutoTable.finalY + 8;
         currentDayIndex += daysPerPage;
       }
-
-      // Summary statistics
-      if (prayerStats.length > 0) {
-        checkPageBreak(35);
-        
-        doc.setFontSize(11);
-        doc.setTextColor(accentColor);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Summary - ${prayerStats.length} Days`, margin, yPosition);
-        yPosition += 8;
-
-        const totalPossiblePrayers = prayerStats.length * 5;
-        const totalPrayedPrayers = prayerStats.reduce((sum, day) => sum + day.total, 0);
-        const overallPercentage = totalPossiblePrayers > 0 ? ((totalPrayedPrayers / totalPossiblePrayers) * 100).toFixed(1) : '0.0';
-
-        // Calculate individual prayer totals
-        const fajrTotal = prayerStats.filter(day => day.fajr === 'X').length;
-        const dhuhrTotal = prayerStats.filter(day => day.dhuhr === 'X').length;
-        const asrTotal = prayerStats.filter(day => day.asr === 'X').length;
-        const maghribTotal = prayerStats.filter(day => day.maghrib === 'X').length;
-        const ishaTotal = prayerStats.filter(day => day.isha === 'X').length;
-
-        const summaryData = [
-          ['Total Days Recorded', prayerStats.length.toString()],
-          ['Fajr Prayers', `${fajrTotal}/${prayerStats.length} (${((fajrTotal/prayerStats.length)*100).toFixed(1)}%)`],
-          ['Dhuhr Prayers', `${dhuhrTotal}/${prayerStats.length} (${((dhuhrTotal/prayerStats.length)*100).toFixed(1)}%)`],
-          ['Asr Prayers', `${asrTotal}/${prayerStats.length} (${((asrTotal/prayerStats.length)*100).toFixed(1)}%)`],
-          ['Maghrib Prayers', `${maghribTotal}/${prayerStats.length} (${((maghribTotal/prayerStats.length)*100).toFixed(1)}%)`],
-          ['Isha Prayers', `${ishaTotal}/${prayerStats.length} (${((ishaTotal/prayerStats.length)*100).toFixed(1)}%)`],
-          ['Total Prayers Completed', `${totalPrayedPrayers}/${totalPossiblePrayers}`],
-          ['Overall Attendance Rate', `${overallPercentage}%`]
-        ];
-
-        autoTable(doc, {
-          startY: yPosition,
-          body: summaryData,
-          theme: 'grid',
-          bodyStyles: { 
-            fontSize: 9,
-            cellPadding: 2.5
-          },
-          columnStyles: {
-            0: { fontStyle: 'bold', cellWidth: 60, fillColor: veryLightGreen },
-            1: { cellWidth: 40, halign: 'center', fontStyle: 'bold' }
-          },
-          margin: { left: margin, right: margin }
-        });
-      }
+      // Summary section removed as requested
     }
   } catch (error) {
     console.error('Error generating prayer statistics:', error);
@@ -453,7 +410,7 @@ yPosition = 55; // Start content lower, since header is taller
     doc.setFontSize(8);
     doc.setTextColor(secondaryColor);
     doc.text(
-      `Prayer Tracker - Member Report | Page ${i} of ${pageCount}`,
+      `Fajr Council Member Report | Page ${i} of ${pageCount}`,
       pageWidth / 2,
       pageHeight - 10,
       { align: 'center' }
