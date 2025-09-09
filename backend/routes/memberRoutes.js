@@ -17,7 +17,7 @@ router.get(
       let query = `
       SELECT u.id, u.full_name as fullName, u.username, u.email, u.phone, u.role, u.status, 
              u.joined_date, u.last_login, u.created_at, u.date_of_birth as dateOfBirth, 
-             u.address, u.area_id, u.subarea_id, u.mobility, u.living_on_rent as onRent, u.zakath_eligible as zakathEligible, 
+             u.address, u.area_id, u.sub_areas_id, u.mobility, u.living_on_rent as onRent, u.zakath_eligible as zakathEligible, 
              u.differently_abled as differentlyAbled, u.muallafathil_quloob as MuallafathilQuloob, 
              a.area_name as area, a.address as area_address,
              sa.address as subarea,
@@ -39,7 +39,7 @@ router.get(
              END as attendance_rate
       FROM users u
       LEFT JOIN areas a ON u.area_id = a.area_id
-      LEFT JOIN sub_areas sa ON u.subarea_id = sa.id
+      LEFT JOIN sub_areas sa ON u.sub_areas_id = sa.id
       LEFT JOIN prayers p ON u.id = p.user_id 
         AND p.prayer_date >= CASE 
           WHEN DATEDIFF(CURDATE(), u.joined_date) >= 39 THEN DATE_SUB(CURDATE(), INTERVAL 39 DAY)
@@ -99,7 +99,7 @@ router.post(
         address,
         area,
         area_id,
-        subarea_id,
+        sub_areas_id,
         mobility,
         onRent = false,
         zakathEligible = false,
@@ -234,10 +234,10 @@ router.post(
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-      // Insert comprehensive member data with area_id (mandatory) and subarea_id (optional)
+      // Insert comprehensive member data with area_id (mandatory) and sub_areas_id (optional)
       const [result] = await pool.execute(
         `INSERT INTO users (
-        full_name, username, email, phone, password, role, area_id, subarea_id,
+        full_name, username, email, phone, password, role, area_id, sub_areas_id,
         date_of_birth, address, mobility, living_on_rent, 
         zakath_eligible, differently_abled, muallafathil_quloob,
         status, joined_date
@@ -250,7 +250,7 @@ router.post(
           hashedPassword,
           role,
           areaId,
-          subarea_id || null,
+          sub_areas_id || null,
           dateOfBirth || null,
           address || null,
           mobility || null,

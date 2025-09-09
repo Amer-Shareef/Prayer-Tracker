@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import FounderLayout from '../../components/layouts/FounderLayout';
-import { pickupService, memberAPI } from '../../services/api';
+import { pickupService, memberAPI, areaService } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 const TransportPage = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('members');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -28,6 +30,62 @@ const TransportPage = () => {
     approvedRequests: 0,
     rejectedRequests: 0
   });
+
+  // Add date and area state
+  const [currentDate, setCurrentDate] = useState({
+    gregorian: 'Loading...',
+    hijri: 'Loading...'
+  });
+  const [areaName, setAreaName] = useState('Loading...');
+
+  // Fetch current date
+  useEffect(() => {
+    const today = new Date();
+    
+    const gregorianDate = today.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric"
+    });
+
+    let hijriDate;
+    try {
+      hijriDate = new Intl.DateTimeFormat("en-TN-u-ca-islamic", {
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      }).format(today);
+    } catch (error) {
+      hijriDate = "Hijri date not supported";
+    }
+
+    setCurrentDate({
+      gregorian: gregorianDate,
+      hijri: hijriDate
+    });
+  }, []);
+
+  // Fetch user area name
+  useEffect(() => {
+    const fetchUserArea = async () => {
+      if (user?.areaId || user?.area_id) {
+        try {
+          const response = await areaService.getAreaStats(user.areaId || user.area_id);
+          if (response.data.success) {
+            setAreaName(response.data.data.area.name || 'Area');
+          }
+        } catch (error) {
+          console.error('Error fetching area:', error);
+          setAreaName('Area');
+        }
+      }
+    };
+    
+    if (user) {
+      fetchUserArea();
+    }
+  }, [user]);
 
   useEffect(() => {
     fetchData();
@@ -324,8 +382,18 @@ const TransportPage = () => {
   return (
     <FounderLayout>
       <div className="max-w-7xl mx-auto">
+        {/* Page Header */}
+        <div className="mb-8 p-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
+            {user?.role === "Founder" ? "Working Committee Dashboard" : "Super Admin Dashboard"}
+          </h1>
+          <p className="mt-1 text-sm text-gray-600">
+            {areaName} • {currentDate.gregorian} • {currentDate.hijri}
+          </p>
+        </div>
+
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Transport & Mobility Management</h1>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Transport & Mobility Management</h2>
           <p className="text-gray-600">Manage member transportation needs and pickup requests</p>
         </div>
 

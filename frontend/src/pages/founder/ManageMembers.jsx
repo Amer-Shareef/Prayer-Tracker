@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FounderLayout from '../../components/layouts/FounderLayout';
 import { memberAPI, areaService } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import generateMemberReport from './GeneratePdf';
 
 function ManageMembers() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [members, setMembers] = useState([]);
   const [areas, setAreas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +25,62 @@ function ManageMembers() {
   const [filterArea, setFilterArea] = useState('all');
   const [filterAdditionalInfo, setFilterAdditionalInfo] = useState('all');
   const [expandedRows, setExpandedRows] = useState(new Set());
+
+  // Add date and area state
+  const [currentDate, setCurrentDate] = useState({
+    gregorian: 'Loading...',
+    hijri: 'Loading...'
+  });
+  const [areaName, setAreaName] = useState('Loading...');
+
+  // Fetch current date
+  useEffect(() => {
+    const today = new Date();
+    
+    const gregorianDate = today.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric"
+    });
+
+    let hijriDate;
+    try {
+      hijriDate = new Intl.DateTimeFormat("en-TN-u-ca-islamic", {
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      }).format(today);
+    } catch (error) {
+      hijriDate = "Hijri date not supported";
+    }
+
+    setCurrentDate({
+      gregorian: gregorianDate,
+      hijri: hijriDate
+    });
+  }, []);
+
+  // Fetch user area name
+  useEffect(() => {
+    const fetchUserArea = async () => {
+      if (user?.areaId || user?.area_id) {
+        try {
+          const response = await areaService.getAreaStats(user.areaId || user.area_id);
+          if (response.data.success) {
+            setAreaName(response.data.data.area.name || 'Area');
+          }
+        } catch (error) {
+          console.error('Error fetching area:', error);
+          setAreaName('Area');
+        }
+      }
+    };
+    
+    if (user) {
+      fetchUserArea();
+    }
+  }, [user]);
 
   // Fetch members and areas from database
   useEffect(() => {
@@ -192,8 +250,18 @@ function ManageMembers() {
   return (
     <FounderLayout>
       <div className="max-w-7xl mx-auto p-6">
+        {/* Page Header */}
+        <div className="mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
+            {user?.role === "Founder" ? "Working Committee Dashboard" : "Super Admin Dashboard"}
+          </h1>
+          <p className="mt-1 text-sm text-gray-600">
+            {areaName} • {currentDate.gregorian} • {currentDate.hijri}
+          </p>
+        </div>
+
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Manage Members</h1>
+          <h2 className="text-xl font-bold text-gray-800">Manage Members</h2>
           <button 
             onClick={() => navigate('/founder/add-member')}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"

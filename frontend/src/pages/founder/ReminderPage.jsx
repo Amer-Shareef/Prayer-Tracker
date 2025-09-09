@@ -3,10 +3,13 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import FounderLayout from '../../components/layouts/FounderLayout';
 import feedsService from '../../services/feedsService';
 import { UploadButton, UploadDropzone, uploadFiles } from '../../utils/uploadthing';
+import { useAuth } from '../../context/AuthContext';
+import { areaService } from '../../services/api';
 
 const PostFeeds = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   // Get editId from URL params if available
   const queryParams = new URLSearchParams(location.search);
@@ -33,6 +36,68 @@ const PostFeeds = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [videoThumbnail, setVideoThumbnail] = useState('');
   const [selectedImageFile, setSelectedImageFile] = useState(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalFeeds, setTotalFeeds] = useState(0);
+  const [pagination, setPagination] = useState({});
+
+  // Add date and area state
+  const [currentDate, setCurrentDate] = useState({
+    gregorian: 'Loading...',
+    hijri: 'Loading...'
+  });
+  const [areaName, setAreaName] = useState('Loading...');
+
+  // Fetch current date
+  useEffect(() => {
+    const today = new Date();
+    
+    const gregorianDate = today.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric"
+    });
+
+    let hijriDate;
+    try {
+      hijriDate = new Intl.DateTimeFormat("en-TN-u-ca-islamic", {
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      }).format(today);
+    } catch (error) {
+      hijriDate = "Hijri date not supported";
+    }
+
+    setCurrentDate({
+      gregorian: gregorianDate,
+      hijri: hijriDate
+    });
+  }, []);
+
+  // Fetch user area name
+  useEffect(() => {
+    const fetchUserArea = async () => {
+      if (user?.areaId || user?.area_id) {
+        try {
+          const response = await areaService.getAreaStats(user.areaId || user.area_id);
+          if (response.data.success) {
+            setAreaName(response.data.data.area.name || 'Area');
+          }
+        } catch (error) {
+          console.error('Error fetching area:', error);
+          setAreaName('Area');
+        }
+      }
+    };
+    
+    if (user) {
+      fetchUserArea();
+    }
+  }, [user]);
 
   // Helper function to extract YouTube video ID and generate thumbnail
   const getYouTubeThumbnail = (url) => {
@@ -89,16 +154,24 @@ const PostFeeds = () => {
     }
   };
 
-  // Fetch feeds from API
-  const fetchFeeds = async () => {
+  // Fetch feeds from API with pagination
+  const fetchFeeds = async (page = 1) => {
     try {
       setLoading(true);
       setApiError('');
       
-      // Use getAllFeeds which calls the /all endpoint (no 10-item limit)
-      const response = await feedsService.getAllFeeds();
+      // Use getFeeds which supports pagination (limit of 5)
+      const response = await feedsService.getFeeds({ 
+        page: page,
+        limit: 15 // #Change for Production
+      });
+      
       if (response.success) {
         setFeeds(response.data);
+        setPagination(response.pagination);
+        setCurrentPage(response.pagination.page);
+        setTotalPages(response.pagination.totalPages);
+        setTotalFeeds(response.pagination.total);
       } else {
         setApiError(response.message || 'Failed to fetch feeds');
       }
@@ -127,7 +200,7 @@ const PostFeeds = () => {
     testEndpoint();
     
     // Fetch feeds from API
-    fetchFeeds();
+    fetchFeeds(1); // Start with page 1
     
     // Check if we're in edit mode
     if (editId) {
@@ -339,7 +412,7 @@ const PostFeeds = () => {
         setActiveTab('list');
         
         // Refresh feeds list
-        fetchFeeds();
+        fetchFeeds(currentPage);
         
         // Reset URL parameter if we were editing
         if (editId) {
@@ -371,7 +444,7 @@ const PostFeeds = () => {
         
         if (response.success) {
           // Refresh feeds list
-          fetchFeeds();
+          fetchFeeds(currentPage);
           
           if (editId === id) {
             // Reset form and navigate back if we were editing the deleted feed
@@ -441,12 +514,42 @@ const PostFeeds = () => {
     });
   };
 
+  // Pagination functions
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      fetchFeeds(newPage);
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      handlePageChange(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      handlePageChange(currentPage + 1);
+    }
+  };
+
   return (
     <FounderLayout>
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">
+        {/* Page Header */}
+        <div className="mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
+            {user?.role === "Founder" ? "Working Committee Dashboard" : "Super Admin Dashboard"}
+          </h1>
+          <p className="mt-1 text-sm text-gray-600">
+            {areaName} • {currentDate.gregorian} • {currentDate.hijri}
+          </p>
+        </div>
+
+        <h2 className="text-xl font-bold mb-6">
           {isEditing ? 'Edit Feed' : 'Create New Feed'}
-        </h1>
+        </h2>
         
         {/* Success message */}
         {success && (
@@ -512,7 +615,7 @@ const PostFeeds = () => {
                 </svg>
                 All Feeds
                 <span className="ml-1 bg-gray-100 text-gray-800 text-xs font-semibold px-2 py-0.5 rounded-full">
-                  {feeds.length}
+                  {totalFeeds}
                 </span>
               </button>
             </li>
@@ -766,6 +869,18 @@ const PostFeeds = () => {
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow">
+            {/* Feed List Header */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">
+                Feeds List
+                {totalFeeds > 0 && (
+                  <span className="ml-2 text-sm text-gray-500">
+                    ({totalFeeds} total feeds, showing {feeds.length} per page)
+                  </span>
+                )}
+              </h3>
+            </div>
+            
             {/* Feed List */}
             {loading && !feeds.length ? (
               <div className="p-6 text-center">
@@ -783,7 +898,7 @@ const PostFeeds = () => {
                 </button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto flex flex-col min-h-[750px]">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
@@ -880,6 +995,56 @@ const PostFeeds = () => {
                     ))}
                   </tbody>
                 </table>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="mt-auto mb-8 flex items-center justify-between">
+                    <div className="text-sm text-gray-700 pl-3">
+                      Showing page {currentPage} of {totalPages} ({totalFeeds} total feeds)
+                    </div>
+                    <div className="flex items-center space-x-2 pr-3">
+                      <button
+                        onClick={handlePreviousPage}
+                        disabled={currentPage === 1}
+                        className={`px-3 py-1 rounded ${
+                          currentPage === 1
+                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                            : 'bg-blue-500 text-white hover:bg-blue-600'
+                        }`}
+                      >
+                        Previous
+                      </button>
+                      
+                      <div className="flex space-x-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                          <button
+                            key={page}
+                            onClick={() => handlePageChange(page)}
+                            className={`px-3 py-1 rounded ${
+                              currentPage === page
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={handleNextPage}
+                        disabled={currentPage === totalPages}
+                        className={`px-3 py-1 rounded ${
+                          currentPage === totalPages
+                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                            : 'bg-blue-500 text-white hover:bg-blue-600'
+                        }`}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
