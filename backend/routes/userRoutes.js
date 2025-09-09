@@ -65,48 +65,65 @@ router.put("/users/profile", authenticateToken, async (req, res) => {
 
     // Build dynamic SQL query to only update provided fields
     const fieldMappings = {
-      fullName: 'full_name',
-      phone: 'phone',
-      dateOfBirth: 'date_of_birth',
-      address: 'address',
-      area_id: 'area_id',
-      mobility: 'mobility',
-      onRent: 'living_on_rent',
-      zakathEligible: 'zakath_eligible',
-      differentlyAbled: 'differently_abled',
-      MuallafathilQuloob: 'muallafathil_quloob'
+      fullName: "full_name",
+      phone: "phone",
+      dateOfBirth: "date_of_birth",
+      address: "address",
+      area_id: "area_id",
+      sub_areas_id: "sub_areas_id",
+      sub_area_id: "sub_areas_id", // Support both naming conventions
+      mobility: "mobility",
+      onRent: "living_on_rent",
+      zakathEligible: "zakath_eligible",
+      differentlyAbled: "differently_abled",
+      MuallafathilQuloob: "muallafathil_quloob",
     };
 
     const updateFields = [];
     const updateValues = [];
 
     // Only include fields that are provided in the request body
-    Object.keys(updateData).forEach(key => {
-      console.log(`🔍 Checking field: ${key}, value: ${updateData[key]}, mapping: ${fieldMappings[key]}`);
-      if (fieldMappings[key] && updateData[key] !== undefined && updateData[key] !== null) {
+    Object.keys(updateData).forEach((key) => {
+      console.log(
+        `🔍 Checking field: ${key}, value: ${updateData[key]}, mapping: ${fieldMappings[key]}`
+      );
+      if (
+        fieldMappings[key] &&
+        updateData[key] !== undefined &&
+        updateData[key] !== null
+      ) {
         updateFields.push(`${fieldMappings[key]} = ?`);
         updateValues.push(updateData[key]);
-        console.log(`✅ Added field: ${fieldMappings[key]} = ${updateData[key]}`);
+        console.log(
+          `✅ Added field: ${fieldMappings[key]} = ${updateData[key]}`
+        );
       } else {
-        console.log(`❌ Skipped field: ${key} - mapping exists: ${!!fieldMappings[key]}, value: ${updateData[key]}`);
+        console.log(
+          `❌ Skipped field: ${key} - mapping exists: ${!!fieldMappings[
+            key
+          ]}, value: ${updateData[key]}`
+        );
       }
     });
 
-    console.log(`📊 Total fields to update: ${updateFields.length}`, updateFields);
+    console.log(
+      `📊 Total fields to update: ${updateFields.length}`,
+      updateFields
+    );
 
     // If no valid fields to update, return error
     if (updateFields.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "No valid fields provided for update"
+        message: "No valid fields provided for update",
       });
     }
 
     // Add updated_at timestamp
-    updateFields.push('updated_at = CURRENT_TIMESTAMP');
+    updateFields.push("updated_at = CURRENT_TIMESTAMP");
 
     // Build and execute dynamic query
-    const sql = `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`;
+    const sql = `UPDATE users SET ${updateFields.join(", ")} WHERE id = ?`;
     updateValues.push(user.id);
 
     const [result] = await pool.execute(sql, updateValues);
@@ -117,7 +134,7 @@ router.put("/users/profile", authenticateToken, async (req, res) => {
         id, username, email, phone, role, status, 
         full_name as fullName,
         date_of_birth as dateOfBirth,
-        address, area_id, mobility,
+        address, area_id, sub_areas_id, mobility,
         living_on_rent as onRent,
         zakath_eligible as zakathEligible,
         differently_abled as differentlyAbled,
