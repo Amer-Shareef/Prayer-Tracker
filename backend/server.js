@@ -11,28 +11,13 @@ const cookieParser = require("cookie-parser");
 
 const app = express();
 
-// Enhanced CORS configuration using environment variables
+// Simple CORS configuration - Production default, comment for localhost
 const getAllowedOrigins = () => {
-  const defaultOrigins = ["http://localhost:3000", "http://13.60.193.171:3000"];
-
-  // Origins from environment (comma-separated)
-  const envOrigins = process.env.CORS_ORIGINS
+  const origins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(",")
         .map((o) => o.trim())
         .filter(Boolean)
-    : [];
-
-  // Ensure local testing IP is allowed (include common port variants)
-  const explicitIpOrigins = [
-    "http://192.168.1.36",
-    "http://192.168.1.36:3000",
-    "http://192.168.1.36:5000",
-  ];
-
-  // Merge and de-duplicate while preserving order: envOrigins -> defaultOrigins -> explicitIpOrigins
-  const origins = Array.from(
-    new Set([...envOrigins, ...defaultOrigins, ...explicitIpOrigins])
-  );
+    : ["http://13.60.193.171:3000", "http://13.60.193.171:5000"];
 
   console.log("🌐 Allowed CORS origins:", origins);
   return origins;
