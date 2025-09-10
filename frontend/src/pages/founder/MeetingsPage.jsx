@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import FounderLayout from '../../components/layouts/FounderLayout';
 import { meetingsService, memberAPI, areaService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import WeeklyMeetings from '../../components/WeeklyMeetings';
 
 const MeetingsPage = () => {
   const navigate = useNavigate();
@@ -16,7 +17,7 @@ const MeetingsPage = () => {
   const [error, setError] = useState('');
   
   // Tab management
-  const [activeTab, setActiveTab] = useState('scheduled');
+  const [activeTab, setActiveTab] = useState('weekly');
   
   // Filter for members tab
   const [memberFilter, setMemberFilter] = useState('all');
@@ -383,6 +384,20 @@ const MeetingsPage = () => {
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
               <button
+                onClick={() => setActiveTab('weekly')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'weekly'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Weekly Committee Meetings
+                <span className="ml-2 bg-purple-100 text-purple-600 py-1 px-2 rounded-full text-xs">
+                  Committee
+                </span>
+              </button>
+              
+              <button
                 onClick={() => setActiveTab('scheduled')}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'scheduled'
@@ -390,7 +405,7 @@ const MeetingsPage = () => {
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                Scheduled Meetings
+                Personal Counseling
                 <span className="ml-2 bg-blue-100 text-blue-600 py-1 px-2 rounded-full text-xs">
                   {getScheduledMeetings().length}
                 </span>
@@ -418,7 +433,7 @@ const MeetingsPage = () => {
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                Completed Meetings
+                Completed Sessions
                 <span className="ml-2 bg-gray-100 text-gray-600 py-1 px-2 rounded-full text-xs">
                   {getCompletedMeetings().length}
                 </span>
@@ -430,11 +445,16 @@ const MeetingsPage = () => {
         {/* Tab Content */}
         <div className="bg-white rounded-lg shadow">
           
-          {/* Scheduled Meetings Tab */}
+          {/* Weekly Committee Meetings Tab */}
+          {activeTab === 'weekly' && (
+            <WeeklyMeetings />
+          )}
+          
+          {/* Personal Counseling Tab */}
           {activeTab === 'scheduled' && (
             <div>
               <div className="p-4 border-b">
-                <h2 className="text-lg font-semibold">Scheduled Meetings</h2>
+                <h2 className="text-lg font-semibold">Personal Counseling Sessions</h2>
               </div>
               <div className="p-4">
                 {getScheduledMeetings().length === 0 ? (

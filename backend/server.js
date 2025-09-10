@@ -85,6 +85,7 @@ const dailyActivitiesRoutes = require("./routes/dailyActivitiesRoutes");
 const feedsRoutes = require("./routes/feedsRoutes");
 const wakeUpCallRoutes = require("./routes/wakeUpCallRoutes"); // Add this line
 const meetingRoutes = require("./routes/meetingRoutes");
+const weeklyMeetingsRoutes = require("./routes/weeklyMeetingsRoutes");
 const areaRoutes = require("./routes/areaRoutes");
 
 // Use routes
@@ -99,6 +100,7 @@ app.use("/api", meetingRoutes);
 app.use("/api/daily-activities", dailyActivitiesRoutes);
 app.use("/api/feeds", feedsRoutes);
 app.use("/api", wakeUpCallRoutes);
+app.use("/api", weeklyMeetingsRoutes);
 app.use("/api", areaRoutes);
 
 // Enhanced health endpoint
