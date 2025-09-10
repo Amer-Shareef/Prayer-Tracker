@@ -452,7 +452,7 @@ const MeetingsPage = () => {
               >
                 <div className="flex items-center space-x-2">
                   <span>📅</span>
-                  <span>Weekly Committee Meetings</span>
+                  <span>Weekly Meetings</span>
                 </div>
                 <p className="text-xs mt-1 text-gray-500">Working committee sessions</p>
               </button>
@@ -467,7 +467,7 @@ const MeetingsPage = () => {
               >
                 <div className="flex items-center space-x-2">
                   <span>👥</span>
-                  <span>Personal Counseling</span>
+                  <span>Personal Meetings</span>
                 </div>
                 <p className="text-xs mt-1 text-gray-500">One-on-one member sessions</p>
               </button>
@@ -724,7 +724,7 @@ const MeetingsPage = () => {
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div>
                                     <div className="text-sm font-medium text-gray-900">
-                                      {member.full_name || 'No Name'}
+                                      {member.username || 'No Name'}
                                     </div>
                                   </div>
                                 </td>
