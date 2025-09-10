@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import FounderLayout from "../layouts/FounderLayout";
-import feedService from "../../services/feedService"; // Import feed service
+import feedsService from "../../services/feedsService"; // Import feeds service
 import { areaService, userService } from "../../services/api"; // Import area and user services
 
 const FounderDashboard = () => {
@@ -250,12 +250,15 @@ const FounderDashboard = () => {
       setFeedsLoading(true);
       setFeedsError(null);
       try {
-        // Fetch feeds with limit param = 3 for latest 3 feeds only
-        const response = await feedService.getAllFeeds({ limit: 3 });
+        // Fetch feeds with pagination - limit to 3 for dashboard
+        const response = await feedsService.getFeeds({ 
+          page: 1,
+          limit: 3 
+        });
         
-        if (response && response.data) {
+        if (response && response.success && response.data) {
           setFeeds(response.data);
-          console.log('✅ Feeds loaded successfully:', response.data.length);
+          console.log('✅ Latest 3 feeds loaded successfully:', response.data.length);
         } else {
           console.error('❌ Invalid feeds data structure:', response);
           setFeedsError('Failed to load feeds data');
@@ -274,7 +277,7 @@ const FounderDashboard = () => {
   // Handler for deleting a feed
   const handleDeleteFeed = async (id) => {
     try {
-      await feedService.deleteFeed(id);
+      await feedsService.deleteFeed(id);
       // Update feeds state to remove the deleted feed
       setFeeds(prevFeeds => prevFeeds.filter(feed => feed.id !== id));
       console.log(`✅ Feed ${id} deleted successfully`);

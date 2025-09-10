@@ -60,42 +60,68 @@ router.get("/all", authenticateToken, async (req, res) => {
   try {
     console.log("📋 Fetching all feeds without restrictions");
 
-    // Pagination parameters
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 50; // Higher default limit for admin use
-    const offset = (page - 1) * limit;
+    // Check if pagination is requested
+    const pageParam = req.query.page;
+    const shouldPaginate = pageParam !== undefined;
 
-    const queryString = `
-      SELECT f.*, 
-             u.username as author_name,
-             u.full_name as author_full_name,
-             a.area_name as area_name
-      FROM feeds f
-      LEFT JOIN users u ON f.author_id = u.id
-      LEFT JOIN areas a ON f.area_id = a.area_id
-      WHERE f.is_active = TRUE
-      ORDER BY f.created_at DESC
-      LIMIT ? OFFSET ?
-    `;
+    if (shouldPaginate) {
+      // Pagination parameters
+      const page = parseInt(pageParam) || 1;
+      const limit = parseInt(req.query.limit) || 15; // #Change for Production - For development: 15, For production: increase to higher value
+      const offset = (page - 1) * limit;
 
-    const countQuery = "SELECT COUNT(*) as total FROM feeds WHERE is_active = TRUE";
+      const queryString = `
+        SELECT f.*, 
+               u.username as author_name,
+               u.full_name as author_full_name,
+               a.area_name as area_name
+        FROM feeds f
+        LEFT JOIN users u ON f.author_id = u.id
+        LEFT JOIN areas a ON f.area_id = a.area_id
+        WHERE f.is_active = TRUE
+        ORDER BY f.created_at DESC
+        LIMIT ? OFFSET ?
+      `;
 
-    const [feeds] = await pool.query(queryString, [limit, offset]);
-    const [countResult] = await pool.execute(countQuery);
+      const countQuery = "SELECT COUNT(*) as total FROM feeds WHERE is_active = TRUE";
 
-    const totalFeeds = countResult[0].total;
-    const totalPages = Math.ceil(totalFeeds / limit);
+      const [feeds] = await pool.query(queryString, [limit, offset]);
+      const [countResult] = await pool.execute(countQuery);
 
-    res.json({
-      success: true,
-      data: feeds,
-      pagination: {
-        total: totalFeeds,
-        page,
-        limit,
-        totalPages,
-      },
-    });
+      const totalFeeds = countResult[0].total;
+      const totalPages = Math.ceil(totalFeeds / limit);
+
+      res.json({
+        success: true,
+        data: feeds,
+        pagination: {
+          total: totalFeeds,
+          page,
+          limit,
+          totalPages,
+        },
+      });
+    } else {
+      // Return all feeds without pagination
+      const queryString = `
+        SELECT f.*, 
+               u.username as author_name,
+               u.full_name as author_full_name,
+               a.area_name as area_name
+        FROM feeds f
+        LEFT JOIN users u ON f.author_id = u.id
+        LEFT JOIN areas a ON f.area_id = a.area_id
+        WHERE f.is_active = TRUE
+        ORDER BY f.created_at DESC
+      `;
+
+      const [feeds] = await pool.query(queryString);
+
+      res.json({
+        success: true,
+        data: feeds,
+      });
+    }
   } catch (error) {
     console.error("❌ Error fetching all feeds:", error);
     res.status(500).json({
@@ -109,13 +135,12 @@ router.get("/all", authenticateToken, async (req, res) => {
 // GET all feeds - Area-based version
 router.get("/", authenticateToken, async (req, res) => {
   try {
-    console.log("📋 Fetching all feeds for area-based system");
+    console.log("📋 Fetching feeds for area-based system");
     const { user } = req;
 
-    // Pagination parameters
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const offset = (page - 1) * limit;
+    // Check if pagination is requested
+    const pageParam = req.query.page;
+    const shouldPaginate = pageParam !== undefined;
 
     let queryString;
     let queryParams = [];
@@ -136,11 +161,9 @@ router.get("/", authenticateToken, async (req, res) => {
           LEFT JOIN areas a ON f.area_id = a.area_id
           WHERE f.area_id = ? AND f.is_active = TRUE
           ORDER BY f.created_at DESC
-          LIMIT ? OFFSET ?
         `;
-        queryParams = [areaId, limit, offset];
-        countQuery =
-          "SELECT COUNT(*) as total FROM feeds WHERE area_id = ? AND is_active = TRUE";
+        queryParams = [areaId];
+        countQuery = "SELECT COUNT(*) as total FROM feeds WHERE area_id = ? AND is_active = TRUE";
         countParams = [areaId];
       } else {
         // Show all feeds for SuperAdmin
@@ -154,11 +177,9 @@ router.get("/", authenticateToken, async (req, res) => {
           LEFT JOIN areas a ON f.area_id = a.area_id
           WHERE f.is_active = TRUE
           ORDER BY f.created_at DESC
-          LIMIT ? OFFSET ?
         `;
-        queryParams = [limit, offset];
-        countQuery =
-          "SELECT COUNT(*) as total FROM feeds WHERE is_active = TRUE";
+        queryParams = [];
+        countQuery = "SELECT COUNT(*) as total FROM feeds WHERE is_active = TRUE";
         countParams = [];
       }
     } else {
@@ -192,30 +213,46 @@ router.get("/", authenticateToken, async (req, res) => {
         LEFT JOIN areas a ON f.area_id = a.area_id
         WHERE f.area_id = ? AND f.is_active = TRUE
         ORDER BY f.created_at DESC
-        LIMIT ? OFFSET ?
       `;
-      queryParams = [areaId, limit, offset];
-      countQuery =
-        "SELECT COUNT(*) as total FROM feeds WHERE area_id = ? AND is_active = TRUE";
+      queryParams = [areaId];
+      countQuery = "SELECT COUNT(*) as total FROM feeds WHERE area_id = ? AND is_active = TRUE";
       countParams = [areaId];
     }
 
-    const [feeds] = await pool.query(queryString, queryParams);
-    const [countResult] = await pool.execute(countQuery, countParams);
+    if (shouldPaginate) {
+      // Apply pagination
+      const page = parseInt(pageParam) || 1;
+      const limit = parseInt(req.query.limit) || 15; // #Change for Production - For development: 15, For production: increase to higher value
+      const offset = (page - 1) * limit;
 
-    const totalFeeds = countResult[0].total;
-    const totalPages = Math.ceil(totalFeeds / limit);
+      queryString += " LIMIT ? OFFSET ?";
+      queryParams.push(limit, offset);
 
-    res.json({
-      success: true,
-      data: feeds,
-      pagination: {
-        total: totalFeeds,
-        page,
-        limit,
-        totalPages,
-      },
-    });
+      const [feeds] = await pool.query(queryString, queryParams);
+      const [countResult] = await pool.execute(countQuery, countParams);
+
+      const totalFeeds = countResult[0].total;
+      const totalPages = Math.ceil(totalFeeds / limit);
+
+      res.json({
+        success: true,
+        data: feeds,
+        pagination: {
+          total: totalFeeds,
+          page,
+          limit,
+          totalPages,
+        },
+      });
+    } else {
+      // Return all feeds without pagination
+      const [feeds] = await pool.query(queryString, queryParams);
+
+      res.json({
+        success: true,
+        data: feeds,
+      });
+    }
   } catch (error) {
     console.error("❌ Error fetching feeds:", error);
     res.status(500).json({

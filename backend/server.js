@@ -11,11 +11,13 @@ const cookieParser = require("cookie-parser");
 
 const app = express();
 
-// Enhanced CORS configuration using environment variables
+// Simple CORS configuration - Production default, comment for localhost
 const getAllowedOrigins = () => {
   const origins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(",")
-    : ["http://localhost:3000", "http://13.60.193.171:3000"];
+        .map((o) => o.trim())
+        .filter(Boolean)
+    : ["http://13.60.193.171:3000", "http://13.60.193.171:5000"];
 
   console.log("🌐 Allowed CORS origins:", origins);
   return origins;
@@ -50,7 +52,7 @@ app.use(
   createRouteHandler({
     router: uploadRouter,
     config: { env: { UPLOADTHING_TOKEN: process.env.UPLOADTHING_TOKEN } },
-  }),
+  })
 );
 
 // Import database config
@@ -68,6 +70,7 @@ const dailyActivitiesRoutes = require("./routes/dailyActivitiesRoutes");
 const feedsRoutes = require("./routes/feedsRoutes");
 const wakeUpCallRoutes = require("./routes/wakeUpCallRoutes"); // Add this line
 const meetingRoutes = require("./routes/meetingRoutes");
+const weeklyMeetingsRoutes = require("./routes/weeklyMeetingsRoutes");
 const areaRoutes = require("./routes/areaRoutes");
 
 // Use routes
@@ -82,6 +85,7 @@ app.use("/api", meetingRoutes);
 app.use("/api/daily-activities", dailyActivitiesRoutes);
 app.use("/api/feeds", feedsRoutes);
 app.use("/api", wakeUpCallRoutes);
+app.use("/api", weeklyMeetingsRoutes);
 app.use("/api", areaRoutes);
 
 // Enhanced health endpoint

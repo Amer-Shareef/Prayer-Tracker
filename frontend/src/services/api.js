@@ -4,7 +4,6 @@ import { ENV_CONFIG, getFullUrl } from "../config/environment";
 // Use environment-based configuration instead of hardcoded URL
 const API_URL = ENV_CONFIG.API_URL;
 
-console.log("🌐 API Base URL:", API_URL); // Debug log
 
 const api = axios.create({
   baseURL: API_URL,

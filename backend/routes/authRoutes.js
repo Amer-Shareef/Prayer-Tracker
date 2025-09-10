@@ -283,10 +283,10 @@ router.post("/refresh", async (req, res) => {
     console.log("📦 Full request body:", req.body);
     console.log("🍪 Cookies:", req.cookies);
     console.log("📋 Headers:", req.headers);
-    
+
     // Try to get refresh token from multiple sources
     let refreshToken;
-    
+
     // Check if req.body exists and has refreshToken
     if (req.body && req.body.refreshToken) {
       refreshToken = req.body.refreshToken;
@@ -294,75 +294,84 @@ router.post("/refresh", async (req, res) => {
     } else if (req.cookies && req.cookies.refreshToken) {
       refreshToken = req.cookies.refreshToken;
       console.log("✅ Found refresh token in cookies");
-    } else if (req.headers['x-refresh-token']) {
-      refreshToken = req.headers['x-refresh-token'];
+    } else if (req.headers["x-refresh-token"]) {
+      refreshToken = req.headers["x-refresh-token"];
       console.log("✅ Found refresh token in headers");
     }
-    
+
     console.log("🔍 Looking for refresh token...");
-    console.log("📦 Request body has refreshToken:", !!(req.body && req.body.refreshToken));
-    console.log("🍪 Cookies has refreshToken:", !!(req.cookies && req.cookies.refreshToken));
-    console.log("📋 Headers has x-refresh-token:", !!req.headers['x-refresh-token']);
-    
+    console.log(
+      "📦 Request body has refreshToken:",
+      !!(req.body && req.body.refreshToken)
+    );
+    console.log(
+      "🍪 Cookies has refreshToken:",
+      !!(req.cookies && req.cookies.refreshToken)
+    );
+    console.log(
+      "📋 Headers has x-refresh-token:",
+      !!req.headers["x-refresh-token"]
+    );
+
     if (!refreshToken) {
       console.log("❌ No refresh token found in request");
-      return res.status(401).json({ 
-        success: false, 
-        message: "No refresh token provided" 
+      return res.status(401).json({
+        success: false,
+        message: "No refresh token provided",
       });
     }
-    
+
     console.log("✅ Refresh token found, verifying...");
     console.log("🔑 Token preview:", refreshToken.substring(0, 20) + "...");
-    
+
     let decoded;
     try {
       decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
       console.log("✅ Refresh token is valid for user ID:", decoded.userId);
     } catch (err) {
       console.log("❌ Invalid refresh token:", err.message);
-      return res.status(401).json({ 
-        success: false, 
-        message: "Invalid or expired refresh token" 
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired refresh token",
       });
     }
-    
+
     // Verify user still exists and is active
     console.log("🔍 Verifying user exists and is active...");
     const [users] = await pool.execute(
       "SELECT id, username, email, role, status FROM users WHERE id = ? AND status = 'active'",
       [decoded.userId]
     );
-    
+
     if (users.length === 0) {
       console.log("❌ User not found or inactive");
-      return res.status(401).json({ 
-        success: false, 
-        message: "User not found or inactive" 
+      return res.status(401).json({
+        success: false,
+        message: "User not found or inactive",
       });
     }
-    
+
     const user = users[0];
     console.log("✅ User verified:", user.username);
-    
+
     // Generate new access token
     const newAccessToken = jwt.sign(
-      { 
-        userId: user.id, 
-        username: user.username, 
-        role: user.role 
+      {
+        userId: user.id,
+        username: user.username,
+        role: user.role,
       },
       process.env.JWT_SECRET,
       { expiresIn: "90d" } // 1 minute for testing, change to 15m for production
     );
-    
+
     // Optionally generate new refresh token (rotate refresh tokens)
     const newRefreshToken = jwt.sign(
       { userId: user.id },
       process.env.JWT_SECRET,
       { expiresIn: "120d" } // 3 minutes for testing, change to 7d for production
     );
-    
+
     // Update refresh token cookie
     res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,
@@ -371,22 +380,25 @@ router.post("/refresh", async (req, res) => {
       maxAge: 120 * 24 * 60 * 60 * 1000, // 120 days
       path: "/api/auth",
     });
-    
-    console.log("🔄 Access token refreshed successfully for user:", user.username);
+
+    console.log(
+      "🔄 Access token refreshed successfully for user:",
+      user.username
+    );
     console.log("🔑 New access token expires in: 90 days");
     console.log("🔄 New refresh token expires in: 120 days");
 
-    return res.json({ 
-      success: true, 
+    return res.json({
+      success: true,
       token: newAccessToken,
       refreshToken: newRefreshToken,
-      message: "Token refreshed successfully"
+      message: "Token refreshed successfully",
     });
   } catch (error) {
     console.error("❌ Refresh token error:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Server error during token refresh" 
+    res.status(500).json({
+      success: false,
+      message: "Server error during token refresh",
     });
   }
 });
@@ -508,12 +520,24 @@ router.post("/resend-otp", async (req, res) => {
 // Register route
 router.post("/register", async (req, res) => {
   try {
-    const { username, email, password, role = "Member", area_id } = req.body;
+    const {
+      email,
+      password,
+      role = "Member",
+      area_id,
+      sub_areas_id,
+      date_of_birth,
+      mobility,
+      full_name,
+      phone,
+      address,
+    } = req.body;
 
-    if (!username || !email || !password) {
+    // Require full_name and contact phone; email and password are optional
+    if (!full_name || !phone) {
       return res.status(400).json({
         success: false,
-        message: "Username, email and password are required",
+        message: "Full name and contact phone number are required",
       });
     }
 
@@ -540,36 +564,72 @@ router.post("/register", async (req, res) => {
       }
     }
 
-    // Check if user already exists
+    // Verify sub-area exists if sub_areas_id is provided
+    if (sub_areas_id) {
+      const [subAreaExists] = await pool.execute(
+        "SELECT id FROM sub_areas WHERE id = ? AND area_id = ?",
+        [sub_areas_id, area_id]
+      );
+
+      if (subAreaExists.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid sub-area selected for this area",
+        });
+      }
+    }
+
+    // Check if user already exists (by phone only, since email is shared dummy address)
     const [existingUsers] = await pool.execute(
-      "SELECT * FROM users WHERE username = ? OR email = ?",
-      [username, email]
+      "SELECT * FROM users WHERE phone = ?",
+      [phone]
     );
 
     if (existingUsers.length > 0) {
       return res.status(409).json({
         success: false,
-        message: "Username or email already exists",
+        message: "A user with this phone number already exists",
       });
     }
 
-    // Hash password
+    // Use default email and password if not provided
+    const defaultEmail = email || "thalibaan25@gmail.com";
+    const defaultPassword = password || "123pass";
+
+    // Hash password (either provided or default)
     const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    const hashedPassword = await bcrypt.hash(defaultPassword, saltRounds);
 
-    // Insert new user
+    // Insert new user with username set to full_name to avoid missing-username issues
     const [result] = await pool.execute(
-      "INSERT INTO users (username, email, password, role, area_id, status, joined_date) VALUES (?, ?, ?, ?, ?, ?, CURDATE())",
-      [username, email, hashedPassword, role, area_id || null, "active"]
+      `INSERT INTO users (
+        username, full_name, email, password, role, area_id, sub_areas_id, 
+        date_of_birth, mobility, phone, address, 
+        status, joined_date
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE())`,
+      [
+        full_name || null,
+        full_name || null,
+        defaultEmail,
+        hashedPassword,
+        role,
+        area_id || null,
+        sub_areas_id || null,
+        date_of_birth || null,
+        mobility || null,
+        phone || null,
+        address || null,
+        "active",
+      ]
     );
-
     res.status(201).json({
       success: true,
       message: "User registered successfully",
       user: {
         id: result.insertId,
-        username,
-        email,
+        full_name,
+        email: defaultEmail,
+        phone,
         role,
       },
     });
