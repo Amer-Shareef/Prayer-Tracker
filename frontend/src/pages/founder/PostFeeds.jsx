@@ -163,7 +163,7 @@ const PostFeeds = () => {
       // Use getFeeds which supports pagination (limit of 5)
       const response = await feedsService.getFeeds({ 
         page: page,
-        limit: 30 // #Change for Production
+        limit: 15 // #Change for Production
       });
       
       if (response.success) {
