@@ -38,7 +38,7 @@ router.get(
         COUNT(CASE WHEN wma.status = 'pending' THEN 1 END) as pending_count
       FROM weekly_meetings wm
       LEFT JOIN areas a ON wm.area_id = a.area_id
-      LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.meeting_id
+      LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
       ${areaFilter}
       GROUP BY wm.id
       ORDER BY wm.meeting_date DESC
@@ -105,7 +105,7 @@ router.get(
         COUNT(CASE WHEN wma.status = 'pending' THEN 1 END) as pending_count
       FROM weekly_meetings wm
       LEFT JOIN areas a ON wm.area_id = a.area_id
-      LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.meeting_id
+      LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
       WHERE wm.meeting_date BETWEEN ? AND ? ${areaFilter}
       GROUP BY wm.id
       ORDER BY wm.meeting_date DESC
@@ -207,7 +207,7 @@ router.post(
           .join(", ");
 
         await pool.execute(`
-        INSERT INTO weekly_meeting_attendance (meeting_id, user_id, status, created_at)
+        INSERT INTO weekly_meeting_attendance (weekly_meeting_id, user_id, status, created_at)
         VALUES ${attendanceValues}
       `);
       }
@@ -224,7 +224,7 @@ router.post(
         COUNT(CASE WHEN wma.status = 'pending' THEN 1 END) as pending_count
       FROM weekly_meetings wm
       LEFT JOIN areas a ON wm.area_id = a.area_id
-      LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.meeting_id
+      LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
       WHERE wm.id = ?
       GROUP BY wm.id
     `,
@@ -287,7 +287,7 @@ router.get(
         u.role
       FROM weekly_meeting_attendance wma
       JOIN users u ON wma.user_id = u.id
-      WHERE wma.meeting_id = ?
+      WHERE wma.weekly_meeting_id = ?
       ORDER BY u.full_name
     `,
         [id]
@@ -401,7 +401,7 @@ router.put(
       const [attendance] = await pool.execute(
         `
       SELECT id FROM weekly_meeting_attendance 
-      WHERE meeting_id = ? AND user_id = ?
+      WHERE weekly_meeting_id = ? AND user_id = ?
     `,
         [id, user.id]
       );
@@ -418,7 +418,7 @@ router.put(
         `
       UPDATE weekly_meeting_attendance 
       SET status = ?, reason = ?, updated_at = NOW()
-      WHERE meeting_id = ? AND user_id = ?
+      WHERE weekly_meeting_id = ? AND user_id = ?
     `,
         [status, reason || null, id, user.id]
       );
@@ -449,7 +449,7 @@ router.delete(
 
       // Delete attendance records first (foreign key constraint)
       await pool.execute(
-        "DELETE FROM weekly_meeting_attendance WHERE meeting_id = ?",
+        "DELETE FROM weekly_meeting_attendance WHERE weekly_meeting_id = ?",
         [id]
       );
 
