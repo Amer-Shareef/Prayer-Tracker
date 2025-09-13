@@ -200,6 +200,7 @@ router.post("/login", async (req, res) => {
         dateOfBirth: user.date_of_birth,
         address: user.address,
         areaId: user.area_id,
+        subAreasId: user.sub_areas_id,
         areaName: user.area_name,
         mobility: user.mobility,
         onRent: user.living_on_rent === 1,
