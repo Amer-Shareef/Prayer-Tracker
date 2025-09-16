@@ -210,7 +210,8 @@ app.listen(PORT, async () => {
 
   // Start the weekly meeting scheduler
   try {
-    weeklyMeetingScheduler.start();
+    const systemUserId = parseInt(process.env.SYSTEM_USER_ID || "1"); // Use env var or default to 1
+    weeklyMeetingScheduler.start(systemUserId);
   } catch (error) {
     console.error("❌ Failed to start weekly meeting scheduler:", error);
   }

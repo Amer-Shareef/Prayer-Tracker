@@ -384,8 +384,14 @@ router.post(
   dbHealthCheck,
   async (req, res) => {
     try {
-      const { meeting_date, meeting_time, location, agenda, area_id } =
-        req.body;
+      const {
+        meeting_date,
+        meeting_time,
+        location,
+        agenda,
+        area_id, // Required: Area ID to create meetings for specific area
+        weeks_ahead = 8,
+      } = req.body;
       const { user } = req;
 
       if (!meeting_date || !meeting_time) {
@@ -401,87 +407,159 @@ router.post(
       if (!meetingAreaId) {
         return res.status(400).json({
           success: false,
-          message: "Area ID is required",
+          message: "Area ID is required - please provide area_id in request body or ensure your account has an assigned area",
         });
       }
 
-      // Check if meeting already exists for this date and area
-      const [existingMeeting] = await pool.execute(
-        "SELECT id FROM weekly_meetings WHERE DATE(meeting_date) = DATE(?) AND area_id = ?",
+      // Validate that the area exists
+      const [areaCheck] = await pool.execute(
+        "SELECT area_id, area_name FROM areas WHERE area_id = ?",
+        [meetingAreaId]
+      );
+
+      if (areaCheck.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Area with ID ${meetingAreaId} does not exist`,
+        });
+      }
+
+      console.log(`🎯 Request to create meetings for area ${meetingAreaId}`);
+      console.log(`📅 Start date: ${meeting_date}`);
+      console.log(`⏰ Time: ${meeting_time}`);
+      console.log(`📍 Location: ${location || "Not provided"}`);
+      console.log(`📋 Agenda: ${agenda || "Not provided"}`);
+
+      // Smart duplicate check - allow meetings with different details
+      const [existingMeetings] = await pool.execute(
+        `SELECT id, location, agenda, meeting_time FROM weekly_meetings
+         WHERE DATE(meeting_date) = DATE(?) AND area_id = ?`,
         [meeting_date, meetingAreaId]
       );
 
-      if (existingMeeting.length > 0) {
+      // Allow creating new meeting sequence if force flag is set
+      const forceCreate = req.body.force_create === true;
+
+      if (existingMeetings.length > 0 && !forceCreate) {
+        // Check if any existing meeting has the same details
+        const duplicateFound = existingMeetings.some(
+          (meeting) =>
+            meeting.location === location &&
+            meeting.agenda === agenda &&
+            meeting.meeting_time === meeting_time
+        );
+
+        if (duplicateFound) {
+          const existingMeeting = existingMeetings.find(
+            (meeting) =>
+              meeting.location === location &&
+              meeting.agenda === agenda &&
+              meeting.meeting_time === meeting_time
+          );
+          console.log(`⚠️ Identical meeting already exists:`, existingMeeting);
+          return res.status(400).json({
+            success: false,
+            message:
+              "An identical meeting already exists for this date, time, location, and agenda in this area. Set force_create=true to override.",
+            existing: existingMeeting,
+          });
+        } else {
+          console.log(`🔄 Different meeting details found, allowing creation`);
+        }
+      }
+
+      console.log(`✅ Proceeding with meeting creation`);
+
+      // Validate the meeting date is a proper date to prevent any bad data
+      const meetingDateObj = new Date(meeting_date);
+      if (isNaN(meetingDateObj.getTime())) {
         return res.status(400).json({
           success: false,
-          message: "A meeting already exists for this date in this area",
+          message: "Invalid meeting date format provided",
         });
       }
 
-      // Create the meeting
-      const [result] = await pool.execute(
-        `
-      INSERT INTO weekly_meetings (
-        meeting_date, meeting_time, location, agenda, area_id, status, created_by, created_at
-      ) VALUES (?, ?, ?, ?, ?, 'scheduled', ?, NOW())
-    `,
-        [
-          meeting_date,
-          meeting_time,
-          location || null,
-          agenda || null,
-          meetingAreaId,
-          user.id,
-        ]
-      );
-
-      const meetingId = result.insertId;
-
-      // Create recurring meetings for the next 8 weeks (longer buffer)
+      // Create ALL meetings using the generator (no manual initial meeting creation)
       const scheduler = new WeeklyMeetingScheduler();
       try {
-        const recurringResults = await scheduler.createRecurringMeetings(
+        console.log(
+          `⏺️ Creating weekly meetings with scheduler.createRecurringMeetingsWithInitial()`
+        );
+        console.log(`📅 Start date: ${meeting_date}`);
+        console.log(`⏰ Time: ${meeting_time}`);
+        console.log(`📍 Location: ${location || "Default will be used"}`);
+        console.log(`📋 Agenda: ${agenda || "Default will be used"}`);
+
+        // Pass the force_create flag to the scheduler
+        const forceCreate = req.body.force_create === true;
+        if (forceCreate) {
+          console.log(
+            `⚠️ Force create flag set, will override duplicate checks for initial meeting`
+          );
+        }
+
+        const results = await scheduler.createRecurringMeetingsWithInitial(
           meetingAreaId,
           meeting_date,
           meeting_time,
+          location,
+          agenda,
           user.id,
-          8 // Create meetings for next 8 weeks
+          weeks_ahead,
+          forceCreate // Pass the force flag to the scheduler
         );
+
+        if (!results || results.length === 0) {
+          return res.status(500).json({
+            success: false,
+            message: "Failed to create any meetings",
+          });
+        }
+
+        // Get the first created meeting (the initial one)
+        const firstNewMeeting = results.find((r) => !r.exists);
+        const meetingId = firstNewMeeting
+          ? firstNewMeeting.meetingId
+          : results[0].meetingId;
+
         console.log(
-          `🔄 Created ${recurringResults.length} recurring meetings for area ${meetingAreaId}`
+          `🔄 Created ${results.length} meetings for area ${meetingAreaId}`
         );
-      } catch (recurringError) {
-        console.error(
-          "⚠️ Failed to create recurring meetings:",
-          recurringError
+
+        // Fetch the created meeting
+        const [createdMeeting] = await pool.execute(
+          `
+        SELECT
+          wm.*,
+          a.area_name,
+          0 as total_members,
+          0 as present_count,
+          0 as absent_count,
+          0 as pending_count,
+          NULL as user_attendance_status,
+          NULL as user_attendance_reason
+        FROM weekly_meetings wm
+        LEFT JOIN areas a ON wm.area_id = a.area_id
+        WHERE wm.id = ?
+      `,
+          [meetingId]
         );
-        // Don't fail the entire request if recurring creation fails
+
+        res.status(201).json({
+          success: true,
+          message: "Weekly meetings created successfully",
+          data: createdMeeting[0],
+          total_meetings: results.length,
+          new_meetings: results.filter((r) => !r.exists).length,
+        });
+      } catch (error) {
+        console.error("❌ Failed to create meetings:", error);
+        res.status(500).json({
+          success: false,
+          message: "Failed to create meetings",
+          error: error.message,
+        });
       }
-
-      // Fetch the created meeting (no attendance records created as placeholders)
-      const [createdMeeting] = await pool.execute(
-        `
-      SELECT 
-        wm.*,
-        a.area_name,
-        0 as total_members,
-        0 as present_count,
-        0 as absent_count,
-        0 as pending_count,
-        NULL as user_attendance_status,
-        NULL as user_attendance_reason
-      FROM weekly_meetings wm
-      LEFT JOIN areas a ON wm.area_id = a.area_id
-      WHERE wm.id = ?
-    `,
-        [meetingId]
-      );
-
-      res.status(201).json({
-        success: true,
-        message: "Weekly meeting created successfully",
-        data: createdMeeting[0],
-      });
     } catch (error) {
       console.error("Error creating weekly meeting:", error);
       res.status(500).json({
