@@ -3,6 +3,9 @@ const { pool } = require("../config/database");
 const { authenticateToken } = require("../middleware/auth");
 const { dbHealthCheck } = require("../middleware/dbHealthCheck");
 
+// Import the weekly meeting scheduler for recurring meetings
+const WeeklyMeetingScheduler = require("../jobs/weeklyMeetingScheduler");
+
 const router = express.Router();
 
 // Get all weekly meetings with attendance stats
@@ -35,7 +38,9 @@ router.get(
         COUNT(wma.id) as total_members,
         COUNT(CASE WHEN wma.status = 'present' THEN 1 END) as present_count,
         COUNT(CASE WHEN wma.status = 'absent' THEN 1 END) as absent_count,
-        COUNT(CASE WHEN wma.status = 'pending' THEN 1 END) as pending_count
+        COUNT(CASE WHEN wma.status = 'pending' THEN 1 END) as pending_count,
+        MAX(CASE WHEN wma.user_id = ? THEN wma.status END) as user_attendance_status,
+        MAX(CASE WHEN wma.user_id = ? THEN wma.reason END) as user_attendance_reason
       FROM weekly_meetings wm
       LEFT JOIN areas a ON wm.area_id = a.area_id
       LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
@@ -43,7 +48,7 @@ router.get(
       GROUP BY wm.id
       ORDER BY wm.meeting_date DESC
     `,
-        queryParams
+        [user.id, user.id, ...queryParams]
       );
 
       res.json({
@@ -61,7 +66,169 @@ router.get(
   }
 );
 
-// Get current week's meeting
+// Get meetings for current user/area (mobile app endpoint - works for both members and founders)
+router.get(
+  "/weekly-meetings/my-meetings",
+  authenticateToken,
+  dbHealthCheck,
+  async (req, res) => {
+    try {
+      const { user } = req;
+      const { limit = 10, offset = 0, sort = "desc" } = req.query;
+
+      let query, params;
+
+      if (user.role === "Member") {
+        // For regular members: show meetings where they are a committee member
+        query = `
+          SELECT 
+            wm.*,
+            a.area_name,
+            wma.status as user_attendance_status,
+            wma.reason as user_attendance_reason,
+            wma.marked_at as user_marked_at,
+            COUNT(all_wma.id) as total_members,
+            COUNT(CASE WHEN all_wma.status = 'present' THEN 1 END) as present_count,
+            COUNT(CASE WHEN all_wma.status = 'absent' THEN 1 END) as absent_count,
+            COUNT(CASE WHEN all_wma.status = 'pending' THEN 1 END) as pending_count
+          FROM weekly_meetings wm
+          LEFT JOIN areas a ON wm.area_id = a.area_id
+          INNER JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id AND wma.user_id = ?
+          LEFT JOIN weekly_meeting_attendance all_wma ON wm.id = all_wma.weekly_meeting_id
+          WHERE wm.meeting_date >= CURDATE()
+          GROUP BY wm.id, wma.id
+          ORDER BY wm.meeting_date ${sort === "asc" ? "ASC" : "DESC"}
+          LIMIT ? OFFSET ?
+        `;
+        params = [user.id, parseInt(limit), parseInt(offset)];
+      } else {
+        // For founders/admins: show all meetings in their area with all committee members
+        query = `
+          SELECT 
+            wm.*,
+            a.area_name,
+            COUNT(wma.id) as total_members,
+            COUNT(CASE WHEN wma.status = 'present' THEN 1 END) as present_count,
+            COUNT(CASE WHEN wma.status = 'absent' THEN 1 END) as absent_count,
+            COUNT(CASE WHEN wma.status = 'excused' THEN 1 END) as excused_count,
+            COUNT(CASE WHEN wma.status IS NULL THEN 1 END) as pending_count
+          FROM weekly_meetings wm
+          LEFT JOIN areas a ON wm.area_id = a.area_id
+          LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
+          WHERE wm.area_id = ?
+          GROUP BY wm.id
+          ORDER BY wm.meeting_date ${sort === "asc" ? "ASC" : "DESC"}
+          LIMIT ? OFFSET ?
+        `;
+        params = [user.area_id, parseInt(limit), parseInt(offset)];
+      }
+
+      const [meetings] = await pool.execute(query, params);
+
+      res.json({
+        success: true,
+        data: meetings,
+        message: `Found ${meetings.length} meetings where you are a committee member`,
+      });
+    } catch (error) {
+      console.error("Error fetching user meetings:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch your meetings",
+        error: error.message,
+      });
+    }
+  }
+);
+
+router.get(
+  "/weekly-meetings/current/my-meeting",
+  authenticateToken,
+  dbHealthCheck,
+  async (req, res) => {
+    try {
+      const { user } = req;
+
+      // Get start and end of current week (Sunday to Saturday)
+      const today = new Date();
+      const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - currentDay);
+      startOfWeek.setHours(0, 0, 0, 0);
+
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      endOfWeek.setHours(23, 59, 59, 999);
+
+      let query, params;
+
+      if (user.role === "Member") {
+        // For regular members: get meeting where they are a committee member
+        query = `
+          SELECT 
+            wm.*,
+            a.area_name,
+            wma.status as user_attendance_status,
+            wma.reason as user_attendance_reason,
+            wma.marked_at as user_marked_at,
+            COUNT(all_wma.id) as total_members,
+            COUNT(CASE WHEN all_wma.status = 'present' THEN 1 END) as present_count,
+            COUNT(CASE WHEN all_wma.status = 'absent' THEN 1 END) as absent_count,
+            COUNT(CASE WHEN all_wma.status = 'excused' THEN 1 END) as excused_count,
+            COUNT(CASE WHEN all_wma.status IS NULL THEN 1 END) as pending_count
+          FROM weekly_meetings wm
+          LEFT JOIN areas a ON wm.area_id = a.area_id
+          INNER JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id AND wma.user_id = ?
+          LEFT JOIN weekly_meeting_attendance all_wma ON wm.id = all_wma.weekly_meeting_id
+          WHERE wm.meeting_date BETWEEN ? AND ?
+          GROUP BY wm.id, wma.id
+          ORDER BY wm.meeting_date DESC
+          LIMIT 1
+        `;
+        params = [user.id, startOfWeek, endOfWeek];
+      } else {
+        // For founders/admins: get meeting in their area with all committee members data
+        query = `
+          SELECT 
+            wm.*,
+            a.area_name,
+            COUNT(wma.id) as total_members,
+            COUNT(CASE WHEN wma.status = 'present' THEN 1 END) as present_count,
+            COUNT(CASE WHEN wma.status = 'absent' THEN 1 END) as absent_count,
+            COUNT(CASE WHEN wma.status = 'excused' THEN 1 END) as excused_count,
+            COUNT(CASE WHEN wma.status IS NULL THEN 1 END) as pending_count
+          FROM weekly_meetings wm
+          LEFT JOIN areas a ON wm.area_id = a.area_id
+          LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
+          WHERE wm.area_id = ? AND wm.meeting_date BETWEEN ? AND ?
+          GROUP BY wm.id
+          ORDER BY wm.meeting_date DESC
+          LIMIT 1
+        `;
+        params = [user.area_id, startOfWeek, endOfWeek];
+      }
+
+      const [meetings] = await pool.execute(query, params);
+
+      res.json({
+        success: true,
+        data: meetings[0] || null,
+        message: meetings[0]
+          ? "Current week meeting found"
+          : "No meeting this week",
+      });
+    } catch (error) {
+      console.error("Error fetching current week user meeting:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch current week meeting",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Get current week's meeting (admin endpoint)
 router.get(
   "/weekly-meetings/current",
   authenticateToken,
@@ -84,7 +251,7 @@ router.get(
 
       // Filter by area_id if provided, otherwise use user's area for Founders
       let areaFilter = "";
-      let queryParams = [startOfWeek, endOfWeek];
+      let queryParams = [user.id, user.id, startOfWeek, endOfWeek];
 
       if (area_id) {
         areaFilter = "AND wm.area_id = ?";
@@ -102,7 +269,9 @@ router.get(
         COUNT(wma.id) as total_members,
         COUNT(CASE WHEN wma.status = 'present' THEN 1 END) as present_count,
         COUNT(CASE WHEN wma.status = 'absent' THEN 1 END) as absent_count,
-        COUNT(CASE WHEN wma.status = 'pending' THEN 1 END) as pending_count
+        COUNT(CASE WHEN wma.status = 'pending' THEN 1 END) as pending_count,
+        MAX(CASE WHEN wma.user_id = ? THEN wma.status END) as user_attendance_status,
+        MAX(CASE WHEN wma.user_id = ? THEN wma.reason END) as user_attendance_reason
       FROM weekly_meetings wm
       LEFT JOIN areas a ON wm.area_id = a.area_id
       LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
@@ -123,6 +292,85 @@ router.get(
       res.status(500).json({
         success: false,
         message: "Failed to fetch current week meeting",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Get committee members for a specific meeting (for founders to mark attendance)
+router.get(
+  "/weekly-meetings/:meetingId/members",
+  authenticateToken,
+  dbHealthCheck,
+  async (req, res) => {
+    try {
+      const { user } = req;
+      const { meetingId } = req.params;
+
+      // Only founders and admins can access this endpoint
+      if (
+        user.role !== "Founder" &&
+        user.role !== "Admin" &&
+        user.role !== "SuperAdmin"
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Access denied. Only founders and admins can view committee members.",
+        });
+      }
+
+      // Get meeting details first to verify it belongs to user's area
+      const [meetingDetails] = await pool.execute(
+        `SELECT wm.*, a.area_name FROM weekly_meetings wm 
+         LEFT JOIN areas a ON wm.area_id = a.area_id 
+         WHERE wm.id = ? AND wm.area_id = ?`,
+        [meetingId, user.area_id]
+      );
+
+      if (meetingDetails.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Meeting not found or access denied",
+        });
+      }
+
+      // Get all committee members in this area with their attendance status
+      const [members] = await pool.execute(
+        `
+        SELECT 
+          u.id,
+          u.username,
+          u.full_name,
+          u.phone,
+          u.email,
+          wma.status as attendance_status,
+          wma.reason as attendance_reason,
+          wma.marked_at,
+          wma.marked_by_user_id,
+          marker.full_name as marked_by_name
+        FROM users u
+        LEFT JOIN weekly_meeting_attendance wma ON u.id = wma.user_id AND wma.weekly_meeting_id = ?
+        LEFT JOIN users marker ON wma.marked_by_user_id = marker.id
+        WHERE u.area_id = ? AND u.status = 'active'
+        ORDER BY u.full_name ASC
+        `,
+        [meetingId, user.area_id]
+      );
+
+      res.json({
+        success: true,
+        data: {
+          meeting: meetingDetails[0],
+          members: members,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching meeting members:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch meeting members",
         error: error.message,
       });
     }
@@ -189,44 +437,42 @@ router.post(
 
       const meetingId = result.insertId;
 
-      // Get all committee members (users with role 'Founder' or 'SuperAdmin') in the same area
-      const [committeeMembers] = await pool.execute(
-        `
-      SELECT id FROM users 
-      WHERE role IN ('Founder', 'SuperAdmin') 
-      AND status = 'active'
-      AND (area_id = ? OR role = 'SuperAdmin')
-    `,
-        [meetingAreaId]
-      );
-
-      // Create attendance records for all committee members
-      if (committeeMembers.length > 0) {
-        const attendanceValues = committeeMembers
-          .map((member) => `(${meetingId}, ${member.id}, 'pending', NOW())`)
-          .join(", ");
-
-        await pool.execute(`
-        INSERT INTO weekly_meeting_attendance (weekly_meeting_id, user_id, status, created_at)
-        VALUES ${attendanceValues}
-      `);
+      // Create recurring meetings for the next 8 weeks (longer buffer)
+      const scheduler = new WeeklyMeetingScheduler();
+      try {
+        const recurringResults = await scheduler.createRecurringMeetings(
+          meetingAreaId,
+          meeting_date,
+          meeting_time,
+          user.id,
+          8 // Create meetings for next 8 weeks
+        );
+        console.log(
+          `🔄 Created ${recurringResults.length} recurring meetings for area ${meetingAreaId}`
+        );
+      } catch (recurringError) {
+        console.error(
+          "⚠️ Failed to create recurring meetings:",
+          recurringError
+        );
+        // Don't fail the entire request if recurring creation fails
       }
 
-      // Fetch the created meeting with stats
+      // Fetch the created meeting (no attendance records created as placeholders)
       const [createdMeeting] = await pool.execute(
         `
       SELECT 
         wm.*,
         a.area_name,
-        COUNT(wma.id) as total_members,
-        COUNT(CASE WHEN wma.status = 'present' THEN 1 END) as present_count,
-        COUNT(CASE WHEN wma.status = 'absent' THEN 1 END) as absent_count,
-        COUNT(CASE WHEN wma.status = 'pending' THEN 1 END) as pending_count
+        0 as total_members,
+        0 as present_count,
+        0 as absent_count,
+        0 as pending_count,
+        NULL as user_attendance_status,
+        NULL as user_attendance_reason
       FROM weekly_meetings wm
       LEFT JOIN areas a ON wm.area_id = a.area_id
-      LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
       WHERE wm.id = ?
-      GROUP BY wm.id
     `,
         [meetingId]
       );
@@ -379,7 +625,7 @@ router.put(
   }
 );
 
-// Mark attendance (for committee members)
+// Mark attendance (for committee members and founders marking for others)
 router.put(
   "/weekly-meetings/:id/attendance",
   authenticateToken,
@@ -387,45 +633,80 @@ router.put(
   async (req, res) => {
     try {
       const { id } = req.params;
-      const { status, reason } = req.body;
+      const { status, reason, user_id } = req.body; // user_id for founders marking others
       const { user } = req;
 
-      if (!["present", "absent"].includes(status)) {
+      if (!["present", "absent", "excused"].includes(status)) {
         return res.status(400).json({
           success: false,
-          message: "Status must be 'present' or 'absent'",
+          message: "Status must be 'present', 'absent', or 'excused'",
         });
       }
 
-      // Check if user is a committee member for this meeting
+      let targetUserId = user.id; // Default to current user
+
+      // If founder/admin is marking for someone else
+      if (
+        user_id &&
+        (user.role === "Founder" ||
+          user.role === "Admin" ||
+          user.role === "SuperAdmin")
+      ) {
+        targetUserId = user_id;
+
+        // Verify the target user is in the same area
+        const [targetUser] = await pool.execute(
+          `SELECT id FROM users WHERE id = ? AND area_id = ? AND status = 'active'`,
+          [user_id, user.area_id]
+        );
+
+        if (targetUser.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: "User not found in your area or inactive",
+          });
+        }
+      }
+
+      // Check if attendance record exists
       const [attendance] = await pool.execute(
-        `
-      SELECT id FROM weekly_meeting_attendance 
-      WHERE weekly_meeting_id = ? AND user_id = ?
-    `,
-        [id, user.id]
+        `SELECT id FROM weekly_meeting_attendance 
+         WHERE weekly_meeting_id = ? AND user_id = ?`,
+        [id, targetUserId]
       );
 
       if (attendance.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: "Attendance record not found",
-        });
+        // Create new attendance record
+        await pool.execute(
+          `INSERT INTO weekly_meeting_attendance 
+           (weekly_meeting_id, user_id, status, reason, marked_at, marked_by_user_id) 
+           VALUES (?, ?, ?, ?, NOW(), ?)`,
+          [id, targetUserId, status, reason || null, user.id]
+        );
+      } else {
+        // Update existing attendance record
+        await pool.execute(
+          `UPDATE weekly_meeting_attendance 
+           SET status = ?, reason = ?, marked_at = NOW(), marked_by_user_id = ?
+           WHERE weekly_meeting_id = ? AND user_id = ?`,
+          [status, reason || null, user.id, id, targetUserId]
+        );
       }
 
-      // Update attendance
-      await pool.execute(
-        `
-      UPDATE weekly_meeting_attendance 
-      SET status = ?, reason = ?, updated_at = NOW()
-      WHERE weekly_meeting_id = ? AND user_id = ?
-    `,
-        [status, reason || null, id, user.id]
+      // Get updated attendance info
+      const [updatedAttendance] = await pool.execute(
+        `SELECT wma.*, u.full_name, marker.full_name as marked_by_name
+         FROM weekly_meeting_attendance wma
+         LEFT JOIN users u ON wma.user_id = u.id
+         LEFT JOIN users marker ON wma.marked_by_user_id = marker.id
+         WHERE wma.weekly_meeting_id = ? AND wma.user_id = ?`,
+        [id, targetUserId]
       );
 
       res.json({
         success: true,
         message: "Attendance marked successfully",
+        data: updatedAttendance[0],
       });
     } catch (error) {
       console.error("Error marking attendance:", error);

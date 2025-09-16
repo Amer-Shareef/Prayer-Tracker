@@ -73,6 +73,12 @@ const meetingRoutes = require("./routes/meetingRoutes");
 const weeklyMeetingsRoutes = require("./routes/weeklyMeetingsRoutes");
 const areaRoutes = require("./routes/areaRoutes");
 
+// Import the weekly meeting scheduler
+const WeeklyMeetingScheduler = require("./jobs/weeklyMeetingScheduler");
+
+// Initialize the weekly meeting scheduler
+const weeklyMeetingScheduler = new WeeklyMeetingScheduler();
+
 // Use routes
 app.use("/api", authRoutes);
 app.use("/api", userRoutes);
@@ -200,6 +206,13 @@ app.listen(PORT, async () => {
       "   The server will continue running, but database operations will fail"
     );
     console.log("   Please check your database configuration");
+  }
+
+  // Start the weekly meeting scheduler
+  try {
+    weeklyMeetingScheduler.start();
+  } catch (error) {
+    console.error("❌ Failed to start weekly meeting scheduler:", error);
   }
 });
 

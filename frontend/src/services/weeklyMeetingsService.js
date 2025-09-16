@@ -126,6 +126,85 @@ const weeklyMeetingsService = {
     }
   },
 
+  // Mobile-specific endpoints for committee members
+
+  // Get user's meetings with attendance status (Mobile endpoint)
+  getMyMeetings: async (params = {}) => {
+    try {
+      console.log("📱 Fetching my meetings with params:", params);
+      const response = await api.get("/weekly-meetings/my-meetings", {
+        params,
+      });
+      console.log("📱 My meetings received:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Get my meetings error:", error);
+      throw (
+        error.response?.data || {
+          message: "An error occurred while fetching your meetings",
+        }
+      );
+    }
+  },
+
+  // Get current week's meeting for user with attendance status (Mobile endpoint)
+  getCurrentWeekMyMeeting: async () => {
+    try {
+      console.log("📱 Fetching current week my meeting");
+      const response = await api.get("/weekly-meetings/current/my-meeting");
+      console.log("📱 Current week my meeting received:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Get current week my meeting error:", error);
+      throw (
+        error.response?.data || {
+          message: "An error occurred while fetching current week meeting",
+        }
+      );
+    }
+  },
+
+  // Get committee members for a meeting (Founder endpoint)
+  getMeetingMembers: async (meetingId) => {
+    try {
+      console.log("👥 Fetching meeting members for meeting:", meetingId);
+      const response = await api.get(`/weekly-meetings/${meetingId}/members`);
+      console.log("👥 Meeting members received:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Get meeting members error:", error);
+      throw (
+        error.response?.data || {
+          message: "An error occurred while fetching meeting members",
+        }
+      );
+    }
+  },
+
+  // Mark attendance for a specific user (Enhanced for founders)
+  markUserAttendance: async (meetingId, attendanceData) => {
+    try {
+      console.log(
+        "📋 Marking user attendance for meeting:",
+        meetingId,
+        attendanceData
+      );
+      const response = await api.put(
+        `/weekly-meetings/${meetingId}/attendance`,
+        attendanceData
+      );
+      console.log("📋 User attendance marked:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Mark user attendance error:", error);
+      throw (
+        error.response?.data || {
+          message: "An error occurred while marking attendance",
+        }
+      );
+    }
+  },
+
   // Helper function to create meetings for future weeks
   createFutureWeekMeeting: async (weeksAhead = 1, baseData = {}) => {
     try {
