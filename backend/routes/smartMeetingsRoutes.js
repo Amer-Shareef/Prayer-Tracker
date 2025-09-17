@@ -745,7 +745,11 @@ router.get(
         `SELECT wm.*, 
         a.area_name,
         CASE WHEN wm.parent_id IS NULL THEN 'parent' ELSE 'child' END as meeting_type,
-        COUNT(wma.id) as early_marked
+        COUNT(wma.id) as total_marked,
+        COUNT(CASE WHEN wma.status = 'present' THEN 1 END) as present_count,
+        COUNT(CASE WHEN wma.status = 'absent' THEN 1 END) as absent_count,
+        COUNT(CASE WHEN wma.status = 'excused' THEN 1 END) as excused_count,
+        (SELECT COUNT(*) FROM users WHERE area_id = wm.area_id AND status = 'active') as total_area_users
        FROM weekly_meetings wm
        LEFT JOIN areas a ON wm.area_id = a.area_id
        LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
@@ -885,7 +889,11 @@ router.get(
           `SELECT wm.*, 
           a.area_name,
           CASE WHEN wm.parent_id IS NULL THEN 'parent' ELSE 'child' END as meeting_type,
-          COUNT(wma.id) as early_marked
+          COUNT(wma.id) as total_marked,
+          COUNT(CASE WHEN wma.status = 'present' THEN 1 END) as present_count,
+          COUNT(CASE WHEN wma.status = 'absent' THEN 1 END) as absent_count,
+          COUNT(CASE WHEN wma.status = 'excused' THEN 1 END) as excused_count,
+          (SELECT COUNT(*) FROM users WHERE area_id = wm.area_id AND status = 'active') as total_area_users
          FROM weekly_meetings wm
          LEFT JOIN areas a ON wm.area_id = a.area_id
          LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id

@@ -70,7 +70,6 @@ const dailyActivitiesRoutes = require("./routes/dailyActivitiesRoutes");
 const feedsRoutes = require("./routes/feedsRoutes");
 const wakeUpCallRoutes = require("./routes/wakeUpCallRoutes"); // Add this line
 const meetingRoutes = require("./routes/meetingRoutes");
-const weeklyMeetingsRoutes = require("./routes/weeklyMeetingsRoutes");
 const smartMeetingsRoutes = require("./routes/smartMeetingsRoutes");
 const areaRoutes = require("./routes/areaRoutes");
 

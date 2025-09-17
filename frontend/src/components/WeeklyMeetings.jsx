@@ -272,14 +272,20 @@ const WeeklyMeetings = () => {
 
   const getStatusBadge = (status) => {
     const statusColors = {
+      // Meeting statuses
       scheduled: 'bg-blue-100 text-blue-800',
       completed: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800'
+      cancelled: 'bg-red-100 text-red-800',
+      // Attendance statuses
+      present: 'bg-green-100 text-green-800',
+      absent: 'bg-red-100 text-red-800',
+      excused: 'bg-yellow-100 text-yellow-800',
+      not_marked: 'bg-gray-100 text-gray-800'
     };
 
     return (
       <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[status] || 'bg-gray-100 text-gray-800'}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+        {status === 'not_marked' ? 'Not Marked' : status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
     );
   };
@@ -403,9 +409,6 @@ const WeeklyMeetings = () => {
                     Members
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Attendance
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -429,23 +432,31 @@ const WeeklyMeetings = () => {
                         {meeting.area_name || 'All Areas'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {meeting.total_area_users || meeting.total_members}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {getAttendanceDisplay(meeting)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                         <button
                           onClick={() => handleViewMeeting(meeting)}
-                          className="text-green-600 hover:text-green-900 flex items-center"
+                          className={`p-1 rounded-md transition-colors ${
+                            expandedMeetings.has(meeting.id)
+                              ? 'text-blue-700 bg-blue-100'
+                              : 'text-blue-600 hover:text-blue-900 hover:bg-blue-50'
+                          }`}
+                          title={expandedMeetings.has(meeting.id) ? "Hide Details" : "View Details"}
                         >
-                          {expandedMeetings.has(meeting.id) ? '▼' : '▶'} Details
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
                         </button>
                         <button
                           onClick={() => handleDeleteMeeting(meeting)}
-                          className="text-red-600 hover:text-red-900"
+                          className="text-red-600 hover:text-red-900 p-1 rounded-md hover:bg-red-50 transition-colors"
+                          title="Delete Meeting"
                         >
-                          Delete
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
                         </button>
                       </td>
                     </tr>
@@ -453,65 +464,86 @@ const WeeklyMeetings = () => {
                     {/* Expandable row for meeting details */}
                     {expandedMeetings.has(meeting.id) && meetingDetails[meeting.id] && (
                       <tr>
-                        <td colSpan="6" className="px-6 py-4 bg-gray-50">
+                        <td colSpan="5" className="px-6 py-4 bg-gray-50">
                           <div className="space-y-4">
                             {/* Meeting Info */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                               <div>
                                 <span className="text-sm font-medium text-gray-600">Location:</span>
                                 <div className="text-sm text-gray-900">
-                                  {meetingDetails[meeting.id].meeting.location || 'Not specified'}
+                                  {meetingDetails[meeting.id].meeting_info.location || 'Not specified'}
                                 </div>
                               </div>
                               <div>
                                 <span className="text-sm font-medium text-gray-600">Area:</span>
                                 <div className="text-sm text-gray-900">
-                                  {meetingDetails[meeting.id].meeting.area_name || 'All Areas'}
+                                  {meetingDetails[meeting.id].meeting_info.area_name || 'All Areas'}
                                 </div>
                               </div>
                               <div>
                                 <span className="text-sm font-medium text-gray-600">Status:</span>
                                 <div className="mt-1">
-                                  {getStatusBadge(meetingDetails[meeting.id].meeting.status)}
+                                  {getStatusBadge(meetingDetails[meeting.id].meeting_info.status || meeting.status)}
                                 </div>
                               </div>
                               <div>
                                 <span className="text-sm font-medium text-gray-600">Time:</span>
                                 <div className="text-sm text-gray-900">
-                                  {formatTime(meetingDetails[meeting.id].meeting.meeting_time)}
+                                  {formatTime(meetingDetails[meeting.id].meeting_info.meeting_time)}
                                 </div>
                               </div>
                             </div>
 
                             {/* Agenda */}
-                            {meetingDetails[meeting.id].meeting.agenda && (
+                            {meetingDetails[meeting.id].meeting_info.agenda && (
                               <div>
                                 <span className="text-sm font-medium text-gray-600">Agenda:</span>
                                 <div className="mt-1 p-3 bg-white rounded-md border text-sm text-gray-700">
-                                  {meetingDetails[meeting.id].meeting.agenda}
+                                  {meetingDetails[meeting.id].meeting_info.agenda}
                                 </div>
                               </div>
                             )}
 
                             {/* Committee Members Attendance */}
                             <div>
-                              <h5 className="text-sm font-medium text-gray-900 mb-3">Committee Members Attendance</h5>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="flex justify-between items-center mb-3">
+                                <h5 className="text-sm font-medium text-gray-900">Committee Members Attendance</h5>
+                                {meetingDetails[meeting.id].summary && (
+                                  <div className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
+                                    Present: {meetingDetails[meeting.id].summary.present} | 
+                                    Absent: {meetingDetails[meeting.id].summary.absent} | 
+                                    Excused: {meetingDetails[meeting.id].summary.excused} | 
+                                    Not Marked: {meetingDetails[meeting.id].summary.not_marked}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                 {meetingDetails[meeting.id].attendance.map((member) => (
-                                  <div key={member.id} className="flex justify-between items-center p-3 bg-white rounded-md border">
-                                    <div>
-                                      <div className="font-medium text-sm">{member.full_name}</div>
-                                      <div className="text-xs text-gray-600">{member.role}</div>
-                                      {member.reason && (
-                                        <div className="text-xs text-gray-500 italic">{member.reason}</div>
+                                  <div key={member.user_id || member.id} className="flex justify-between items-center p-3 bg-white rounded-md border hover:bg-gray-50 transition-colors">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium text-sm text-gray-900 truncate">{member.full_name}</div>
+                                      <div className="text-xs text-gray-600">{member.email}</div>
+                                      {member.reason && member.status !== 'present' && (
+                                        <div className="text-xs text-gray-500 italic mt-1 truncate">{member.reason}</div>
+                                      )}
+                                      {member.marked_at && (
+                                        <div className="text-xs text-gray-400 mt-1">
+                                          Marked: {new Date(member.marked_at).toLocaleDateString()}
+                                          {member.marked_by && ` by ${member.marked_by}`}
+                                        </div>
                                       )}
                                     </div>
-                                    <div>
+                                    <div className="ml-2 flex-shrink-0">
                                       {getStatusBadge(member.status)}
                                     </div>
                                   </div>
                                 ))}
                               </div>
+                              {meetingDetails[meeting.id].attendance.length === 0 && (
+                                <div className="text-center py-4 text-gray-500 text-sm">
+                                  No attendance records found for this meeting.
+                                </div>
+                              )}
                             </div>
                           </div>
                         </td>
