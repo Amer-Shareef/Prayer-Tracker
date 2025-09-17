@@ -407,7 +407,8 @@ router.post(
       if (!meetingAreaId) {
         return res.status(400).json({
           success: false,
-          message: "Area ID is required - please provide area_id in request body or ensure your account has an assigned area",
+          message:
+            "Area ID is required - please provide area_id in request body or ensure your account has an assigned area",
         });
       }
 
@@ -498,12 +499,19 @@ router.post(
           );
         }
 
+        // Create meetings array for the new method signature
+        const meetings = [
+          {
+            meetingTime: meeting_time || "10:00:00",
+            location: location || "Community Center",
+            agenda: agenda || "Weekly committee meeting",
+          },
+        ];
+
         const results = await scheduler.createRecurringMeetingsWithInitial(
           meetingAreaId,
           meeting_date,
-          meeting_time,
-          location,
-          agenda,
+          meetings,
           user.id,
           weeks_ahead,
           forceCreate // Pass the force flag to the scheduler
