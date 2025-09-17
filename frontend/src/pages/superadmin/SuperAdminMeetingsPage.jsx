@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import SuperAdminLayout from '../../components/layouts/SuperAdminLayout';
+import WeeklyMeetings from '../../components/WeeklyMeetings';
 
 const SuperAdminMeetingsPage = () => {
   const [activeTab, setActiveTab] = useState('schedule');
@@ -105,6 +106,16 @@ const SuperAdminMeetingsPage = () => {
               }`}
             >
               Manage Meetings
+            </button>
+            <button
+              onClick={() => setActiveTab('weekly')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'weekly'
+                  ? 'border-purple-500 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Weekly Meetings
             </button>
             <button
               onClick={() => setActiveTab('counselling')}
@@ -304,6 +315,12 @@ const SuperAdminMeetingsPage = () => {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'weekly' && (
+          <div className="space-y-6">
+            <WeeklyMeetings />
           </div>
         )}
 

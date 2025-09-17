@@ -5,12 +5,32 @@ import { areaService } from '../services/api';
 
 const WeeklyMeetings = () => {
   const { user } = useAuth();
+
+  // Role-based access control - only Founders and SuperAdmins can access
+  const allowedRoles = ['Founder', 'SuperAdmin'];
+  const hasAccess = allowedRoles.includes(user?.role);
+
+  // If user doesn't have access, show error message
+  if (!hasAccess) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <h3 className="text-lg font-medium text-red-800">Access Denied</h3>
+          <p className="text-red-600 mt-2">
+            You don't have permission to access weekly meetings management.
+            This feature is only available to Founders and Super Administrators.
+          </p>
+        </div>
+      </div>
+    );
+  }
   
   // State management
   const [allMeetings, setAllMeetings] = useState([]);
   const [areas, setAreas] = useState([]);
-  const [selectedArea, setSelectedArea] = useState('');
+  const [selectedArea, setSelectedArea] = useState(user?.role === 'SuperAdmin' ? 'all' : '');
   const [loading, setLoading] = useState(true);
+  const [loadingAreas, setLoadingAreas] = useState(false);
   const [error, setError] = useState('');
   
   // Search and filter functionality
@@ -24,7 +44,7 @@ const WeeklyMeetings = () => {
   
   // Form state
   const [createForm, setCreateForm] = useState({
-    meeting_day: 0, // 0 = Sunday, 1 = Monday, etc.
+    meeting_date: '',
     meeting_time: '10:00',
     location: '',
     agenda: '',
@@ -32,26 +52,36 @@ const WeeklyMeetings = () => {
   });
 
   useEffect(() => {
-    fetchData();
     if (user?.role === 'SuperAdmin') {
       fetchAreas();
     }
   }, [user]);
 
   useEffect(() => {
-    if (selectedArea || user?.area_id) {
-      fetchData();
+    // For SuperAdmins, only fetch data if an area is selected (including "all")
+    // For Founders, always fetch data (they have their assigned area)
+    if (user?.role === 'SuperAdmin') {
+      if (selectedArea) {
+        fetchData();
+      }
+    } else {
+      if (user?.area_id) {
+        fetchData();
+      }
     }
-  }, [selectedArea]);
+  }, [selectedArea, user]);
 
   const fetchAreas = async () => {
     try {
+      setLoadingAreas(true);
       const response = await areaService.getAreas();
       if (response.data && response.data.success) {
         setAreas(response.data.data || []);
       }
     } catch (error) {
       console.error('Error fetching areas:', error);
+    } finally {
+      setLoadingAreas(false);
     }
   };
 
@@ -59,18 +89,65 @@ const WeeklyMeetings = () => {
     try {
       setLoading(true);
       setError('');
-      
+
+      console.log('WeeklyMeetings: fetchData called', { selectedArea, userRole: user?.role, userAreaId: user?.area_id });
+
       const areaId = selectedArea || user?.area_id;
-      const params = areaId ? { area_id: areaId } : {};
-      
-      const response = await weeklyMeetingsService.getWeeklyMeetings(params);
+
+      if (!areaId) {
+        if (user?.role === 'SuperAdmin') {
+          setError('Please select an area to view meetings');
+        } else {
+          setError('No area selected or assigned');
+        }
+        setAllMeetings([]);
+        return;
+      }
+
+      // Skip the no areaId check for SuperAdmins with 'all' selected
+      if (user?.role === 'SuperAdmin' && selectedArea === 'all') {
+        // Proceed with all areas dashboard
+      } else if (!areaId) {
+        setError('No area selected or assigned');
+        setAllMeetings([]);
+        return;
+      }
+
+      let response;
+      if (selectedArea === 'all' && user?.role === 'SuperAdmin') {
+        console.log('WeeklyMeetings: Fetching all areas dashboard');
+        response = await weeklyMeetingsService.getAllAreasDashboard();
+      } else {
+        console.log('WeeklyMeetings: Fetching area dashboard for areaId:', areaId);
+        response = await weeklyMeetingsService.getAreaDashboard(areaId);
+      }
+
+      console.log('WeeklyMeetings: API response received', response);
 
       if (response.success) {
-        setAllMeetings(response.data || []);
+        if (selectedArea === 'all') {
+          // For all areas, combine meetings from all areas
+          const allMeetings = [];
+          if (response.data && Array.isArray(response.data)) {
+            // If backend returns array of area data
+            response.data.forEach(areaData => {
+              if (areaData.recent_meetings) allMeetings.push(...areaData.recent_meetings);
+              if (areaData.upcoming_meetings) allMeetings.push(...areaData.upcoming_meetings);
+            });
+          }
+          console.log('WeeklyMeetings: Combined meetings from all areas:', allMeetings.length);
+          setAllMeetings(allMeetings);
+        } else {
+          // The dashboard response contains recent_meetings and upcoming_meetings
+          const recentMeetings = response.data?.recent_meetings || [];
+          const upcomingMeetings = response.data?.upcoming_meetings || [];
+          console.log('WeeklyMeetings: Recent meetings:', recentMeetings.length, 'Upcoming meetings:', upcomingMeetings.length);
+          setAllMeetings([...recentMeetings, ...upcomingMeetings]);
+        }
       }
 
     } catch (err) {
-      console.error('Error fetching data:', err);
+      console.error('WeeklyMeetings: Error fetching data:', err);
       setError('Failed to load weekly meetings data');
     } finally {
       setLoading(false);
@@ -78,45 +155,27 @@ const WeeklyMeetings = () => {
   };
 
   const submitCreateMeeting = async () => {
-    if (!createForm.meeting_time) {
-      alert('Please select meeting time');
+    if (!createForm.meeting_date || !createForm.meeting_time) {
+      alert('Please select meeting date and time');
       return;
     }
 
     try {
-      // Calculate the next occurrence of the selected day
-      const today = new Date();
-      const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
-      const selectedDay = parseInt(createForm.meeting_day);
-      
-      let daysUntilMeeting;
-      if (selectedDay >= currentDay) {
-        // If selected day is today or later this week
-        daysUntilMeeting = selectedDay - currentDay;
-      } else {
-        // If selected day is earlier in the week, schedule for next week
-        daysUntilMeeting = (7 - currentDay) + selectedDay;
-      }
-      
-      const meetingDate = new Date(today);
-      meetingDate.setDate(today.getDate() + daysUntilMeeting);
-
       const meetingData = {
-        ...createForm,
-        meeting_date: meetingDate.toISOString().split('T')[0],
+        meeting_date: createForm.meeting_date,
+        meeting_time: createForm.meeting_time,
+        location: createForm.location || 'Community Center',
+        agenda: createForm.agenda || 'Weekly Committee Meeting',
         area_id: createForm.area_id || user?.area_id
       };
 
-      // Remove meeting_day from the data sent to backend
-      delete meetingData.meeting_day;
-
       const response = await weeklyMeetingsService.createWeeklyMeeting(meetingData);
-      
+
       if (response.success) {
-        alert('Weekly meeting created successfully!');
+        alert('Weekly meeting series created successfully!');
         setShowCreateModal(false);
         setCreateForm({
-          meeting_day: 0,
+          meeting_date: '',
           meeting_time: '10:00',
           location: '',
           agenda: '',
@@ -133,15 +192,15 @@ const WeeklyMeetings = () => {
   const handleViewMeeting = async (meeting) => {
     try {
       const newExpanded = new Set(expandedMeetings);
-      
+
       if (newExpanded.has(meeting.id)) {
         // Collapse if already expanded
         newExpanded.delete(meeting.id);
         setExpandedMeetings(newExpanded);
       } else {
-        // Expand and fetch details if not already loaded
+        // Expand and fetch attendance report if not already loaded
         if (!meetingDetails[meeting.id]) {
-          const response = await weeklyMeetingsService.getMeetingDetails(meeting.id);
+          const response = await weeklyMeetingsService.getAttendanceReport(meeting.id);
           if (response.success) {
             setMeetingDetails(prev => ({
               ...prev,
@@ -164,7 +223,7 @@ const WeeklyMeetings = () => {
     }
 
     try {
-      await weeklyMeetingsService.deleteWeeklyMeeting(meeting.id);
+      await weeklyMeetingsService.deleteMeeting(meeting.id);
       alert('Meeting deleted successfully!');
       await fetchData();
     } catch (error) {
@@ -226,10 +285,13 @@ const WeeklyMeetings = () => {
   };
 
   const getAttendanceDisplay = (meeting) => {
+    const totalMembers = meeting.total_area_users || meeting.total_members || 0;
+    const presentCount = meeting.present_count || 0;
+
     if (meeting.status === 'completed') {
-      return `${meeting.present_count}/${meeting.total_members}`;
+      return `${presentCount}/${totalMembers}`;
     }
-    return meeting.pending_count > 0 ? 'Pending' : `${meeting.present_count}/${meeting.total_members}`;
+    return meeting.total_marked > 0 ? `${presentCount}/${totalMembers}` : 'Not started';
   };
 
   if (loading) {
@@ -247,12 +309,7 @@ const WeeklyMeetings = () => {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Weekly Meetings</h2>
           <p className="text-sm text-gray-600 mt-1">
-            {user?.role === 'SuperAdmin' 
-              ? selectedArea 
-                ? `Managing meetings for: ${areas.find(a => a.area_id == selectedArea)?.area_name || 'Selected Area'}`
-                : 'Managing meetings for all areas'
-              : `Area: ${areas.find(a => a.area_id == user?.area_id)?.area_name || 'Your Area'}`
-            }
+            {selectedArea === 'all' ? 'Viewing all areas' : `Viewing area: ${areas.find(a => a.area_id == selectedArea)?.area_name || 'Unknown'}`}
           </p>
         </div>
         {user?.role === 'SuperAdmin' && (
@@ -263,9 +320,10 @@ const WeeklyMeetings = () => {
             <select
               value={selectedArea}
               onChange={(e) => setSelectedArea(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              disabled={loadingAreas}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
-              <option value="">🌍 All Areas</option>
+              <option value="all">🌍 All Areas</option>
               {areas.map(area => (
                 <option key={area.area_id} value={area.area_id}>
                   📍 {area.area_name}
@@ -371,7 +429,7 @@ const WeeklyMeetings = () => {
                         {meeting.area_name || 'All Areas'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {meeting.total_members}
+                        {meeting.total_area_users || meeting.total_members}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {getAttendanceDisplay(meeting)}
@@ -488,27 +546,21 @@ const WeeklyMeetings = () => {
             <div className="px-6 py-4 space-y-4">
               <div className="bg-green-50 p-3 rounded-md">
                 <p className="text-sm text-green-700">
-                  📅 Meeting will be scheduled for the next occurrence of the selected day
+                  📅 Select the date for the first meeting in the series
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Meeting Day
+                  Meeting Date
                 </label>
-                <select
-                  value={createForm.meeting_day}
-                  onChange={(e) => setCreateForm({...createForm, meeting_day: e.target.value})}
+                <input
+                  type="date"
+                  value={createForm.meeting_date}
+                  onChange={(e) => setCreateForm({...createForm, meeting_date: e.target.value})}
+                  min={new Date().toISOString().split('T')[0]}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                >
-                  <option value={0}>Sunday</option>
-                  <option value={1}>Monday</option>
-                  <option value={2}>Tuesday</option>
-                  <option value={3}>Wednesday</option>
-                  <option value={4}>Thursday</option>
-                  <option value={5}>Friday</option>
-                  <option value={6}>Saturday</option>
-                </select>
+                />
               </div>
 
               <div>
