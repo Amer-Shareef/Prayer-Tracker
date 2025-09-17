@@ -30,9 +30,9 @@ const memberService = {
   },
 
   // Get all members for a mosque
-  getMembers: async () => {
+  getMembers: async (params = {}) => {
     try {
-      const response = await memberAPI.getMembers();
+      const response = await memberAPI.getMembers(params);
       return response;
     } catch (error) {
       throw (

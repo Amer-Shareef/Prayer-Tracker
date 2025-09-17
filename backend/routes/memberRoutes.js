@@ -5,7 +5,109 @@ const { authenticateToken, authorizeRole } = require("../middleware/auth");
 
 const router = express.Router();
 
-// Get all members for a founder's mosque
+// Get all members - returns ALL members across all areas (SuperAdmin view)
+// This route must be defined BEFORE the general /members route
+router.get(
+  "/members/all",
+  authenticateToken,
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
+  async (req, res) => {
+    try {
+      console.log("📋 Fetching ALL members across all areas");
+
+      // Check if pagination is requested
+      const pageParam = req.query.page;
+      const shouldPaginate = pageParam !== undefined;
+
+      // Base query without WHERE restrictions - gets ALL members
+      const baseQuery = `
+        SELECT u.id, u.full_name as fullName, u.username, u.email, u.phone, u.role, u.status, 
+               u.joined_date, u.last_login, u.created_at, u.date_of_birth as dateOfBirth, 
+               u.address, u.area_id, u.sub_areas_id, u.mobility, u.living_on_rent as onRent, 
+               u.zakath_eligible as zakathEligible, u.differently_abled as differentlyAbled, 
+               u.muallafathil_quloob as MuallafathilQuloob, 
+               a.area_name as area, a.address as area_address,
+               sa.address as subarea,
+               CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId,
+               COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) as prayed_count,
+               CASE 
+                 WHEN DATEDIFF(CURDATE(), u.joined_date) >= 39 THEN 200
+                 ELSE (DATEDIFF(CURDATE(), u.joined_date) + 1) * 5
+               END as total_prayers,
+               CASE 
+                 WHEN DATEDIFF(CURDATE(), u.joined_date) >= 39 THEN 
+                   ROUND((COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) / 200) * 100, 2)
+                 ELSE 
+                   CASE 
+                     WHEN (DATEDIFF(CURDATE(), u.joined_date) + 1) * 5 > 0 THEN 
+                       ROUND((COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) / ((DATEDIFF(CURDATE(), u.joined_date) + 1) * 5)) * 100, 2)
+                     ELSE 0 
+                   END
+               END as attendance_rate
+        FROM users u
+        LEFT JOIN areas a ON u.area_id = a.area_id
+        LEFT JOIN sub_areas sa ON u.sub_areas_id = sa.id
+        LEFT JOIN prayers p ON u.id = p.user_id 
+          AND p.prayer_date >= CASE 
+            WHEN DATEDIFF(CURDATE(), u.joined_date) >= 39 THEN DATE_SUB(CURDATE(), INTERVAL 39 DAY)
+            ELSE u.joined_date
+          END
+          AND p.prayer_date <= CURDATE()
+        GROUP BY u.id 
+        ORDER BY u.created_at DESC
+      `;
+
+      const countQuery = `SELECT COUNT(DISTINCT u.id) as total FROM users u`;
+
+      if (shouldPaginate) {
+        // Apply pagination when page parameter is present
+        const page = parseInt(pageParam) || 1;
+        const limit = parseInt(req.query.limit) || 5; // PRODUCTION CONFIGURABLE: Default limit for /all endpoint
+        const offset = (page - 1) * limit;
+
+        const paginatedQuery = baseQuery + ` LIMIT ${limit} OFFSET ${offset}`;
+
+        const [members] = await pool.execute(paginatedQuery);
+        const [countResult] = await pool.execute(countQuery);
+
+        const totalMembers = countResult[0].total;
+        const totalPages = Math.ceil(totalMembers / limit);
+
+        console.log(`✅ Fetched ${members.length} of ${totalMembers} members (page ${page}/${totalPages})`);
+
+        res.json({
+          success: true,
+          data: members,
+          pagination: {
+            total: totalMembers,
+            page,
+            limit,
+            totalPages,
+          },
+        });
+      } else {
+        // Return ALL members without any limit
+        const [members] = await pool.execute(baseQuery);
+
+        console.log(`✅ Fetched ALL ${members.length} members (no pagination)`);
+
+        res.json({
+          success: true,
+          data: members,
+        });
+      }
+    } catch (error) {
+      console.error("❌ Error fetching all members:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch all members",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Get area-specific members
 router.get(
   "/members",
   authenticateToken,
@@ -13,64 +115,100 @@ router.get(
   async (req, res) => {
     try {
       const { user } = req;
+      console.log(`📋 Fetching area-specific members for user role: ${user.role}`);
 
-      let query = `
-      SELECT u.id, u.full_name as fullName, u.username, u.email, u.phone, u.role, u.status, 
-             u.joined_date, u.last_login, u.created_at, u.date_of_birth as dateOfBirth, 
-             u.address, u.area_id, u.sub_areas_id, u.mobility, u.living_on_rent as onRent, u.zakath_eligible as zakathEligible, 
-             u.differently_abled as differentlyAbled, u.muallafathil_quloob as MuallafathilQuloob, 
-             a.area_name as area, a.address as area_address,
-             sa.address as subarea,
-             CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId,
-             COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) as prayed_count,
-             CASE 
-               WHEN DATEDIFF(CURDATE(), u.joined_date) >= 39 THEN 200
-               ELSE (DATEDIFF(CURDATE(), u.joined_date) + 1) * 5
-             END as total_prayers,
-             CASE 
-               WHEN DATEDIFF(CURDATE(), u.joined_date) >= 39 THEN 
-                 ROUND((COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) / 200) * 100, 2)
-               ELSE 
-                 CASE 
-                   WHEN (DATEDIFF(CURDATE(), u.joined_date) + 1) * 5 > 0 THEN 
-                     ROUND((COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) / ((DATEDIFF(CURDATE(), u.joined_date) + 1) * 5)) * 100, 2)
-                   ELSE 0 
-                 END
-             END as attendance_rate
-      FROM users u
-      LEFT JOIN areas a ON u.area_id = a.area_id
-      LEFT JOIN sub_areas sa ON u.sub_areas_id = sa.id
-      LEFT JOIN prayers p ON u.id = p.user_id 
-        AND p.prayer_date >= CASE 
-          WHEN DATEDIFF(CURDATE(), u.joined_date) >= 39 THEN DATE_SUB(CURDATE(), INTERVAL 39 DAY)
-          ELSE u.joined_date
-        END
-        AND p.prayer_date <= CURDATE()
-    `;
-      let queryParams = [];
+      // Check if pagination is requested
+      const pageParam = req.query.page;
+      const shouldPaginate = pageParam !== undefined;
 
-      // If founder or WCM, only show members from their area
-      // If superadmin, show all members
-      if (user.role === "Founder" || user.role === "WCM") {
-        query += ` WHERE u.area_id = (SELECT area_id FROM users WHERE id = ?)`;
-        queryParams.push(user.id);
+      // Base query for area-specific members
+      let baseQuery = `
+        SELECT u.id, u.full_name as fullName, u.username, u.email, u.phone, u.role, u.status, 
+               u.joined_date, u.last_login, u.created_at, u.date_of_birth as dateOfBirth, 
+               u.address, u.area_id, u.sub_areas_id, u.mobility, u.living_on_rent as onRent, 
+               u.zakath_eligible as zakathEligible, u.differently_abled as differentlyAbled, 
+               u.muallafathil_quloob as MuallafathilQuloob, 
+               a.area_name as area, a.address as area_address,
+               sa.address as subarea,
+               CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId,
+               COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) as prayed_count,
+               CASE 
+                 WHEN DATEDIFF(CURDATE(), u.joined_date) >= 39 THEN 200
+                 ELSE (DATEDIFF(CURDATE(), u.joined_date) + 1) * 5
+               END as total_prayers,
+               CASE 
+                 WHEN DATEDIFF(CURDATE(), u.joined_date) >= 39 THEN 
+                   ROUND((COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) / 200) * 100, 2)
+                 ELSE 
+                   CASE 
+                     WHEN (DATEDIFF(CURDATE(), u.joined_date) + 1) * 5 > 0 THEN 
+                       ROUND((COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) / ((DATEDIFF(CURDATE(), u.joined_date) + 1) * 5)) * 100, 2)
+                     ELSE 0 
+                   END
+               END as attendance_rate
+        FROM users u
+        LEFT JOIN areas a ON u.area_id = a.area_id
+        LEFT JOIN sub_areas sa ON u.sub_areas_id = sa.id
+        LEFT JOIN prayers p ON u.id = p.user_id 
+          AND p.prayer_date >= CASE 
+            WHEN DATEDIFF(CURDATE(), u.joined_date) >= 39 THEN DATE_SUB(CURDATE(), INTERVAL 39 DAY)
+            ELSE u.joined_date
+          END
+          AND p.prayer_date <= CURDATE()
+      `;
+
+      let countQuery = `SELECT COUNT(DISTINCT u.id) as total FROM users u`;
+
+      // Add area restriction based on user role
+      if (user.role === "Founder" || user.role === "WCM" || user.role === "SuperAdmin") {
+        baseQuery += ` WHERE u.area_id = (SELECT area_id FROM users WHERE id = ${user.id})`;
+        countQuery += ` WHERE u.area_id = (SELECT area_id FROM users WHERE id = ${user.id})`;
       } else if (user.role === "Member") {
-        // Members should only see their own data (if this route is accessible to them)
-        query += ` WHERE u.id = ?`;
-        queryParams.push(user.id);
+        baseQuery += ` WHERE u.id = ${user.id}`;
+        countQuery += ` WHERE u.id = ${user.id}`;
       }
-      // SuperAdmin sees all members (no WHERE clause added)
 
-      query += ` GROUP BY u.id ORDER BY u.created_at DESC`;
+      baseQuery += ` GROUP BY u.id ORDER BY u.created_at DESC`;
 
-      const [members] = await pool.execute(query, queryParams);
+      if (shouldPaginate) {
+        // Apply pagination when page parameter is present
+        const page = parseInt(pageParam) || 1;
+        const limit = parseInt(req.query.limit) || 5; // PRODUCTION CONFIGURABLE: Default limit for area-specific endpoint
+        const offset = (page - 1) * limit;
 
-      res.json({
-        success: true,
-        data: members,
-      });
+        const paginatedQuery = baseQuery + ` LIMIT ${limit} OFFSET ${offset}`;
+
+        const [members] = await pool.execute(paginatedQuery);
+        const [countResult] = await pool.execute(countQuery);
+
+        const totalMembers = countResult[0].total;
+        const totalPages = Math.ceil(totalMembers / limit);
+
+        console.log(`✅ Fetched ${members.length} of ${totalMembers} area members (page ${page}/${totalPages})`);
+
+        res.json({
+          success: true,
+          data: members,
+          pagination: {
+            total: totalMembers,
+            page,
+            limit,
+            totalPages,
+          },
+        });
+      } else {
+        // Return ALL area members without any limit
+        const [members] = await pool.execute(baseQuery);
+
+        console.log(`✅ Fetched ALL ${members.length} area members (no pagination)`);
+
+        res.json({
+          success: true,
+          data: members,
+        });
+      }
     } catch (error) {
-      console.error("Error fetching members:", error);
+      console.error("❌ Error fetching area members:", error);
       res.status(500).json({
         success: false,
         message: "Failed to fetch members",
