@@ -67,6 +67,20 @@ const weeklyMeetingsService = {
     }
   },
 
+  // Mark or update attendance for a meeting
+  updateAttendance: async (meetingId, attendanceData) => {
+    try {
+      const response = await api.put(
+        `/weekly-meetings/${meetingId}/attendance`,
+        attendanceData
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error updating attendance:", error);
+      throw error;
+    }
+  },
+
   // Delete a meeting
   deleteMeeting: async (meetingId) => {
     try {

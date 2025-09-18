@@ -39,6 +39,10 @@ const WeeklyMeetings = () => {
   const [recurringMeetings, setRecurringMeetings] = useState({});
   const [attendanceDetails, setAttendanceDetails] = useState({});
   
+  // Attendance editing state
+  const [editingAttendance, setEditingAttendance] = useState({ meetingId: null, userId: null });
+  const [editForm, setEditForm] = useState({ status: '', reason: '' });
+  
   // Modal and form states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -206,6 +210,8 @@ const WeeklyMeetings = () => {
     if (expandedAttendance.has(meetingId)) {
       newExpanded.delete(meetingId);
       setExpandedAttendance(newExpanded);
+      // Clear editing state when closing
+      setEditingAttendance({ meetingId: null, userId: null });
     } else {
       newExpanded.add(meetingId);
       setExpandedAttendance(newExpanded);
@@ -228,16 +234,72 @@ const WeeklyMeetings = () => {
     }
   }, [expandedAttendance, attendanceDetails]);
 
+  // Attendance editing functions
+  const startEditingAttendance = useCallback((meetingId, member) => {
+    setEditingAttendance({ meetingId, userId: member.user_id });
+    setEditForm({ 
+      status: member.status || 'pending', 
+      reason: member.reason || '' 
+    });
+  }, []);
+
+  const cancelEditingAttendance = useCallback(() => {
+    setEditingAttendance({ meetingId: null, userId: null });
+    setEditForm({ status: '', reason: '' });
+  }, []);
+
+  const saveAttendanceEdit = useCallback(async () => {
+    try {
+      const { meetingId, userId } = editingAttendance;
+      
+      const response = await weeklyMeetingsService.updateAttendance(meetingId, {
+        user_id: userId,
+        status: editForm.status,
+        reason: editForm.reason
+      });
+
+      if (response.success) {
+        // Refresh attendance details
+        const updatedResponse = await weeklyMeetingsService.getAttendanceDetails(meetingId);
+        if (updatedResponse.success) {
+          setAttendanceDetails(prev => ({
+            ...prev,
+            [meetingId]: updatedResponse.data
+          }));
+        }
+        cancelEditingAttendance();
+      } else {
+        setError('Failed to update attendance');
+      }
+    } catch (error) {
+      console.error('Error updating attendance:', error);
+      setError('Failed to update attendance');
+    }
+  }, [editingAttendance, editForm, cancelEditingAttendance]);
+
   const handleCreateMeeting = useCallback(async () => {
     try {
-      const areaId = selectedArea === 'all' ? user?.area_id : (selectedArea || user?.area_id);
+      // For SuperAdmins, use the selected area from the form if provided
+      // Otherwise, use the existing logic
+      let areaId;
+      if (user?.role === 'SuperAdmin' && createForm.area_id) {
+        areaId = createForm.area_id;
+      } else {
+        areaId = selectedArea === 'all' ? user?.area_id : (selectedArea || user?.area_id);
+      }
       
       if (!areaId) {
         setError('Please select an area');
         return;
       }
 
-      const meetingData = { ...createForm, area_id: areaId };
+      const meetingData = { 
+        meeting_date: createForm.meeting_date,
+        meeting_time: createForm.meeting_time,
+        location: createForm.location,
+        agenda: createForm.agenda,
+        area_id: areaId
+      };
       const response = await weeklyMeetingsService.createWeeklyMeeting(meetingData);
       
       if (response.success) {
@@ -257,7 +319,7 @@ const WeeklyMeetings = () => {
       console.error('Error creating meeting:', error);
       setError('Failed to create meeting');
     }
-  }, [createForm, selectedArea, user?.area_id, fetchParentMeetings]);
+  }, [createForm, selectedArea, user?.role, user?.area_id, fetchParentMeetings]);
 
   // Effects
   useEffect(() => {
@@ -426,9 +488,6 @@ const WeeklyMeetings = () => {
                             <div className="text-sm font-medium text-gray-900">
                               {meeting.area_name}
                             </div>
-                            <div className="text-sm text-gray-500">
-                              {meeting.present_count || 0}/{meeting.total_area_users || 0} attendance
-                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {getStatusBadge(meeting.status)}
@@ -517,54 +576,181 @@ const WeeklyMeetings = () => {
                                               {/* Attendance Details Row */}
                                               {isAttendanceExpanded && attendanceData && (
                                                 <tr>
-                                                  <td colSpan="5" className="px-4 py-3 bg-blue-50">
-                                                    {/* Summary Stats */}
-                                                    {attendanceData.summary && (
-                                                      <div className="grid grid-cols-4 gap-3 mb-4">
-                                                        <div className="bg-white rounded p-2 text-center">
-                                                          <div className="text-lg font-bold text-green-600">{attendanceData.summary.present}</div>
-                                                          <div className="text-xs text-gray-600">Present</div>
-                                                        </div>
-                                                        <div className="bg-white rounded p-2 text-center">
-                                                          <div className="text-lg font-bold text-red-600">{attendanceData.summary.absent}</div>
-                                                          <div className="text-xs text-gray-600">Absent</div>
-                                                        </div>
-                                                        <div className="bg-white rounded p-2 text-center">
-                                                          <div className="text-lg font-bold text-yellow-600">{attendanceData.summary.excused}</div>
-                                                          <div className="text-xs text-gray-600">Excused</div>
-                                                        </div>
-                                                        <div className="bg-white rounded p-2 text-center">
-                                                          <div className="text-lg font-bold text-gray-600">{attendanceData.summary.not_marked}</div>
-                                                          <div className="text-xs text-gray-600">Not Marked</div>
+                                                  <td colSpan="5" className="px-6 py-6 bg-gradient-to-r from-blue-50 to-indigo-50">
+                                                    <div className="space-y-6">
+                                                      {/* Header */}
+                                                      <div className="flex items-center justify-between">
+                                                        <h4 className="text-lg font-semibold text-gray-900 flex items-center">
+                                                          <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                                          </svg>
+                                                          Attendance Details
+                                                        </h4>
+                                                        <div className="text-sm text-gray-600">
+                                                          Meeting ID: {seriesMeeting.id}
                                                         </div>
                                                       </div>
-                                                    )}
 
-                                                    {/* Member List Table */}
-                                                    {attendanceData.member_attendance && (
-                                                      <div className="bg-white rounded overflow-hidden">
-                                                        <table className="min-w-full text-sm">
-                                                          <thead className="bg-gray-50">
-                                                            <tr>
-                                                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Member</th>
-                                                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Status</th>
-                                                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Reason</th>
-                                                            </tr>
-                                                          </thead>
-                                                          <tbody className="divide-y divide-gray-200">
-                                                            {attendanceData.member_attendance.map((member) => (
-                                                              <tr key={member.user_id} className="hover:bg-gray-50">
-                                                                <td className="px-3 py-2 font-medium text-gray-900">{member.full_name}</td>
-                                                                <td className="px-3 py-2">{getStatusBadge(member.status)}</td>
-                                                                <td className="px-3 py-2 text-gray-500 text-xs">
-                                                                  {member.reason || '-'}
-                                                                </td>
-                                                              </tr>
-                                                            ))}
-                                                          </tbody>
-                                                        </table>
-                                                      </div>
-                                                    )}
+                                                      {/* Summary Stats - Improved Design */}
+                                                      {attendanceData.summary && (
+                                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                          <div className="bg-white rounded-lg p-4 shadow-sm border border-green-100">
+                                                            <div className="flex items-center justify-between">
+                                                              <div>
+                                                                <div className="text-2xl font-bold text-green-600">{attendanceData.summary.present}</div>
+                                                                <div className="text-sm text-gray-600 font-medium">Present</div>
+                                                              </div>
+                                                              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                                                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                              </div>
+                                                            </div>
+                                                          </div>
+                                                          <div className="bg-white rounded-lg p-4 shadow-sm border border-red-100">
+                                                            <div className="flex items-center justify-between">
+                                                              <div>
+                                                                <div className="text-2xl font-bold text-red-600">{attendanceData.summary.absent}</div>
+                                                                <div className="text-sm text-gray-600 font-medium">Absent</div>
+                                                              </div>
+                                                              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                                                                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                </svg>
+                                                              </div>
+                                                            </div>
+                                                          </div>
+                                                          <div className="bg-white rounded-lg p-4 shadow-sm border border-yellow-100">
+                                                            <div className="flex items-center justify-between">
+                                                              <div>
+                                                                <div className="text-2xl font-bold text-yellow-600">{attendanceData.summary.excused}</div>
+                                                                <div className="text-sm text-gray-600 font-medium">Excused</div>
+                                                              </div>
+                                                              <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
+                                                                <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                                                </svg>
+                                                              </div>
+                                                            </div>
+                                                          </div>
+                                                          <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+                                                            <div className="flex items-center justify-between">
+                                                              <div>
+                                                                <div className="text-2xl font-bold text-gray-600">{attendanceData.summary.not_marked}</div>
+                                                                <div className="text-sm text-gray-600 font-medium">Not Marked</div>
+                                                              </div>
+                                                              <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                                                                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                              </div>
+                                                            </div>
+                                                          </div>
+                                                        </div>
+                                                      )}
+
+                                                      {/* Member Attendance List */}
+                                                      {attendanceData.member_attendance && (
+                                                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                                                          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                                                            <h5 className="text-md font-semibold text-gray-900">Member Attendance</h5>
+                                                            <p className="text-sm text-gray-600 mt-1">Click edit to update attendance status and reasons</p>
+                                                          </div>
+                                                          <div className="divide-y divide-gray-200">
+                                                            {attendanceData.member_attendance.map((member) => {
+                                                              const isEditing = editingAttendance.meetingId === seriesMeeting.id && editingAttendance.userId === member.user_id;
+                                                              const canEdit = ['SuperAdmin', 'Founder'].includes(user?.role);
+
+                                                              return (
+                                                                <div key={member.user_id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                                                                  {isEditing ? (
+                                                                    // Edit Mode
+                                                                    <div className="space-y-4">
+                                                                      <div className="flex items-center justify-between">
+                                                                        <h6 className="text-sm font-medium text-gray-900">{member.full_name || 'Unknown User'}</h6>
+                                                                        <div className="flex space-x-2">
+                                                                          <button
+                                                                            onClick={saveAttendanceEdit}
+                                                                            className="px-3 py-1 bg-green-600 text-white text-xs rounded-md hover:bg-green-700 transition-colors"
+                                                                          >
+                                                                            Save
+                                                                          </button>
+                                                                          <button
+                                                                            onClick={cancelEditingAttendance}
+                                                                            className="px-3 py-1 bg-gray-600 text-white text-xs rounded-md hover:bg-gray-700 transition-colors"
+                                                                          >
+                                                                            Cancel
+                                                                          </button>
+                                                                        </div>
+                                                                      </div>
+                                                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                        <div>
+                                                                          <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                                                                          <select
+                                                                            value={editForm.status}
+                                                                            onChange={(e) => setEditForm(prev => ({ ...prev, status: e.target.value }))}
+                                                                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                                          >
+                                                                            <option value="present">Present</option>
+                                                                            <option value="absent">Absent</option>
+                                                                            <option value="excused">Excused</option>
+                                                                            <option value="pending">Pending</option>
+                                                                          </select>
+                                                                        </div>
+                                                                        <div>
+                                                                          <label className="block text-xs font-medium text-gray-700 mb-1">Reason</label>
+                                                                          <input
+                                                                            type="text"
+                                                                            value={editForm.reason}
+                                                                            onChange={(e) => setEditForm(prev => ({ ...prev, reason: e.target.value }))}
+                                                                            placeholder="Optional reason..."
+                                                                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                                            maxLength={500}
+                                                                          />
+                                                                        </div>
+                                                                      </div>
+                                                                    </div>
+                                                                  ) : (
+                                                                    // View Mode
+                                                                    <div className="flex items-center justify-between">
+                                                                      <div className="flex-1">
+                                                                        <div className="flex items-center space-x-3">
+                                                                          <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                                                                            <span className="text-sm font-medium text-gray-600">
+                                                                              {member.full_name ? member.full_name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
+                                                                            </span>
+                                                                          </div>
+                                                                          <div>
+                                                                            <div className="text-sm font-medium text-gray-900">{member.full_name || 'Unknown User'}</div>
+                                                                            <div className="text-xs text-gray-500">
+                                                                              {member.reason || 'No reason provided'}
+                                                                            </div>
+                                                                          </div>
+                                                                        </div>
+                                                                      </div>
+                                                                      <div className="flex items-center space-x-3">
+                                                                        {getStatusBadge(member.status)}
+                                                                        {canEdit && (
+                                                                          <button
+                                                                            onClick={() => startEditingAttendance(seriesMeeting.id, member)}
+                                                                            className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                                                                            title="Edit attendance"
+                                                                          >
+                                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                                            </svg>
+                                                                          </button>
+                                                                        )}
+                                                                      </div>
+                                                                    </div>
+                                                                  )}
+                                                                </div>
+                                                              );
+                                                            })}
+                                                          </div>
+                                                        </div>
+                                                      )}
+                                                    </div>
                                                   </td>
                                                 </tr>
                                               )}
@@ -626,6 +812,24 @@ const WeeklyMeetings = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                     />
                   </div>
+                  
+                  {user?.role === 'SuperAdmin' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Area</label>
+                      <select
+                        value={createForm.area_id}
+                        onChange={(e) => setCreateForm(prev => ({ ...prev, area_id: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      >
+                        <option value="">Select Area</option>
+                        {areas.map(area => (
+                          <option key={area.area_id} value={area.area_id}>
+                            {area.area_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
