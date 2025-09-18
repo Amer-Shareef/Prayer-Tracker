@@ -31,8 +31,7 @@ const meetingCreationLimit = rateLimit({
 // Validation middleware
 const validateMeetingCreation = [
   body("meeting_date")
-    .isISO8601()
-    .toDate()
+    .matches(/^\d{4}-\d{2}-\d{2}$/)
     .withMessage("Valid date required (YYYY-MM-DD)"),
   body("meeting_time")
     .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
@@ -55,8 +54,8 @@ const validateMeetingCreation = [
 
 const validateAttendance = [
   body("status")
-    .isIn(["present", "absent", "excused"])
-    .withMessage("Status must be present, absent, or excused"),
+    .isIn(["present", "absent", "excused", "pending"])
+    .withMessage("Status must be present, absent, excused, or pending"),
   body("reason").optional().isLength({ max: 500 }).trim(),
   body("user_id").optional().isInt({ min: 1 }),
   (req, res, next) => {
@@ -88,9 +87,28 @@ function getUTCDateString(date) {
 }
 
 function addWeeksToDate(dateString, weeks) {
-  const date = new Date(dateString + "T00:00:00.000Z");
+  // Ensure dateString is a valid YYYY-MM-DD format
+  if (!dateString || typeof dateString !== "string") {
+    throw new Error(`Invalid date string: ${dateString}`);
+  }
+
+  // Create date at noon UTC to avoid timezone issues
+  const date = new Date(dateString + "T12:00:00.000Z");
+
+  if (isNaN(date.getTime())) {
+    throw new Error(`Invalid date created from: ${dateString}`);
+  }
+
   date.setUTCDate(date.getUTCDate() + weeks * 7);
   return date.toISOString().split("T")[0];
+}
+
+function formatTimeToHHMM(timeString) {
+  // Parse time and format to HH:MM
+  const [hours, minutes] = timeString.split(":").map(Number);
+  const formattedHours = hours.toString().padStart(2, "0");
+  const formattedMinutes = minutes.toString().padStart(2, "0");
+  return `${formattedHours}:${formattedMinutes}`;
 }
 
 // Enhanced future meeting creation with transaction safety
@@ -140,6 +158,17 @@ async function ensureFutureMeetingsSafe(connection, meeting, minFuture = 2) {
     );
 
     let lastMeetingDate = lastMeetingQuery[0].meeting_date;
+
+    // Ensure lastMeetingDate is in YYYY-MM-DD format
+    if (lastMeetingDate instanceof Date) {
+      lastMeetingDate = getUTCDateString(lastMeetingDate);
+    } else if (
+      typeof lastMeetingDate === "string" &&
+      lastMeetingDate.includes(":")
+    ) {
+      // Handle YYYY:MM:DD format if it somehow got corrupted
+      lastMeetingDate = lastMeetingDate.replace(/:/g, "-");
+    }
 
     // Ensure we don't create meetings in the past
     if (lastMeetingDate <= today) {
@@ -231,6 +260,7 @@ router.post(
 
       const { meeting_date, meeting_time, location, agenda, area_id } =
         req.body;
+      const formattedMeetingTime = formatTimeToHHMM(meeting_time);
       const { user } = req;
 
       const meetingAreaId = area_id || user.area_id;
@@ -253,7 +283,7 @@ router.post(
         `SELECT id FROM weekly_meetings 
          WHERE area_id = ? AND meeting_date = ? AND meeting_time = ?
          FOR UPDATE`,
-        [meetingAreaId, meetingDateStr, meeting_time]
+        [meetingAreaId, meetingDateStr, formattedMeetingTime]
       );
 
       if (existing.length > 0) {
@@ -269,7 +299,7 @@ router.post(
         [
           meetingAreaId,
           meetingDateStr,
-          meeting_time,
+          formattedMeetingTime,
           location || "Community Center",
           agenda || "Weekly Committee Meeting",
           user.id,
@@ -285,7 +315,7 @@ router.post(
           id: parentMeetingId,
           area_id: meetingAreaId,
           meeting_date: meetingDateStr,
-          meeting_time,
+          meeting_time: formattedMeetingTime,
           location: location || "Community Center",
           agenda: agenda || "Weekly Committee Meeting",
           created_by: user.id,
@@ -458,7 +488,7 @@ router.get(
       // Get next meeting
       const [nextMeeting] = await pool.execute(
         `SELECT wm.*, 
-        COALESCE(wma.status, 'not_marked') as my_attendance_status,
+        COALESCE(wma.status, 'pending') as my_attendance_status,
         (SELECT COUNT(*) FROM weekly_meeting_attendance WHERE weekly_meeting_id = wm.id) as total_marked,
         (SELECT COUNT(*) FROM weekly_meeting_attendance WHERE weekly_meeting_id = wm.id AND status = 'present') as present_count,
         CASE WHEN wm.parent_id IS NULL THEN 'parent' ELSE 'child' END as meeting_type
@@ -475,7 +505,7 @@ router.get(
       // Get recent past meetings (last 5)
       const [recentMeetings] = await pool.execute(
         `SELECT wm.*, 
-        COALESCE(wma.status, 'not_marked') as my_attendance_status,
+        COALESCE(wma.status, 'pending') as my_attendance_status,
         (SELECT COUNT(*) FROM weekly_meeting_attendance WHERE weekly_meeting_id = wm.id AND status = 'present') as present_count,
         (SELECT COUNT(*) FROM weekly_meeting_attendance WHERE weekly_meeting_id = wm.id) as total_marked,
         CASE WHEN wm.parent_id IS NULL THEN 'parent' ELSE 'child' END as meeting_type
@@ -520,7 +550,7 @@ router.get(
           // Retry getting next meeting
           const [newNextMeeting] = await pool.execute(
             `SELECT wm.*, 
-            'not_marked' as my_attendance_status,
+            'pending' as my_attendance_status,
             0 as total_marked,
             0 as present_count,
             CASE WHEN wm.parent_id IS NULL THEN 'parent' ELSE 'child' END as meeting_type
@@ -591,6 +621,29 @@ router.get(
         [id]
       );
 
+      console.log(`Backend: Meeting ${id} details:`, meetingCheck[0]);
+
+      // Check attendance records for this meeting
+      const [attendanceRecords] = await pool.execute(
+        `SELECT * FROM weekly_meeting_attendance WHERE weekly_meeting_id = ?`,
+        [id]
+      );
+      console.log(
+        `Backend: Attendance records in database for meeting ${id}:`,
+        attendanceRecords.length,
+        "records"
+      );
+      console.log(
+        "Backend: Attendance records:",
+        attendanceRecords.map((r) => ({
+          id: r.id,
+          weekly_meeting_id: r.weekly_meeting_id,
+          user_id: r.user_id,
+          status: r.status,
+          reason: r.reason,
+        }))
+      );
+
       if (meetingCheck.length === 0) {
         return res.status(404).json({
           success: false,
@@ -606,8 +659,23 @@ router.get(
         });
       }
 
+      // Check users in the meeting's area
+      const [areaUsers] = await pool.execute(
+        `SELECT id, full_name, area_id, status FROM users WHERE area_id = ? AND status = 'active'`,
+        [meetingCheck[0].area_id]
+      );
+      console.log(
+        `Backend: Active users in area ${meetingCheck[0].area_id}:`,
+        areaUsers.length,
+        "users"
+      );
+      console.log(
+        "Backend: User 18 in area?",
+        areaUsers.find((u) => u.id === 18)
+      );
+
       const [report] = await pool.execute(
-        `SELECT 
+        `SELECT
         wm.id as meeting_id,
         wm.meeting_date,
         wm.meeting_time,
@@ -615,23 +683,55 @@ router.get(
         wm.agenda,
         wm.parent_id,
         CASE WHEN wm.parent_id IS NULL THEN 'parent' ELSE 'child' END as meeting_type,
-        a.area_name,
+        a.area_name as meeting_area_name,
         u.id as user_id,
         u.full_name,
         u.email,
         u.phone,
-        COALESCE(wma.status, 'not_marked') as status,
+        ua.area_name as user_area_name,
+        wma.status,
         wma.reason,
         wma.marked_at,
-        marker.full_name as marked_by
+        wma.marked_by as marked_by_id,
+        marker.full_name as marked_by_name
        FROM weekly_meetings wm
        LEFT JOIN areas a ON wm.area_id = a.area_id
-       CROSS JOIN users u ON u.area_id = wm.area_id AND u.status = 'active'
+       INNER JOIN users u ON u.area_id = wm.area_id AND u.status = 'active'
+       LEFT JOIN areas ua ON u.area_id = ua.area_id
        LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id AND u.id = wma.user_id
        LEFT JOIN users marker ON wma.marked_by = marker.id
        WHERE wm.id = ?
        ORDER BY u.full_name`,
         [id]
+      );
+
+      console.log(
+        `Backend: Attendance query result for meeting ${id}:`,
+        report.length,
+        "records"
+      );
+      console.log(
+        "Backend: Sample attendance records:",
+        report.slice(0, 3).map((r) => ({
+          user_id: r.user_id,
+          full_name: r.full_name,
+          status: r.status,
+        }))
+      );
+
+      // Check if user 18 is in the results
+      const user18Record = report.find((r) => r.user_id === 18);
+      console.log("Backend: User 18 record:", user18Record);
+
+      // Check all present records
+      const presentRecords = report.filter((r) => r.status === "present");
+      console.log(
+        "Backend: Present records:",
+        presentRecords.map((r) => ({
+          user_id: r.user_id,
+          full_name: r.full_name,
+          status: r.status,
+        }))
       );
 
       if (report.length === 0) {
@@ -646,7 +746,12 @@ router.get(
         present: report.filter((r) => r.status === "present").length,
         absent: report.filter((r) => r.status === "absent").length,
         excused: report.filter((r) => r.status === "excused").length,
-        not_marked: report.filter((r) => r.status === "not_marked").length,
+        pending: report.filter(
+          (r) =>
+            r.status !== "present" &&
+            r.status !== "absent" &&
+            r.status !== "excused"
+        ).length,
         attendance_rate:
           report.length > 0
             ? (
@@ -656,6 +761,27 @@ router.get(
               ).toFixed(1)
             : 0,
       };
+
+      console.log("Backend: Summary calculation:", summary);
+      console.log("Backend: Status distribution:", {
+        present: report
+          .filter((r) => r.status === "present")
+          .map((r) => ({ id: r.user_id, name: r.full_name, status: r.status })),
+        absent: report
+          .filter((r) => r.status === "absent")
+          .map((r) => ({ id: r.user_id, name: r.full_name, status: r.status })),
+        excused: report
+          .filter((r) => r.status === "excused")
+          .map((r) => ({ id: r.user_id, name: r.full_name, status: r.status })),
+        pending: report
+          .filter(
+            (r) =>
+              r.status !== "present" &&
+              r.status !== "absent" &&
+              r.status !== "excused"
+          )
+          .map((r) => ({ id: r.user_id, name: r.full_name, status: r.status })),
+      });
 
       res.json({
         success: true,
@@ -668,7 +794,7 @@ router.get(
             agenda: report[0].agenda,
             parent_id: report[0].parent_id,
             meeting_type: report[0].meeting_type,
-            area_name: report[0].area_name,
+            area_name: report[0].meeting_area_name,
           },
           attendance: report,
           summary: summary,
@@ -685,7 +811,167 @@ router.get(
   }
 );
 
-// Organizer dashboard - comprehensive area overview
+// Improved endpoint to get meeting attendance details including unmarked users
+router.get(
+  "/weekly-meetings/:id/attendance",
+  authenticateToken,
+  dbHealthCheck,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { user } = req;
+
+      console.log("Improved attendance endpoint called:", {
+        meetingId: id,
+        userId: user.id,
+        userRole: user.role,
+      });
+
+      // Get meeting details first to check permissions
+      const [meetingCheck] = await pool.execute(
+        `SELECT wm.*, a.area_name FROM weekly_meetings wm
+         LEFT JOIN areas a ON wm.area_id = a.area_id
+         WHERE wm.id = ?`,
+        [id]
+      );
+
+      if (meetingCheck.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Meeting not found",
+        });
+      }
+
+      const meeting = meetingCheck[0];
+
+      // Check permissions
+      if (!isAuthorized(user) && user.area_id !== meeting.area_id) {
+        console.log(
+          "Attendance access denied for user:",
+          user.id,
+          "area:",
+          meeting.area_id
+        );
+        return res.status(403).json({
+          success: false,
+          message: "Access denied",
+        });
+      }
+
+      // Get all active committee members in the meeting's area
+      const [committeeMembers] = await pool.execute(
+        `SELECT 
+          u.id as user_id,
+          u.full_name,
+          u.email,
+          u.phone,
+          u.area_id,
+          a.area_name
+         FROM users u
+         LEFT JOIN areas a ON u.area_id = a.area_id
+         WHERE u.area_id = ? AND u.status = 'active'
+         ORDER BY u.full_name`,
+        [meeting.area_id]
+      );
+
+      console.log(
+        `Committee members in area ${meeting.area_id}:`,
+        committeeMembers.length
+      );
+
+      // Get attendance records for this meeting
+      const [attendanceRecords] = await pool.execute(
+        `SELECT 
+          wma.user_id,
+          wma.status,
+          wma.reason,
+          wma.marked_at,
+          wma.marked_by,
+          marker.full_name as marked_by_name
+         FROM weekly_meeting_attendance wma
+         LEFT JOIN users marker ON wma.marked_by = marker.id
+         WHERE wma.weekly_meeting_id = ?`,
+        [id]
+      );
+
+      console.log(
+        `Attendance records for meeting ${id}:`,
+        attendanceRecords.length
+      );
+
+      // Create a map of attendance records for quick lookup
+      const attendanceMap = new Map();
+      attendanceRecords.forEach((record) => {
+        attendanceMap.set(record.user_id, record);
+      });
+
+      // Combine committee members with their attendance status
+      const memberAttendance = committeeMembers.map((member) => {
+        const attendance = attendanceMap.get(member.user_id);
+        return {
+          user_id: member.user_id,
+          full_name: member.full_name,
+          email: member.email,
+          phone: member.phone,
+          area_name: member.area_name,
+          status: attendance ? attendance.status : null,
+          reason: attendance ? attendance.reason : null,
+          marked_at: attendance ? attendance.marked_at : null,
+          marked_by: attendance ? attendance.marked_by : null,
+          marked_by_name: attendance ? attendance.marked_by_name : null,
+        };
+      });
+
+      // Calculate summary statistics
+      const summary = {
+        total_members: memberAttendance.length,
+        present: memberAttendance.filter((m) => m.status === "present").length,
+        absent: memberAttendance.filter((m) => m.status === "absent").length,
+        excused: memberAttendance.filter((m) => m.status === "excused").length,
+        not_marked: memberAttendance.filter((m) => !m.status).length,
+      };
+
+      summary.attendance_rate =
+        summary.total_members > 0
+          ? ((summary.present / summary.total_members) * 100).toFixed(1)
+          : 0;
+
+      console.log("Improved attendance processed:", {
+        meetingId: id,
+        totalMembers: summary.total_members,
+        summary: summary,
+      });
+
+      res.json({
+        success: true,
+        data: {
+          meeting_info: {
+            meeting_id: meeting.id,
+            meeting_date: meeting.meeting_date,
+            meeting_time: meeting.meeting_time,
+            location: meeting.location,
+            agenda: meeting.agenda,
+            status: meeting.status,
+            parent_id: meeting.parent_id,
+            area_name: meeting.area_name,
+            meeting_type: meeting.parent_id ? "recurring" : "parent",
+          },
+          member_attendance: memberAttendance,
+          summary: summary,
+        },
+      });
+    } catch (error) {
+      console.error("Error getting meeting attendance:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to get meeting attendance",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Area dashboard - Get parent meetings only for specific area
 router.get(
   "/weekly-meetings/area/:areaId/dashboard",
   authenticateToken,
@@ -695,7 +981,7 @@ router.get(
       const { areaId } = req.params;
       const { user } = req;
 
-      console.log("Dashboard endpoint called:", {
+      console.log("Area dashboard endpoint called:", {
         areaId,
         userId: user.id,
         userRole: user.role,
@@ -715,115 +1001,46 @@ router.get(
         });
       }
 
-      const today = getUTCDateString(new Date());
-
-      // Get recent meetings with comprehensive stats
-      const [recentMeetings] = await pool.execute(
-        `SELECT 
-        wm.*,
-        a.area_name,
-        CASE WHEN wm.parent_id IS NULL THEN 'parent' ELSE 'child' END as meeting_type,
-        COUNT(wma.id) as total_marked,
-        COUNT(CASE WHEN wma.status = 'present' THEN 1 END) as present_count,
-        COUNT(CASE WHEN wma.status = 'absent' THEN 1 END) as absent_count,
-        COUNT(CASE WHEN wma.status = 'excused' THEN 1 END) as excused_count,
-        (SELECT COUNT(*) FROM users WHERE area_id = wm.area_id AND status = 'active') as total_area_users,
-        ROUND((COUNT(CASE WHEN wma.status = 'present' THEN 1 END) / 
-               (SELECT COUNT(*) FROM users WHERE area_id = wm.area_id AND status = 'active')) * 100, 1) as attendance_rate
-       FROM weekly_meetings wm
-       LEFT JOIN areas a ON wm.area_id = a.area_id
-       LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
-       WHERE wm.area_id = ? AND wm.meeting_date <= ?
-       GROUP BY wm.id
-       ORDER BY wm.meeting_date DESC, wm.meeting_time DESC
-       LIMIT 5`,
-        [areaId, today]
+      // Get all parent meetings for this area (regardless of date)
+      const [parentMeetings] = await pool.execute(
+        `SELECT
+          wm.*,
+          a.area_name,
+          COUNT(wma.id) as total_marked,
+          COUNT(CASE WHEN wma.status = 'present' THEN 1 END) as present_count,
+          COUNT(CASE WHEN wma.status = 'absent' THEN 1 END) as absent_count,
+          COUNT(CASE WHEN wma.status = 'excused' THEN 1 END) as excused_count,
+          (SELECT COUNT(*) FROM users WHERE area_id = wm.area_id AND status = 'active') as total_area_users,
+          ROUND((COUNT(CASE WHEN wma.status = 'present' THEN 1 END) /
+                 (SELECT COUNT(*) FROM users WHERE area_id = wm.area_id AND status = 'active')) * 100, 1) as attendance_rate,
+          (SELECT COUNT(*) FROM weekly_meetings WHERE parent_id = wm.id) as recurring_count
+         FROM weekly_meetings wm
+         LEFT JOIN areas a ON wm.area_id = a.area_id
+         LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
+         WHERE wm.area_id = ? AND wm.parent_id IS NULL
+         GROUP BY wm.id
+         ORDER BY wm.created_at DESC`,
+        [areaId]
       );
 
-      // Get upcoming meetings
-      const [upcomingMeetings] = await pool.execute(
-        `SELECT wm.*, 
-        a.area_name,
-        CASE WHEN wm.parent_id IS NULL THEN 'parent' ELSE 'child' END as meeting_type,
-        COUNT(wma.id) as total_marked,
-        COUNT(CASE WHEN wma.status = 'present' THEN 1 END) as present_count,
-        COUNT(CASE WHEN wma.status = 'absent' THEN 1 END) as absent_count,
-        COUNT(CASE WHEN wma.status = 'excused' THEN 1 END) as excused_count,
-        (SELECT COUNT(*) FROM users WHERE area_id = wm.area_id AND status = 'active') as total_area_users
-       FROM weekly_meetings wm
-       LEFT JOIN areas a ON wm.area_id = a.area_id
-       LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
-       WHERE wm.area_id = ? AND wm.meeting_date > ?
-       GROUP BY wm.id
-       ORDER BY wm.meeting_date ASC, wm.meeting_time ASC
-       LIMIT 5`,
-        [areaId, today]
-      );
-
-      // Get meeting series statistics
-      const [seriesStats] = await pool.execute(
-        `SELECT 
-        CASE WHEN parent_id IS NULL THEN id ELSE parent_id END as series_id,
-        COUNT(*) as total_meetings,
-        MIN(meeting_date) as series_start,
-        MAX(meeting_date) as series_end,
-        COUNT(CASE WHEN meeting_date <= ? THEN 1 END) as completed_meetings,
-        COUNT(CASE WHEN meeting_date > ? THEN 1 END) as upcoming_meetings
-       FROM weekly_meetings 
-       WHERE area_id = ?
-       GROUP BY CASE WHEN parent_id IS NULL THEN id ELSE parent_id END
-       ORDER BY series_start DESC`,
-        [today, today, areaId]
-      );
-
-      // Calculate overall statistics
-      const totalMeetings = recentMeetings.length;
-      const avgAttendance =
-        totalMeetings > 0
-          ? recentMeetings.reduce(
-              (sum, m) => sum + parseFloat(m.attendance_rate || 0),
-              0
-            ) / totalMeetings
-          : 0;
-
-      const stats = {
-        total_recent_meetings: totalMeetings,
-        avg_attendance_rate: Math.round(avgAttendance * 10) / 10,
-        total_upcoming: upcomingMeetings.length,
-        active_series: seriesStats.length,
-        total_series_meetings: seriesStats.reduce(
-          (sum, s) => sum + s.total_meetings,
-          0
-        ),
-      };
-
-      console.log("Dashboard response:", {
-        recentMeetings: recentMeetings.length,
-        upcomingMeetings: upcomingMeetings.length,
-        stats,
-      });
+      console.log("Found parent meetings for area:", parentMeetings.length);
 
       res.json({
         success: true,
-        data: {
-          recent_meetings: recentMeetings,
-          upcoming_meetings: upcomingMeetings,
-          meeting_series: seriesStats,
-          area_stats: stats,
-        },
+        data: parentMeetings,
       });
     } catch (error) {
-      console.error("Error getting dashboard:", error);
+      console.error("Error getting area dashboard:", error);
       res.status(500).json({
         success: false,
-        message: "Failed to get dashboard data",
+        message: "Failed to get area dashboard data",
         error: error.message,
       });
     }
   }
 );
 
-// All areas dashboard for SuperAdmins
+// All areas dashboard for SuperAdmins - Get parent meetings only
 router.get(
   "/weekly-meetings/dashboard",
   authenticateToken,
@@ -846,90 +1063,33 @@ router.get(
         });
       }
 
-      const today = getUTCDateString(new Date());
-
-      // Get all areas
-      const [allAreas] = await pool.execute(
-        "SELECT area_id, area_name FROM areas ORDER BY area_name"
-      );
-
-      console.log("Found areas:", allAreas.length);
-
-      const allAreaData = [];
-
-      // Get dashboard data for each area
-      for (const area of allAreas) {
-        console.log("Processing area:", area.area_name);
-
-        // Get recent meetings for this area
-        const [recentMeetings] = await pool.execute(
-          `SELECT 
+      // Get all parent meetings (regardless of date)
+      const [parentMeetings] = await pool.execute(
+        `SELECT
           wm.*,
           a.area_name,
-          CASE WHEN wm.parent_id IS NULL THEN 'parent' ELSE 'child' END as meeting_type,
           COUNT(wma.id) as total_marked,
           COUNT(CASE WHEN wma.status = 'present' THEN 1 END) as present_count,
           COUNT(CASE WHEN wma.status = 'absent' THEN 1 END) as absent_count,
           COUNT(CASE WHEN wma.status = 'excused' THEN 1 END) as excused_count,
           (SELECT COUNT(*) FROM users WHERE area_id = wm.area_id AND status = 'active') as total_area_users,
-          ROUND((COUNT(CASE WHEN wma.status = 'present' THEN 1 END) / 
-                 (SELECT COUNT(*) FROM users WHERE area_id = wm.area_id AND status = 'active')) * 100, 1) as attendance_rate
+          ROUND((COUNT(CASE WHEN wma.status = 'present' THEN 1 END) /
+                 (SELECT COUNT(*) FROM users WHERE area_id = wm.area_id AND status = 'active')) * 100, 1) as attendance_rate,
+          (SELECT COUNT(*) FROM weekly_meetings WHERE parent_id = wm.id) as recurring_count
          FROM weekly_meetings wm
          LEFT JOIN areas a ON wm.area_id = a.area_id
          LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
-         WHERE wm.area_id = ? AND wm.meeting_date <= ?
+         WHERE wm.parent_id IS NULL
          GROUP BY wm.id
-         ORDER BY wm.meeting_date DESC, wm.meeting_time DESC
-         LIMIT 3`,
-          [area.area_id, today]
-        );
-
-        // Get upcoming meetings for this area
-        const [upcomingMeetings] = await pool.execute(
-          `SELECT wm.*, 
-          a.area_name,
-          CASE WHEN wm.parent_id IS NULL THEN 'parent' ELSE 'child' END as meeting_type,
-          COUNT(wma.id) as total_marked,
-          COUNT(CASE WHEN wma.status = 'present' THEN 1 END) as present_count,
-          COUNT(CASE WHEN wma.status = 'absent' THEN 1 END) as absent_count,
-          COUNT(CASE WHEN wma.status = 'excused' THEN 1 END) as excused_count,
-          (SELECT COUNT(*) FROM users WHERE area_id = wm.area_id AND status = 'active') as total_area_users
-         FROM weekly_meetings wm
-         LEFT JOIN areas a ON wm.area_id = a.area_id
-         LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
-         WHERE wm.area_id = ? AND wm.meeting_date > ?
-         GROUP BY wm.id
-         ORDER BY wm.meeting_date ASC, wm.meeting_time ASC
-         LIMIT 3`,
-          [area.area_id, today]
-        );
-
-        console.log(
-          "Area",
-          area.area_name,
-          "- Recent:",
-          recentMeetings.length,
-          "Upcoming:",
-          upcomingMeetings.length
-        );
-
-        allAreaData.push({
-          area_id: area.area_id,
-          area_name: area.area_name,
-          recent_meetings: recentMeetings,
-          upcoming_meetings: upcomingMeetings,
-        });
-      }
-
-      console.log(
-        "All areas dashboard response prepared with",
-        allAreaData.length,
-        "areas"
+         ORDER BY wm.created_at DESC`,
+        []
       );
+
+      console.log("Found parent meetings:", parentMeetings.length);
 
       res.json({
         success: true,
-        data: allAreaData,
+        data: parentMeetings,
       });
     } catch (error) {
       console.error("Error getting all areas dashboard:", error);
@@ -942,13 +1102,322 @@ router.get(
   }
 );
 
+// Get recurring meetings for a specific parent meeting (past dates only)
+router.get(
+  "/weekly-meetings/series/:parentId/recurring",
+  authenticateToken,
+  dbHealthCheck,
+  async (req, res) => {
+    try {
+      const { parentId } = req.params;
+      const { user } = req;
+
+      console.log("Recurring meetings endpoint called:", {
+        parentId,
+        userId: user.id,
+        userRole: user.role,
+      });
+
+      // First, get the parent meeting to check permissions
+      const [parentMeeting] = await pool.execute(
+        `SELECT area_id FROM weekly_meetings WHERE id = ? AND parent_id IS NULL`,
+        [parentId]
+      );
+
+      if (parentMeeting.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Parent meeting not found",
+        });
+      }
+
+      const areaId = parentMeeting[0].area_id;
+
+      // Check permissions
+      if (!isAuthorized(user) && user.area_id != areaId) {
+        console.log(
+          "Recurring meetings access denied for user:",
+          user.id,
+          "area:",
+          areaId
+        );
+        return res.status(403).json({
+          success: false,
+          message: "Access denied",
+        });
+      }
+
+      const today = getUTCDateString(new Date());
+
+      // Get the parent meeting details
+      const [parentMeetingDetails] = await pool.execute(
+        `SELECT
+          wm.*,
+          a.area_name,
+          COUNT(wma.id) as total_marked,
+          COUNT(CASE WHEN wma.status = 'present' THEN 1 END) as present_count,
+          COUNT(CASE WHEN wma.status = 'absent' THEN 1 END) as absent_count,
+          COUNT(CASE WHEN wma.status = 'excused' THEN 1 END) as excused_count,
+          (SELECT COUNT(*) FROM users WHERE area_id = wm.area_id AND status = 'active') as total_area_users,
+          ROUND((COUNT(CASE WHEN wma.status = 'present' THEN 1 END) /
+                 (SELECT COUNT(*) FROM users WHERE area_id = wm.area_id AND status = 'active')) * 100, 1) as attendance_rate,
+          'parent' as meeting_type
+         FROM weekly_meetings wm
+         LEFT JOIN areas a ON wm.area_id = a.area_id
+         LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
+         WHERE wm.id = ?
+         GROUP BY wm.id`,
+        [parentId]
+      );
+
+      // Get all recurring meetings for this parent (past dates only)
+      const [recurringMeetings] = await pool.execute(
+        `SELECT
+          wm.*,
+          a.area_name,
+          COUNT(wma.id) as total_marked,
+          COUNT(CASE WHEN wma.status = 'present' THEN 1 END) as present_count,
+          COUNT(CASE WHEN wma.status = 'absent' THEN 1 END) as absent_count,
+          COUNT(CASE WHEN wma.status = 'excused' THEN 1 END) as excused_count,
+          (SELECT COUNT(*) FROM users WHERE area_id = wm.area_id AND status = 'active') as total_area_users,
+          ROUND((COUNT(CASE WHEN wma.status = 'present' THEN 1 END) /
+                 (SELECT COUNT(*) FROM users WHERE area_id = wm.area_id AND status = 'active')) * 100, 1) as attendance_rate,
+          'recurring' as meeting_type
+         FROM weekly_meetings wm
+         LEFT JOIN areas a ON wm.area_id = a.area_id
+         LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
+         WHERE wm.parent_id = ? AND wm.meeting_date <= ?
+         GROUP BY wm.id
+         ORDER BY wm.meeting_date DESC`,
+        [parentId, today]
+      );
+
+      // Combine parent meeting with recurring meetings (parent first)
+      const allMeetings = [];
+      if (parentMeetingDetails.length > 0) {
+        allMeetings.push(parentMeetingDetails[0]);
+      }
+      allMeetings.push(...recurringMeetings);
+
+      console.log("Found meetings:", {
+        parent: parentMeetingDetails.length,
+        recurring: recurringMeetings.length,
+        total: allMeetings.length,
+      });
+
+      res.json({
+        success: true,
+        data: allMeetings,
+      });
+    } catch (error) {
+      console.error("Error getting recurring meetings:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to get recurring meetings",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Get detailed attendance details for a meeting with committee member comparison
+router.get(
+  "/weekly-meetings/:id/attendance-details",
+  authenticateToken,
+  dbHealthCheck,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { user } = req;
+
+      console.log("Attendance details endpoint called:", {
+        meetingId: id,
+        userId: user.id,
+        userRole: user.role,
+      });
+
+      // Get meeting details first to check permissions
+      const [meetingCheck] = await pool.execute(
+        `SELECT wm.*, a.area_name FROM weekly_meetings wm
+         LEFT JOIN areas a ON wm.area_id = a.area_id
+         WHERE wm.id = ?`,
+        [id]
+      );
+
+      if (meetingCheck.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Meeting not found",
+        });
+      }
+
+      const meeting = meetingCheck[0];
+
+      // Check permissions
+      if (!isAuthorized(user) && user.area_id !== meeting.area_id) {
+        console.log(
+          "Attendance details access denied for user:",
+          user.id,
+          "area:",
+          meeting.area_id
+        );
+        return res.status(403).json({
+          success: false,
+          message: "Access denied",
+        });
+      }
+
+      // DEBUG: Test the same query used in dashboard to see present count
+      const [dashboardCount] = await pool.execute(
+        `SELECT 
+          COUNT(CASE WHEN wma.status = 'present' THEN 1 END) as present_count_dashboard,
+          COUNT(wma.id) as total_marked_dashboard
+         FROM weekly_meetings wm
+         LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
+         WHERE wm.id = ?`,
+        [id]
+      );
+
+      console.log("Dashboard query result for meeting:", id, dashboardCount[0]);
+
+      // Get all active committee members in the meeting's area
+      const [committeeMembers] = await pool.execute(
+        `SELECT 
+          u.id as user_id,
+          u.full_name,
+          u.email,
+          u.phone,
+          u.area_id,
+          a.area_name
+         FROM users u
+         LEFT JOIN areas a ON u.area_id = a.area_id
+         WHERE u.area_id = ? AND u.status = 'active'
+         ORDER BY u.full_name`,
+        [meeting.area_id]
+      );
+
+      console.log(
+        `Committee members in area ${meeting.area_id}:`,
+        committeeMembers.length
+      );
+
+      // Get attendance records for this meeting
+      const [attendanceRecords] = await pool.execute(
+        `SELECT 
+          wma.user_id,
+          wma.status,
+          wma.reason,
+          wma.marked_at,
+          wma.marked_by,
+          marker.full_name as marked_by_name
+         FROM weekly_meeting_attendance wma
+         LEFT JOIN users marker ON wma.marked_by = marker.id
+         WHERE wma.weekly_meeting_id = ?`,
+        [id]
+      );
+
+      console.log(
+        `Attendance records for meeting ${id}:`,
+        attendanceRecords.length
+      );
+      console.log(
+        "Present users:",
+        attendanceRecords
+          .filter((r) => r.status === "present")
+          .map((r) => ({ user_id: r.user_id, status: r.status }))
+      );
+
+      // Create a map of attendance records for quick lookup
+      const attendanceMap = new Map();
+      attendanceRecords.forEach((record) => {
+        attendanceMap.set(record.user_id, record);
+      });
+
+      // Combine committee members with their attendance status
+      const memberAttendance = committeeMembers.map((member) => {
+        const attendance = attendanceMap.get(member.user_id);
+        return {
+          user_id: member.user_id,
+          full_name: member.full_name,
+          email: member.email,
+          phone: member.phone,
+          area_name: member.area_name,
+          status: attendance ? attendance.status : null,
+          reason: attendance ? attendance.reason : null,
+          marked_at: attendance ? attendance.marked_at : null,
+          marked_by: attendance ? attendance.marked_by : null,
+          marked_by_name: attendance ? attendance.marked_by_name : null,
+        };
+      });
+
+      // Calculate summary statistics
+      const summary = {
+        total_members: memberAttendance.length,
+        present: memberAttendance.filter((m) => m.status === "present").length,
+        absent: memberAttendance.filter((m) => m.status === "absent").length,
+        excused: memberAttendance.filter((m) => m.status === "excused").length,
+        not_marked: memberAttendance.filter((m) => !m.status).length,
+      };
+
+      summary.attendance_rate =
+        summary.total_members > 0
+          ? ((summary.present / summary.total_members) * 100).toFixed(1)
+          : 0;
+
+      console.log("Attendance details processed:", {
+        meetingId: id,
+        totalMembers: summary.total_members,
+        summary: summary,
+        dashboardCount: dashboardCount[0],
+        presentMembers: memberAttendance
+          .filter((m) => m.status === "present")
+          .map((m) => ({ id: m.user_id, name: m.full_name })),
+      });
+
+      res.json({
+        success: true,
+        data: {
+          meeting_info: {
+            meeting_id: meeting.id,
+            meeting_date: meeting.meeting_date,
+            meeting_time: meeting.meeting_time,
+            location: meeting.location,
+            agenda: meeting.agenda,
+            status: meeting.status,
+            parent_id: meeting.parent_id,
+            area_name: meeting.area_name,
+            meeting_type: meeting.parent_id ? "recurring" : "parent",
+          },
+          member_attendance: memberAttendance,
+          summary: summary,
+          debug_info: {
+            dashboard_present_count: dashboardCount[0].present_count_dashboard,
+            dashboard_total_marked: dashboardCount[0].total_marked_dashboard,
+            attendance_records_count: attendanceRecords.length,
+            committee_members_count: committeeMembers.length,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Error getting attendance details:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to get attendance details",
+        error: error.message,
+      });
+    }
+  }
+);
+
 // Update meeting with series consideration
 router.put(
   "/weekly-meetings/:id",
   authenticateToken,
   dbHealthCheck,
   [
-    body("meeting_date").optional().isISO8601().toDate(),
+    body("meeting_date")
+      .optional()
+      .matches(/^\d{4}-\d{2}-\d{2}$/),
     body("meeting_time")
       .optional()
       .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
@@ -989,6 +1458,9 @@ router.put(
         status,
         update_series = false,
       } = req.body;
+      const formattedMeetingTime = meeting_time
+        ? formatTimeToHHMM(meeting_time)
+        : null;
       const { user } = req;
 
       // Get current meeting with lock
@@ -1021,9 +1493,12 @@ router.put(
         updateValues.push(getUTCDateString(meeting_date));
       }
 
-      if (meeting_time && meeting_time !== meeting.meeting_time) {
+      if (
+        formattedMeetingTime &&
+        formattedMeetingTime !== meeting.meeting_time
+      ) {
         updateFields.push("meeting_time = ?");
-        updateValues.push(meeting_time);
+        updateValues.push(formattedMeetingTime);
       }
 
       if (location !== undefined && location !== meeting.location) {
@@ -1063,9 +1538,12 @@ router.put(
         const futureUpdateFields = [];
         const futureUpdateValues = [];
 
-        if (meeting_time && meeting_time !== meeting.meeting_time) {
+        if (
+          formattedMeetingTime &&
+          formattedMeetingTime !== meeting.meeting_time
+        ) {
           futureUpdateFields.push("meeting_time = ?");
-          futureUpdateValues.push(meeting_time);
+          futureUpdateValues.push(formattedMeetingTime);
         }
 
         if (location !== undefined && location !== meeting.location) {

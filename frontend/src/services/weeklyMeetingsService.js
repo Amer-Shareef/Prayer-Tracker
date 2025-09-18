@@ -38,7 +38,7 @@ const weeklyMeetingsService = {
     }
   },
 
-  // Get dashboard data for an area (organizer view)
+  // Get simple area dashboard focused on attendance status
   getAreaDashboard: async (areaId) => {
     console.log("Frontend: getAreaDashboard called with areaId:", areaId);
     try {
@@ -78,7 +78,7 @@ const weeklyMeetingsService = {
     }
   },
 
-  // Get dashboard data for all areas (SuperAdmin only)
+  // Get all meeting series dashboard data for SuperAdmins
   getAllAreasDashboard: async () => {
     console.log("Frontend: getAllAreasDashboard called");
     try {
@@ -87,6 +87,42 @@ const weeklyMeetingsService = {
       return response.data;
     } catch (error) {
       console.error("Frontend: Error getting all areas dashboard:", error);
+      throw error;
+    }
+  },
+
+  // Get recurring meetings for a specific parent meeting (past dates only)
+  getRecurringMeetings: async (parentId) => {
+    console.log(
+      "Frontend: getRecurringMeetings called with parentId:",
+      parentId
+    );
+    try {
+      const response = await api.get(
+        `/weekly-meetings/series/${parentId}/recurring`
+      );
+      console.log("Frontend: getRecurringMeetings response:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Frontend: Error getting recurring meetings:", error);
+      throw error;
+    }
+  },
+
+  // Get detailed attendance details with committee member comparison (improved version)
+  getAttendanceDetails: async (meetingId) => {
+    console.log(
+      "Frontend: getAttendanceDetails called with meetingId:",
+      meetingId
+    );
+    try {
+      const response = await api.get(
+        `/weekly-meetings/${meetingId}/attendance`
+      );
+      console.log("Frontend: getAttendanceDetails response:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Frontend: Error getting attendance details:", error);
       throw error;
     }
   },
