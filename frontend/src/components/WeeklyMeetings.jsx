@@ -685,47 +685,128 @@ const WeeklyMeetings = () => {
                                                                     // Edit Mode
                                                                     <div className="space-y-4">
                                                                       <div className="flex items-center justify-between">
-                                                                        <h6 className="text-sm font-medium text-gray-900">{member.full_name || 'Unknown User'}</h6>
+                                                                        <div className="flex items-center space-x-3">
+                                                                          <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                                                                            <span className="text-sm font-medium text-gray-600">
+                                                                              {member.full_name ? member.full_name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
+                                                                            </span>
+                                                                          </div>
+                                                                          <div>
+                                                                            <h6 className="text-sm font-medium text-gray-900">{member.full_name || 'Unknown User'}</h6>
+                                                                            <div className="flex items-center space-x-2 text-xs">
+                                                                              {getStatusBadge(member.status)}
+                                                                              <span className="text-gray-500">→</span>
+                                                                              <span className="text-blue-600 font-medium">Editing</span>
+                                                                            </div>
+                                                                          </div>
+                                                                        </div>
                                                                         <div className="flex space-x-2">
                                                                           <button
                                                                             onClick={saveAttendanceEdit}
                                                                             disabled={savingAttendance}
-                                                                            className="px-3 py-1 bg-green-600 text-white text-xs rounded-md hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed transition-colors"
+                                                                            className="px-3 py-1 bg-green-600 text-white text-xs rounded-md hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed transition-colors flex items-center space-x-1"
                                                                           >
-                                                                            {savingAttendance ? 'Saving...' : 'Save'}
+                                                                            {savingAttendance ? (
+                                                                              <>
+                                                                                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                                </svg>
+                                                                                <span>Saving...</span>
+                                                                              </>
+                                                                            ) : (
+                                                                              <>
+                                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                                </svg>
+                                                                                <span>Save</span>
+                                                                              </>
+                                                                            )}
                                                                           </button>
                                                                           <button
                                                                             onClick={cancelEditingAttendance}
-                                                                            className="px-3 py-1 bg-gray-600 text-white text-xs rounded-md hover:bg-gray-700 transition-colors"
+                                                                            className="px-3 py-1 bg-gray-600 text-white text-xs rounded-md hover:bg-gray-700 transition-colors flex items-center space-x-1"
                                                                           >
-                                                                            Cancel
+                                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                            </svg>
+                                                                            <span>Cancel</span>
                                                                           </button>
                                                                         </div>
                                                                       </div>
-                                                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                      <div className="space-y-4">
                                                                         <div>
-                                                                          <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-                                                                          <select
-                                                                            value={editForm.status}
-                                                                            onChange={(e) => setEditForm(prev => ({ ...prev, status: e.target.value }))}
-                                                                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                                                          >
-                                                                            <option value="present">Present</option>
-                                                                            <option value="absent">Absent</option>
-                                                                            <option value="excused">Excused</option>
-                                                                            <option value="pending">Pending</option>
-                                                                          </select>
+                                                                          <label className="block text-xs font-medium text-gray-700 mb-2">Attendance Status</label>
+                                                                          <div className="grid grid-cols-2 gap-2">
+                                                                            <button
+                                                                              onClick={() => setEditForm(prev => ({ ...prev, status: 'present' }))}
+                                                                              className={`flex items-center space-x-2 p-3 rounded-lg border-2 transition-all ${
+                                                                                editForm.status === 'present'
+                                                                                  ? 'border-green-500 bg-green-50 text-green-700'
+                                                                                  : 'border-gray-200 bg-white text-gray-700 hover:border-green-300'
+                                                                              }`}
+                                                                            >
+                                                                              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                              </svg>
+                                                                              <span className="font-medium">Present</span>
+                                                                            </button>
+                                                                            <button
+                                                                              onClick={() => setEditForm(prev => ({ ...prev, status: 'absent' }))}
+                                                                              className={`flex items-center space-x-2 p-3 rounded-lg border-2 transition-all ${
+                                                                                editForm.status === 'absent'
+                                                                                  ? 'border-red-500 bg-red-50 text-red-700'
+                                                                                  : 'border-gray-200 bg-white text-gray-700 hover:border-red-300'
+                                                                              }`}
+                                                                            >
+                                                                              <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                              </svg>
+                                                                              <span className="font-medium">Absent</span>
+                                                                            </button>
+                                                                            <button
+                                                                              onClick={() => setEditForm(prev => ({ ...prev, status: 'excused' }))}
+                                                                              className={`flex items-center space-x-2 p-3 rounded-lg border-2 transition-all ${
+                                                                                editForm.status === 'excused'
+                                                                                  ? 'border-yellow-500 bg-yellow-50 text-yellow-700'
+                                                                                  : 'border-gray-200 bg-white text-gray-700 hover:border-yellow-300'
+                                                                              }`}
+                                                                            >
+                                                                              <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                                                              </svg>
+                                                                              <span className="font-medium">Excused</span>
+                                                                            </button>
+                                                                            <button
+                                                                              onClick={() => setEditForm(prev => ({ ...prev, status: 'pending' }))}
+                                                                              className={`flex items-center space-x-2 p-3 rounded-lg border-2 transition-all ${
+                                                                                editForm.status === 'pending'
+                                                                                  ? 'border-gray-500 bg-gray-50 text-gray-700'
+                                                                                  : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                                                                              }`}
+                                                                            >
+                                                                              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                              </svg>
+                                                                              <span className="font-medium">Pending</span>
+                                                                            </button>
+                                                                          </div>
                                                                         </div>
                                                                         <div>
-                                                                          <label className="block text-xs font-medium text-gray-700 mb-1">Reason</label>
+                                                                          <label className="block text-xs font-medium text-gray-700 mb-2">Reason (Optional)</label>
                                                                           <input
                                                                             type="text"
                                                                             value={editForm.reason}
                                                                             onChange={(e) => setEditForm(prev => ({ ...prev, reason: e.target.value }))}
-                                                                            placeholder="Optional reason..."
+                                                                            placeholder="e.g., Sick leave, family emergency, etc."
                                                                             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                                             maxLength={500}
                                                                           />
+                                                                          {editForm.reason && (
+                                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                              Current reason: "{editForm.reason}"
+                                                                            </p>
+                                                                          )}
                                                                         </div>
                                                                       </div>
                                                                     </div>
