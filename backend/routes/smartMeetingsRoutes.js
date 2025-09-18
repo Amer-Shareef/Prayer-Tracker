@@ -79,10 +79,22 @@ function isAuthorized(
 }
 
 function getUTCDateString(date) {
+  // If date is already a string in YYYY-MM-DD format, return it as-is
+  if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return date;
+  }
+
+  // For Date objects or other formats, convert to YYYY-MM-DD without timezone shift
   const d = new Date(date);
-  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
-    .toISOString()
-    .split("T")[0];
+  if (isNaN(d.getTime())) {
+    throw new Error(`Invalid date: ${date}`);
+  }
+
+  // Use local date components to avoid timezone conversion
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function addWeeksToDate(dateString, weeks) {
