@@ -627,11 +627,7 @@ router.get(
         `SELECT * FROM weekly_meeting_attendance WHERE weekly_meeting_id = ?`,
         [id]
       );
-      console.log(
-        `Backend: Attendance records in database for meeting ${id}:`,
-        attendanceRecords.length,
-        "records"
-      );
+
       console.log(
         "Backend: Attendance records:",
         attendanceRecords.map((r) => ({
@@ -643,6 +639,7 @@ router.get(
         }))
       );
 
+      console.log("records >>>", attendanceRecords);
       if (meetingCheck.length === 0) {
         return res.status(404).json({
           success: false,
@@ -663,11 +660,7 @@ router.get(
         `SELECT id, full_name, area_id, status FROM users WHERE area_id = ? AND status = 'active'`,
         [meetingCheck[0].area_id]
       );
-      console.log(
-        `Backend: Active users in area ${meetingCheck[0].area_id}:`,
-        areaUsers.length,
-        "users"
-      );
+
       console.log(
         "Backend: User 18 in area?",
         areaUsers.find((u) => u.id === 18)
@@ -695,7 +688,7 @@ router.get(
         marker.full_name as marked_by_name
        FROM weekly_meetings wm
        LEFT JOIN areas a ON wm.area_id = a.area_id
-       INNER JOIN users u ON u.area_id = wm.area_id AND u.status = 'active'
+       LEFT JOIN users u ON (u.area_id = wm.area_id AND u.status = 'active') OR (u.id IN (SELECT user_id FROM weekly_meeting_attendance WHERE weekly_meeting_id = wm.id))
        LEFT JOIN areas ua ON u.area_id = ua.area_id
        LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id AND u.id = wma.user_id
        LEFT JOIN users marker ON wma.marked_by = marker.id
@@ -705,11 +698,6 @@ router.get(
       );
 
       console.log(
-        `Backend: Attendance query result for meeting ${id}:`,
-        report.length,
-        "records"
-      );
-      console.log(
         "Backend: Sample attendance records:",
         report.slice(0, 3).map((r) => ({
           user_id: r.user_id,
@@ -717,10 +705,6 @@ router.get(
           status: r.status,
         }))
       );
-
-      // Check if user 18 is in the results
-      const user18Record = report.find((r) => r.user_id === 18);
-      console.log("Backend: User 18 record:", user18Record);
 
       // Check all present records
       const presentRecords = report.filter((r) => r.status === "present");
@@ -762,25 +746,6 @@ router.get(
       };
 
       console.log("Backend: Summary calculation:", summary);
-      console.log("Backend: Status distribution:", {
-        present: report
-          .filter((r) => r.status === "present")
-          .map((r) => ({ id: r.user_id, name: r.full_name, status: r.status })),
-        absent: report
-          .filter((r) => r.status === "absent")
-          .map((r) => ({ id: r.user_id, name: r.full_name, status: r.status })),
-        excused: report
-          .filter((r) => r.status === "excused")
-          .map((r) => ({ id: r.user_id, name: r.full_name, status: r.status })),
-        pending: report
-          .filter(
-            (r) =>
-              r.status !== "present" &&
-              r.status !== "absent" &&
-              r.status !== "excused"
-          )
-          .map((r) => ({ id: r.user_id, name: r.full_name, status: r.status })),
-      });
 
       res.json({
         success: true,
