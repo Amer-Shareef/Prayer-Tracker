@@ -473,10 +473,10 @@ const WeeklyMeetings = () => {
                                         </tr>
                                       </thead>
                                       <tbody className="divide-y divide-gray-200">
-                                        {[meeting, ...seriesMeetings].map((seriesMeeting) => {
+                                        {[...seriesMeetings, meeting].map((seriesMeeting) => {
                                           const isAttendanceExpanded = expandedAttendance.has(seriesMeeting.id);
                                           const attendanceData = attendanceDetails[seriesMeeting.id];
-                                          
+
                                           return (
                                             <React.Fragment key={seriesMeeting.id}>
                                               <tr className="hover:bg-gray-50">

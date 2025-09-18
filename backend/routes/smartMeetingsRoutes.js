@@ -6,7 +6,6 @@ const { body, validationResult } = require("express-validator");
 const rateLimit = require("express-rate-limit");
 
 const router = express.Router();
-
 // Rate limiting middleware
 const attendanceLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -914,11 +913,11 @@ router.get(
           email: member.email,
           phone: member.phone,
           area_name: member.area_name,
-          status: attendance ? attendance.status : null,
-          reason: attendance ? attendance.reason : null,
-          marked_at: attendance ? attendance.marked_at : null,
-          marked_by: attendance ? attendance.marked_by : null,
-          marked_by_name: attendance ? attendance.marked_by_name : null,
+          status: attendance?.status || "not_marked",
+          reason: attendance?.reason || null,
+          marked_at: attendance?.marked_at || null,
+          marked_by: attendance?.marked_by || null,
+          marked_by_name: attendance?.marked_by_name || null,
         };
       });
 
@@ -928,7 +927,8 @@ router.get(
         present: memberAttendance.filter((m) => m.status === "present").length,
         absent: memberAttendance.filter((m) => m.status === "absent").length,
         excused: memberAttendance.filter((m) => m.status === "excused").length,
-        not_marked: memberAttendance.filter((m) => !m.status).length,
+        not_marked: memberAttendance.filter((m) => m.status === "not_marked")
+          .length,
       };
 
       summary.attendance_rate =
@@ -1170,7 +1170,7 @@ router.get(
         [parentId]
       );
 
-      // Get all recurring meetings for this parent (past dates only)
+      // Get all recurring meetings for this parent (past dates only, excluding parent meeting)
       const [recurringMeetings] = await pool.execute(
         `SELECT
           wm.*,
@@ -1192,17 +1192,14 @@ router.get(
         [parentId, today]
       );
 
-      // Combine parent meeting with recurring meetings (parent first)
-      const allMeetings = [];
-      if (parentMeetingDetails.length > 0) {
-        allMeetings.push(parentMeetingDetails[0]);
-      }
-      allMeetings.push(...recurringMeetings);
+      // Return only recurring meetings (latest dates first), no parent meeting
+      const allMeetings = [...recurringMeetings];
 
       console.log("Found meetings:", {
-        parent: parentMeetingDetails.length,
+        parent_id: parentId,
         recurring: recurringMeetings.length,
         total: allMeetings.length,
+        order: "latest_first",
       });
 
       res.json({
@@ -1342,11 +1339,11 @@ router.get(
           email: member.email,
           phone: member.phone,
           area_name: member.area_name,
-          status: attendance ? attendance.status : null,
-          reason: attendance ? attendance.reason : null,
-          marked_at: attendance ? attendance.marked_at : null,
-          marked_by: attendance ? attendance.marked_by : null,
-          marked_by_name: attendance ? attendance.marked_by_name : null,
+          status: attendance?.status || "not_marked",
+          reason: attendance?.reason || null,
+          marked_at: attendance?.marked_at || null,
+          marked_by: attendance?.marked_by || null,
+          marked_by_name: attendance?.marked_by_name || null,
         };
       });
 
@@ -1356,7 +1353,8 @@ router.get(
         present: memberAttendance.filter((m) => m.status === "present").length,
         absent: memberAttendance.filter((m) => m.status === "absent").length,
         excused: memberAttendance.filter((m) => m.status === "excused").length,
-        not_marked: memberAttendance.filter((m) => !m.status).length,
+        not_marked: memberAttendance.filter((m) => m.status === "not_marked")
+          .length,
       };
 
       summary.attendance_rate =
