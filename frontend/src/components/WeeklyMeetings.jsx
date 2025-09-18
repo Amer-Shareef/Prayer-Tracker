@@ -34,14 +34,16 @@ const WeeklyMeetings = () => {
   // Optimized expansion states
   const [expandedSeries, setExpandedSeries] = useState(new Set());
   const [expandedAttendance, setExpandedAttendance] = useState(new Set());
-  
-  // Data caches to prevent re-fetching
   const [recurringMeetings, setRecurringMeetings] = useState({});
   const [attendanceDetails, setAttendanceDetails] = useState({});
-  
-  // Attendance editing state
   const [editingAttendance, setEditingAttendance] = useState({ meetingId: null, userId: null });
   const [editForm, setEditForm] = useState({ status: '', reason: '' });
+  
+  // Loading states
+  const [loadingSeries, setLoadingSeries] = useState(new Set());
+  const [loadingAttendance, setLoadingAttendance] = useState(new Set());
+  const [savingAttendance, setSavingAttendance] = useState(false);
+  const [creatingMeeting, setCreatingMeeting] = useState(false);
   
   // Modal and form states
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -188,6 +190,7 @@ const WeeklyMeetings = () => {
       
       // Only fetch if not already cached
       if (!recurringMeetings[meetingId]) {
+        setLoadingSeries(prev => new Set([...prev, meetingId]));
         try {
           const response = await weeklyMeetingsService.getRecurringMeetings(meetingId);
           if (response.success) {
@@ -199,6 +202,12 @@ const WeeklyMeetings = () => {
         } catch (error) {
           console.error('Error fetching recurring meetings:', error);
           setError('Failed to load meeting series');
+        } finally {
+          setLoadingSeries(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(meetingId);
+            return newSet;
+          });
         }
       }
     }
@@ -218,6 +227,7 @@ const WeeklyMeetings = () => {
       
       // Only fetch if not already cached
       if (!attendanceDetails[meetingId]) {
+        setLoadingAttendance(prev => new Set([...prev, meetingId]));
         try {
           const response = await weeklyMeetingsService.getAttendanceDetails(meetingId);
           if (response.success) {
@@ -229,6 +239,12 @@ const WeeklyMeetings = () => {
         } catch (error) {
           console.error('Error fetching attendance details:', error);
           setError('Failed to load attendance details');
+        } finally {
+          setLoadingAttendance(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(meetingId);
+            return newSet;
+          });
         }
       }
     }
@@ -249,6 +265,7 @@ const WeeklyMeetings = () => {
   }, []);
 
   const saveAttendanceEdit = useCallback(async () => {
+    setSavingAttendance(true);
     try {
       const { meetingId, userId } = editingAttendance;
       
@@ -274,10 +291,13 @@ const WeeklyMeetings = () => {
     } catch (error) {
       console.error('Error updating attendance:', error);
       setError('Failed to update attendance');
+    } finally {
+      setSavingAttendance(false);
     }
   }, [editingAttendance, editForm, cancelEditingAttendance]);
 
   const handleCreateMeeting = useCallback(async () => {
+    setCreatingMeeting(true);
     try {
       // For SuperAdmins, use the selected area from the form if provided
       // Otherwise, use the existing logic
@@ -318,6 +338,8 @@ const WeeklyMeetings = () => {
     } catch (error) {
       console.error('Error creating meeting:', error);
       setError('Failed to create meeting');
+    } finally {
+      setCreatingMeeting(false);
     }
   }, [createForm, selectedArea, user?.role, user?.area_id, fetchParentMeetings]);
 
@@ -495,12 +517,13 @@ const WeeklyMeetings = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <button
                               onClick={() => toggleSeriesExpansion(meeting.id)}
-                              className="text-green-600 hover:text-green-900 inline-flex items-center"
+                              disabled={loadingSeries.has(meeting.id)}
+                              className="text-green-600 hover:text-green-900 disabled:text-green-400 disabled:cursor-not-allowed inline-flex items-center transition-colors"
                             >
                               <svg className={`w-4 h-4 mr-1 transform transition-transform ${isSeriesExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                               </svg>
-                              {isSeriesExpanded ? 'Hide' : 'Show'} History
+                              {loadingSeries.has(meeting.id) ? 'Loading...' : (isSeriesExpanded ? 'Hide' : 'Show') + ' History'}
                             </button>
                           </td>
                         </tr>
@@ -563,12 +586,13 @@ const WeeklyMeetings = () => {
                                                 <td className="px-4 py-3 text-sm">
                                                   <button
                                                     onClick={() => toggleAttendanceDetails(seriesMeeting.id)}
-                                                    className="text-blue-600 hover:text-blue-900 inline-flex items-center"
+                                                    disabled={loadingAttendance.has(seriesMeeting.id)}
+                                                    className="text-blue-600 hover:text-blue-900 disabled:text-blue-400 disabled:cursor-not-allowed inline-flex items-center transition-colors"
                                                   >
                                                     <svg className={`w-3 h-3 mr-1 transform transition-transform ${isAttendanceExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                                     </svg>
-                                                    {isAttendanceExpanded ? 'Hide' : 'View'}
+                                                    {loadingAttendance.has(seriesMeeting.id) ? 'Loading...' : (isAttendanceExpanded ? 'Hide' : 'View')}
                                                   </button>
                                                 </td>
                                               </tr>
@@ -671,9 +695,10 @@ const WeeklyMeetings = () => {
                                                                         <div className="flex space-x-2">
                                                                           <button
                                                                             onClick={saveAttendanceEdit}
-                                                                            className="px-3 py-1 bg-green-600 text-white text-xs rounded-md hover:bg-green-700 transition-colors"
+                                                                            disabled={savingAttendance}
+                                                                            className="px-3 py-1 bg-green-600 text-white text-xs rounded-md hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed transition-colors"
                                                                           >
-                                                                            Save
+                                                                            {savingAttendance ? 'Saving...' : 'Save'}
                                                                           </button>
                                                                           <button
                                                                             onClick={cancelEditingAttendance}
@@ -863,9 +888,10 @@ const WeeklyMeetings = () => {
                   </button>
                   <button
                     onClick={handleCreateMeeting}
-                    className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors font-medium"
+                    disabled={creatingMeeting}
+                    className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed transition-colors font-medium"
                   >
-                    Create Meeting
+                    {creatingMeeting ? 'Creating...' : 'Create Meeting'}
                   </button>
                 </div>
               </div>
