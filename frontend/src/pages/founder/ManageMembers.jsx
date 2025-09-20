@@ -291,6 +291,18 @@ function ManageMembers() {
   // Helper function to format checked attributes as badges
   const formatCheckedAttributesBadges = (member) => {
     const attributes = [];
+    
+    // Add family status with widow assistance if applicable
+    if (member.familyStatus) {
+      if (member.familyStatus === 'Widow' && member.widowAssistance) {
+        attributes.push({ label: 'Family Status: Widowed (Receiving Assistance)', key: 'widow-assistance' });
+      } else if (member.familyStatus === 'Widow') {
+        attributes.push({ label: 'Family Status: Widowed', key: 'widow' });
+      } else {
+        attributes.push({ label: `Family Status: ${member.familyStatus}`, key: 'family-status' });
+      }
+    }
+    
     if (member.onRent) attributes.push({ label: 'Rent', key: 'rent' });
     if (member.zakathEligible) attributes.push({ label: 'Zakath', key: 'zakath' });
     if (member.differentlyAbled) attributes.push({ label: 'Disabled', key: 'disabled' });
@@ -724,43 +736,71 @@ function ManageMembers() {
                       {/* Expanded Details Row */}
                       {isExpanded && (
                         <tr className="bg-gray-50">
-                          <td colSpan="7" className="px-4 py-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                              <div>
-                                <span className="font-medium text-gray-700">Age:</span>
-                                <span className="ml-2 text-gray-900">{calculateAge(member.dateOfBirth)}</span>
+                          <td colSpan="7" className="px-6 py-6">
+                            {/* Main Info Grid - 4 rows x 3 columns */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm mb-6">
+                              {/* Row 1 */}
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-gray-600 text-xs uppercase tracking-wide">Age</span>
+                                <span className="text-gray-900 font-medium mt-1">{calculateAge(member.dateOfBirth)}</span>
                               </div>
-                              <div>
-                                <span className="font-medium text-gray-700">Area:</span>
-                                <span className="ml-2 text-gray-900">{member.area || '-'}</span>
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-gray-600 text-xs uppercase tracking-wide">Contact No</span>
+                                <span className="text-gray-900 font-medium mt-1">{member.phone || '-'}</span>
                               </div>
-                              <div>
-                                <span className="font-medium text-gray-700">Sub-area:</span>
-                                <span className="ml-2 text-gray-900">{member.subarea || '-'}</span>
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-gray-600 text-xs uppercase tracking-wide">Email</span>
+                                <span className="text-gray-900 font-medium mt-1">{member.email || '-'}</span>
                               </div>
-                              <div>
-                                <span className="font-medium text-gray-700">Contact No:</span>
-                                <span className="ml-2 text-gray-900">{member.phone || '-'}</span>
+                              
+                              {/* Row 2 */}
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-gray-600 text-xs uppercase tracking-wide">Address</span>
+                                <span className="text-gray-900 font-medium mt-1">{member.address || '-'}</span>
                               </div>
-                              <div>
-                                <span className="font-medium text-gray-700">Email:</span>
-                                <span className="ml-2 text-gray-900">{member.email || '-'}</span>
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-gray-600 text-xs uppercase tracking-wide">Workplace Address</span>
+                                <span className="text-gray-900 font-medium mt-1">{member.workplaceAddress || '-'}</span>
                               </div>
-                              <div>
-                                <span className="font-medium text-gray-700">Address:</span>
-                                <span className="ml-2 text-gray-900">{member.address || '-'}</span>
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-gray-600 text-xs uppercase tracking-wide">Mobility</span>
+                                <span className="text-gray-900 font-medium mt-1">{member.mobility || '-'}</span>
                               </div>
-                              <div>
-                                <span className="font-medium text-gray-700">Username:</span>
-                                <span className="ml-2 text-gray-900">{member.username || '-'}</span>
+                              
+                              {/* Row 3 */}
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-gray-600 text-xs uppercase tracking-wide">Place of Birth</span>
+                                <span className="text-gray-900 font-medium mt-1">{member.placeOfBirth || '-'}</span>
                               </div>
-                              <div>
-                                <span className="font-medium text-gray-700">Mobility:</span>
-                                <span className="ml-2 text-gray-900">{member.mobility || '-'}</span>
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-gray-600 text-xs uppercase tracking-wide">Occupation</span>
+                                <span className="text-gray-900 font-medium mt-1">{member.occupation || '-'}</span>
                               </div>
-                              <div className="lg:col-span-2">
-                                <span className="font-medium text-gray-700">Additional Info:</span>
-                                <div className="ml-2 mt-1">
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-gray-600 text-xs uppercase tracking-wide">Area</span>
+                                <span className="text-gray-900 font-medium mt-1">{member.area || '-'}</span>
+                              </div>
+                              
+                              {/* Row 4 */}
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-gray-600 text-xs uppercase tracking-wide">Sub-area</span>
+                                <span className="text-gray-900 font-medium mt-1">{member.subarea || '-'}</span>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-gray-600 text-xs uppercase tracking-wide">NIC Number</span>
+                                <span className="text-gray-900 font-medium mt-1">{member.nicNo || '-'}</span>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-gray-600 text-xs uppercase tracking-wide">Username</span>
+                                <span className="text-gray-900 font-medium mt-1">{member.username || '-'}</span>
+                              </div>
+                            </div>
+                            
+                            {/* Additional Info Section */}
+                            <div className="border-t border-gray-200 pt-4">
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-gray-600 text-xs uppercase tracking-wide mb-3">Additional Information</span>
+                                <div className="bg-white rounded-lg p-3 border border-gray-200">
                                   {formatCheckedAttributesBadges(member)}
                                 </div>
                               </div>
@@ -833,7 +873,7 @@ function ManageMembers() {
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Showing {filteredMembers.length} filtered results. Pagination is disabled when filters are active.
+                Showing {filteredMembers.length} filtered results.
               </div>
             </div>
           )}

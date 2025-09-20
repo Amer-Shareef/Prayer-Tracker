@@ -26,6 +26,9 @@ router.get(
                u.address, u.area_id, u.sub_areas_id, u.mobility, u.living_on_rent as onRent, 
                u.zakath_eligible as zakathEligible, u.differently_abled as differentlyAbled, 
                u.muallafathil_quloob as MuallafathilQuloob, 
+               u.place_of_birth as placeOfBirth, u.nic_no as nicNo, u.occupation, 
+               u.workplace_address as workplaceAddress, u.family_status as familyStatus, 
+               u.widow_assistance as widowAssistance,
                a.area_name as area, a.address as area_address,
                sa.address as subarea,
                CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId,
@@ -128,6 +131,9 @@ router.get(
                u.address, u.area_id, u.sub_areas_id, u.mobility, u.living_on_rent as onRent, 
                u.zakath_eligible as zakathEligible, u.differently_abled as differentlyAbled, 
                u.muallafathil_quloob as MuallafathilQuloob, 
+               u.place_of_birth as placeOfBirth, u.nic_no as nicNo, u.occupation, 
+               u.workplace_address as workplaceAddress, u.family_status as familyStatus, 
+               u.widow_assistance as widowAssistance,
                a.area_name as area, a.address as area_address,
                sa.address as subarea,
                CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId,
@@ -243,6 +249,12 @@ router.post(
         zakathEligible = false,
         differentlyAbled = false,
         MuallafathilQuloob = false,
+        placeOfBirth,
+        nicNo,
+        occupation,
+        workplaceAddress,
+        familyStatus,
+        widowAssistance = false,
       } = req.body;
 
       console.log("📝 Received member data:", {
@@ -378,8 +390,9 @@ router.post(
         full_name, username, email, phone, password, role, area_id, sub_areas_id,
         date_of_birth, address, mobility, living_on_rent, 
         zakath_eligible, differently_abled, muallafathil_quloob,
-        status, joined_date
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', CURDATE())`,
+        place_of_birth, nic_no, occupation, workplace_address,
+        family_status, widow_assistance, status, joined_date
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', CURDATE())`,
         [
           fullName,
           username,
@@ -396,6 +409,12 @@ router.post(
           zakathEligible,
           differentlyAbled,
           MuallafathilQuloob,
+          placeOfBirth || null,
+          nicNo || null,
+          occupation || null,
+          workplaceAddress || null,
+          familyStatus || null,
+          widowAssistance || false,
         ]
       );
 
@@ -406,7 +425,10 @@ router.post(
         `SELECT u.id, u.full_name as fullName, u.username, u.email, u.phone, u.role, u.status, 
               u.joined_date, u.created_at, u.date_of_birth as dateOfBirth, u.address, u.area_id,
               u.mobility, u.living_on_rent as onRent, u.zakath_eligible as zakathEligible, 
-              u.differently_abled as differentlyAbled, u.muallafathil_quloob as MuallafathilQuloob, 
+              u.differently_abled as differentlyAbled, u.muallafathil_quloob as MuallafathilQuloob,
+              u.place_of_birth as placeOfBirth, u.nic_no as nicNo, u.occupation, 
+              u.workplace_address as workplaceAddress, u.family_status as familyStatus, 
+              u.widow_assistance as widowAssistance,
               a.area_name, a.address as area_address
        FROM users u
        LEFT JOIN areas a ON u.area_id = a.area_id
@@ -440,7 +462,19 @@ router.put(
   async (req, res) => {
     try {
       const { id } = req.params;
-      const { username, email, phone, role, status } = req.body;
+      const { 
+        username, 
+        email, 
+        phone, 
+        role, 
+        status,
+        placeOfBirth,
+        nicNo,
+        occupation,
+        workplaceAddress,
+        familyStatus,
+        widowAssistance
+      } = req.body;
       const { user } = req;
 
       // Check if member exists and access permissions
@@ -464,12 +498,55 @@ router.put(
         });
       }
 
-      // Update member
-      const [result] = await pool.execute(
-        `UPDATE users SET username = ?, email = ?, phone = ?, role = ?, status = ?, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = ?`,
-        [username, email, phone, role, status, id]
-      );
+      // Build dynamic UPDATE query based on provided fields
+      const updateFields = [];
+      const updateValues = [];
+
+      // Map of frontend field names to database column names
+      const fieldMapping = {
+        username: 'username',
+        email: 'email', 
+        phone: 'phone',
+        role: 'role',
+        status: 'status',
+        placeOfBirth: 'place_of_birth',
+        nicNo: 'nic_no',
+        occupation: 'occupation',
+        workplaceAddress: 'workplace_address',
+        familyStatus: 'family_status',
+        widowAssistance: 'widow_assistance'
+      };
+
+      // Only add fields that are provided in the request
+      Object.keys(fieldMapping).forEach(frontendField => {
+        if (req.body[frontendField] !== undefined) {
+          const dbField = fieldMapping[frontendField];
+          updateFields.push(`${dbField} = ?`);
+          
+          // Handle special cases for data conversion
+          if (frontendField === 'widowAssistance') {
+            updateValues.push(req.body[frontendField] ? 1 : 0);
+          } else {
+            updateValues.push(req.body[frontendField]);
+          }
+        }
+      });
+
+      // Always update the timestamp
+      updateFields.push('updated_at = CURRENT_TIMESTAMP');
+
+      if (updateFields.length === 1) { // Only timestamp was added
+        return res.status(400).json({
+          success: false,
+          message: "No valid fields provided for update"
+        });
+      }
+
+      // Execute the dynamic UPDATE query
+      const updateQuery = `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`;
+      updateValues.push(id);
+      
+      const [result] = await pool.execute(updateQuery, updateValues);
 
       if (result.affectedRows === 0) {
         return res.status(404).json({
@@ -481,10 +558,16 @@ router.put(
       // Fetch updated member
       const [updatedMember] = await pool.execute(
         `SELECT u.id, u.username, u.email, u.phone, u.role, u.status, u.joined_date, u.created_at,
-              a.area_name, a.address as area_address
-       FROM users u
-       LEFT JOIN areas a ON u.area_id = a.area_id
-       WHERE u.id = ?`,
+                u.place_of_birth as placeOfBirth,
+                u.nic_no as nicNo,
+                u.occupation,
+                u.workplace_address as workplaceAddress,
+                u.family_status as familyStatus,
+                u.widow_assistance as widowAssistance,
+                a.area_name, a.address as area_address
+         FROM users u
+         LEFT JOIN areas a ON u.area_id = a.area_id
+         WHERE u.id = ?`,
         [id]
       );
 

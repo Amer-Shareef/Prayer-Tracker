@@ -34,7 +34,13 @@ const AddMember = () => {
     differentlyAbled: false,
     mobility: '',
     otherSpecify: '',
-    MuallafathilQuloob: false
+    MuallafathilQuloob: false,
+    placeOfBirth: '',
+    nicNo: '',
+    occupation: '',
+    workplaceAddress: '',
+    familyStatus: '',
+    widowAssistance: false
   });
 
   // Fetch areas from database
@@ -364,7 +370,7 @@ const AddMember = () => {
                   </div>
                 </div>
 
-                {/* Age */}
+                {/* Date of Birth */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="dateOfBirth">
                     Date of Birth
@@ -379,19 +385,83 @@ const AddMember = () => {
                   />
                 </div>
 
-                {/* Location */}
+                {/* Place of Birth */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="address">
-                    Address
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="placeOfBirth">
+                    Place of Birth
                   </label>
                   <input
                     type="text"
+                    id="placeOfBirth"
+                    name="placeOfBirth"
+                    value={formData.placeOfBirth}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter place of birth"
+                  />
+                </div>
+
+                {/* NIC No */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="nicNo">
+                    NIC No
+                  </label>
+                  <input
+                    type="text"
+                    id="nicNo"
+                    name="nicNo"
+                    value={formData.nicNo}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter NIC number"
+                  />
+                </div>
+
+                {/* Occupation */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="occupation">
+                    Occupation
+                  </label>
+                  <input
+                    type="text"
+                    id="occupation"
+                    name="occupation"
+                    value={formData.occupation}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter occupation"
+                  />
+                </div>
+
+                {/* Address */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="address">
+                    Address
+                  </label>
+                  <textarea
                     id="address"
                     name="address"
                     value={formData.address}
                     onChange={handleInputChange}
+                    rows="3"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Enter address"
+                  />
+                </div>
+
+                {/* Workplace/Business Address */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="workplaceAddress">
+                    Workplace/Business Address
+                  </label>
+                  <textarea
+                    id="workplaceAddress"
+                    name="workplaceAddress"
+                    value={formData.workplaceAddress}
+                    onChange={handleInputChange}
+                    rows="3"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter workplace or business address"
                   />
                 </div>
 
@@ -508,6 +578,27 @@ const AddMember = () => {
                   </select>
                 </div>
 
+                {/* Family Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="familyStatus">
+                    Family Status
+                  </label>
+                  <select
+                    id="familyStatus"
+                    name="familyStatus"
+                    value={formData.familyStatus}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select family status</option>
+                    <option value="Joint Living">Joint Living</option>
+                    <option value="Widow">Widow</option>
+                    <option value="Divorced">Divorced</option>
+                    <option value="Separated">Separated</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
                 {/* Password */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="password">
@@ -584,6 +675,23 @@ const AddMember = () => {
             <div className="mb-8">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* If Widowed, are you receiving assistance? */}
+                {formData.familyStatus === 'Widow' && (
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="widowAssistance"
+                      name="widowAssistance"
+                      checked={formData.widowAssistance}
+                      onChange={(e) => setFormData({ ...formData, widowAssistance: e.target.checked })}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="widowAssistance" className="ml-2 block text-sm text-gray-900">
+                      Receiving Assistance <span className="text-gray-500">[additional info]</span>
+                    </label>
+                  </div>
+                )}
+
                 {/* On Rent */}
                 <div className="flex items-center">
                   <input
