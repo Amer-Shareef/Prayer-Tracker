@@ -455,8 +455,12 @@ export const mosqueService = {
 
 // Member Management APIs
 export const memberAPI = {
-  getMembers: async () => {
-    const response = await api.get("/members");
+  getMembers: async (params = {}) => {
+    const response = await api.get("/members", { params });
+    return response.data;
+  },
+  getAllMembers: async (params = {}) => {
+    const response = await api.get("/members/all", { params });
     return response.data;
   },
   getFounders: async () => {

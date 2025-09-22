@@ -244,12 +244,18 @@ yPosition = 55; // Start content lower, since header is taller
     ['Full Name', member.fullName || 'N/A'],
     ['Age', calculateAge(member.dateOfBirth).toString()],
     ['Date of Birth', member.dateOfBirth ? new Date(member.dateOfBirth).toLocaleDateString() : 'N/A'],
+    ['Place of Birth', member.placeOfBirth || 'N/A'],
+    ['NIC Number', member.nicNo || 'N/A'],
     ['Email', member.email || 'N/A'],
     ['Phone', member.phone || 'N/A'],
     ['Address', member.address || 'N/A'],
+    ['Workplace Address', member.workplaceAddress || 'N/A'],
     ['Area', member.subarea || 'N/A'],
     ['Mahallah', member.area || 'N/A'],
     ['Mobility', member.mobility || 'N/A'],
+    ['Occupation', member.occupation || 'N/A'],
+    ['Family Status', member.familyStatus || 'N/A'],
+    ['Receiving Assistance', (member.familyStatus === 'Widow' && member.widowAssistance) ? 'Yes' : 'No'],
     ['Role', member.role === 'Member' ? 'Member' :
              member.role === 'WCM' ? 'Working Committee Member' :
              member.role === 'Founder' ? 'Working Committee Admin' :

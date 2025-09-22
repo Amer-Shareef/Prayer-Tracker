@@ -70,8 +70,14 @@ const dailyActivitiesRoutes = require("./routes/dailyActivitiesRoutes");
 const feedsRoutes = require("./routes/feedsRoutes");
 const wakeUpCallRoutes = require("./routes/wakeUpCallRoutes"); // Add this line
 const meetingRoutes = require("./routes/meetingRoutes");
-const weeklyMeetingsRoutes = require("./routes/weeklyMeetingsRoutes");
+const smartMeetingsRoutes = require("./routes/smartMeetingsRoutes");
 const areaRoutes = require("./routes/areaRoutes");
+
+// // Import the weekly meeting scheduler
+// const WeeklyMeetingScheduler = require("./jobs/weeklyMeetingScheduler");
+
+// // Initialize the weekly meeting scheduler
+// const weeklyMeetingScheduler = new WeeklyMeetingScheduler();
 
 // Use routes
 app.use("/api", authRoutes);
@@ -85,7 +91,8 @@ app.use("/api", meetingRoutes);
 app.use("/api/daily-activities", dailyActivitiesRoutes);
 app.use("/api/feeds", feedsRoutes);
 app.use("/api", wakeUpCallRoutes);
-app.use("/api", weeklyMeetingsRoutes);
+// app.use("/api", weeklyMeetingsRoutes);
+app.use("/api", smartMeetingsRoutes);
 app.use("/api", areaRoutes);
 
 // Enhanced health endpoint
@@ -201,11 +208,18 @@ app.listen(PORT, async () => {
     );
     console.log("   Please check your database configuration");
   }
+
+  // Start the weekly meeting scheduler
+  // try {
+  //   const systemUserId = parseInt(process.env.SYSTEM_USER_ID || "1"); // Use env var or default to 1
+  //   weeklyMeetingScheduler.start(systemUserId);
+  // } catch (error) {
+  //   console.error("❌ Failed to start weekly meeting scheduler:", error);
+  // }
 });
 
 // Graceful shutdown handling
 process.on("SIGTERM", async () => {
-  console.log("📋 SIGTERM received, shutting down gracefully");
   const { pool } = require("./config/database");
   await pool.end();
   process.exit(0);

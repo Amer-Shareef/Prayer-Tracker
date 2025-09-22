@@ -17,6 +17,9 @@ router.get("/users/profile", authenticateToken, async (req, res) => {
               u.zakath_eligible as zakathEligible, 
               u.differently_abled as differentlyAbled, 
               u.muallafathil_quloob as MuallafathilQuloob,
+              u.place_of_birth as placeOfBirth, u.nic_no as nicNo, u.occupation, 
+              u.workplace_address as workplaceAddress, u.family_status as familyStatus, 
+              u.widow_assistance as widowAssistance,
               u.joined_date, u.last_login, u.created_at, u.updated_at,
               u.otp_verified, u.login_attempts,
               a.area_name, a.address as area_address,
@@ -77,6 +80,12 @@ router.put("/users/profile", authenticateToken, async (req, res) => {
       zakathEligible: "zakath_eligible",
       differentlyAbled: "differently_abled",
       MuallafathilQuloob: "muallafathil_quloob",
+      placeOfBirth: "place_of_birth",
+      nicNo: "nic_no",
+      occupation: "occupation",
+      workplaceAddress: "workplace_address",
+      familyStatus: "family_status",
+      widowAssistance: "widow_assistance",
     };
 
     const updateFields = [];
@@ -139,6 +148,9 @@ router.put("/users/profile", authenticateToken, async (req, res) => {
         zakath_eligible as zakathEligible,
         differently_abled as differentlyAbled,
         muallafathil_quloob as MuallafathilQuloob,
+        place_of_birth as placeOfBirth, nic_no as nicNo, occupation,
+        workplace_address as workplaceAddress, family_status as familyStatus,
+        widow_assistance as widowAssistance,
         joined_date, last_login, updated_at,
         CONCAT(UPPER(LEFT(COALESCE(area_id, 'GEN'), 2)), LPAD(id, 4, '0')) as memberId
       FROM users 
