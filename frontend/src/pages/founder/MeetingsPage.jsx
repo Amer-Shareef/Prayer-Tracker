@@ -373,7 +373,6 @@ const MeetingsPage = () => {
     if (user?.role === 'SuperAdmin' && memberAreaFilter !== 'all') {
       filtered = filtered.filter(member => member.area_id === parseInt(memberAreaFilter));
     }
-    
     return filtered;
   };
 
