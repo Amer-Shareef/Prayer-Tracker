@@ -2,73 +2,8 @@ const express = require("express");
 const { pool } = require("../config/database");
 const { authenticateToken } = require("../middleware/auth");
 const { dbHealthCheck } = require("../middleware/dbHealthCheck");
-const { body, validationResult } = require("express-validator");
-const rateLimit = require("express-rate-limit");
 
 const router = express.Router();
-// Rate limiting middleware
-const attendanceLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // limit each user to 20 attendance requests per 15 minutes
-  message: {
-    success: false,
-    message: "Too many attendance requests, please try again later.",
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-const meetingCreationLimit = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10,
-  message: {
-    success: false,
-    message: "Too many meeting creation requests, please try again later.",
-  },
-});
-
-// Validation middleware
-const validateMeetingCreation = [
-  body("meeting_date")
-    .matches(/^\d{4}-\d{2}-\d{2}$/)
-    .withMessage("Valid date required (YYYY-MM-DD)"),
-  body("meeting_time")
-    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
-    .withMessage("Valid time required (HH:MM)"),
-  body("location").optional().isLength({ min: 1, max: 255 }).trim(),
-  body("agenda").optional().isLength({ min: 1, max: 1000 }).trim(),
-  body("area_id").optional().isInt({ min: 1 }),
-  (req, res, next) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation errors",
-        errors: errors.array(),
-      });
-    }
-    next();
-  },
-];
-
-const validateAttendance = [
-  body("status")
-    .isIn(["present", "absent", "excused", "pending"])
-    .withMessage("Status must be present, absent, excused, or pending"),
-  body("reason").optional().isLength({ max: 500 }).trim(),
-  body("user_id").optional().isInt({ min: 1 }),
-  (req, res, next) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation errors",
-        errors: errors.array(),
-      });
-    }
-    next();
-  },
-];
 
 // Helper functions
 function isAuthorized(
@@ -254,10 +189,8 @@ async function ensureFutureMeetingsSafe(connection, meeting, minFuture = 2) {
 // Create initial weekly meeting (parent meeting)
 router.post(
   "/weekly-meetings",
-  meetingCreationLimit,
   authenticateToken,
   dbHealthCheck,
-  validateMeetingCreation,
   async (req, res) => {
     console.log("Create weekly meeting endpoint called:", {
       userId: req.user.id,
@@ -370,10 +303,8 @@ router.post(
 // Mark attendance with automatic future meeting creation
 router.put(
   "/weekly-meetings/:id/attendance",
-  attendanceLimit,
   authenticateToken,
   dbHealthCheck,
-  validateAttendance,
   async (req, res) => {
     console.log("Mark attendance endpoint called:", {
       meetingId: req.params.id,
@@ -1514,29 +1445,6 @@ router.put(
   "/weekly-meetings/:id",
   authenticateToken,
   dbHealthCheck,
-  [
-    body("meeting_date")
-      .optional()
-      .matches(/^\d{4}-\d{2}-\d{2}$/),
-    body("meeting_time")
-      .optional()
-      .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
-    body("location").optional().isLength({ min: 1, max: 255 }).trim(),
-    body("agenda").optional().isLength({ min: 1, max: 1000 }).trim(),
-    body("status").optional().isIn(["scheduled", "completed", "cancelled"]),
-    body("update_series").optional().isBoolean(),
-    (req, res, next) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          message: "Validation errors",
-          errors: errors.array(),
-        });
-      }
-      next();
-    },
-  ],
   async (req, res) => {
     console.log("Update meeting endpoint called:", {
       meetingId: req.params.id,
