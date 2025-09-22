@@ -20,7 +20,7 @@ const attendanceLimit = rateLimit({
 
 const meetingCreationLimit = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5, // limit to 5 meeting creations per hour
+  max: 10,
   message: {
     success: false,
     message: "Too many meeting creation requests, please try again later.",
@@ -483,7 +483,7 @@ router.put(
 
 // Get all meetings for user's area (simplified - no date filtering)
 router.get(
-  "/weekly-meetings/my-area/upcoming",
+  "/weekly-meetings/upcoming",
   authenticateToken,
   dbHealthCheck,
   async (req, res) => {
@@ -600,6 +600,135 @@ router.get(
       });
     } catch (error) {
       console.error("Error getting meetings:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to get meetings",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Mobile-optimized endpoint - always returns 3 past + 1 future meetings
+router.get(
+  "/weekly-meetings/mobile",
+  authenticateToken,
+  dbHealthCheck,
+  async (req, res) => {
+    console.log("Mobile meetings endpoint called:", {
+      userId: req.user.id,
+      userArea: req.user.area_id,
+    });
+
+    try {
+      const { user } = req;
+      const today = getUTCDateString(new Date());
+
+      // Get 3 most recent past meetings
+      const [pastMeetings] = await pool.execute(
+        `SELECT wm.*,
+        COALESCE(wma.status, 'pending') as my_attendance_status,
+        wma.reason as my_attendance_note,
+        (SELECT COUNT(*) FROM weekly_meeting_attendance WHERE weekly_meeting_id = wm.id AND status = 'present') as present_count,
+        CASE WHEN wm.parent_id IS NULL THEN 'parent' ELSE 'child' END as meeting_type
+       FROM weekly_meetings wm
+       LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id AND wma.user_id = ?
+       WHERE wm.area_id = ? AND wm.meeting_date < ?
+       ORDER BY wm.meeting_date DESC, wm.meeting_time DESC
+       LIMIT 3`,
+        [user.id, user.area_id, today]
+      );
+
+      // Get 1 next future meeting
+      const [futureMeetings] = await pool.execute(
+        `SELECT wm.*,
+        COALESCE(wma.status, 'pending') as my_attendance_status,
+        wma.reason as my_attendance_note,
+        (SELECT COUNT(*) FROM weekly_meeting_attendance WHERE weekly_meeting_id = wm.id AND status = 'present') as present_count,
+        CASE WHEN wm.parent_id IS NULL THEN 'parent' ELSE 'child' END as meeting_type
+       FROM weekly_meetings wm
+       LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id AND wma.user_id = ?
+       WHERE wm.area_id = ? AND wm.meeting_date >= ?
+       ORDER BY wm.meeting_date ASC, wm.meeting_time ASC
+       LIMIT 1`,
+        [user.id, user.area_id, today]
+      );
+
+      // If we have less than 1 future meeting, try to create more
+      if (futureMeetings.length < 1) {
+        console.log(
+          `🔄 Only ${futureMeetings.length} future meetings found, attempting to create more for area ${user.area_id}`
+        );
+
+        // Find the most recent meeting to use as template for creating future meetings
+        const [recentMeeting] = await pool.execute(
+          `SELECT * FROM weekly_meetings
+           WHERE area_id = ?
+           ORDER BY meeting_date DESC, meeting_time DESC
+           LIMIT 1`,
+          [user.area_id]
+        );
+
+        if (recentMeeting.length > 0) {
+          const connection = await pool.getConnection();
+          try {
+            await connection.beginTransaction();
+            const futureResult = await ensureFutureMeetingsSafe(
+              connection,
+              recentMeeting[0],
+              1
+            );
+            await connection.commit();
+
+            console.log(
+              `✅ Created ${futureResult.created} additional future meetings`
+            );
+
+            // Re-fetch future meetings after creation
+            const [updatedFutureMeetings] = await pool.execute(
+              `SELECT wm.*,
+              COALESCE(wma.status, 'pending') as my_attendance_status,
+              wma.reason as my_attendance_note,
+              (SELECT COUNT(*) FROM weekly_meeting_attendance WHERE weekly_meeting_id = wm.id AND status = 'present') as present_count,
+              CASE WHEN wm.parent_id IS NULL THEN 'parent' ELSE 'child' END as meeting_type
+             FROM weekly_meetings wm
+             LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id AND wma.user_id = ?
+             WHERE wm.area_id = ? AND wm.meeting_date >= ?
+             ORDER BY wm.meeting_date ASC, wm.meeting_time ASC
+             LIMIT 1`,
+              [user.id, user.area_id, today]
+            );
+
+            futureMeetings.splice(
+              0,
+              futureMeetings.length,
+              ...updatedFutureMeetings
+            );
+          } catch (error) {
+            await connection.rollback();
+            console.error("Error creating future meetings:", error);
+          } finally {
+            connection.release();
+          }
+        }
+      }
+
+      // Combine past and future meetings
+      const allMeetings = [...pastMeetings, ...futureMeetings];
+
+      res.json({
+        success: true,
+        data: {
+          meetings: allMeetings,
+          summary: {
+            past_meetings_count: pastMeetings.length,
+            future_meetings_count: futureMeetings.length,
+            total_meetings: allMeetings.length,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Error getting mobile meetings:", error);
       res.status(500).json({
         success: false,
         message: "Failed to get meetings",

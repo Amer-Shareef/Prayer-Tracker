@@ -17,7 +17,7 @@ const weeklyMeetingsService = {
   // Get upcoming meetings for user's area (mobile app style)
   getUpcomingMeetings: async () => {
     try {
-      const response = await api.get("/weekly-meetings/my-area/upcoming");
+      const response = await api.get("/weekly-meetings/upcoming");
       return response.data;
     } catch (error) {
       console.error("Error getting upcoming meetings:", error);
