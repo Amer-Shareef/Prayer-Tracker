@@ -185,12 +185,12 @@ const PostFeeds = () => {
 
   useEffect(() => {
     console.log("🔍 PostFeeds component mounted");
-    console.log("🔧 UploadThing URL:", process.env.REACT_APP_BACKEND_URL || "http://localhost:5000");
+    console.log("🔧 UploadThing URL:", process.env.REACT_APP_BACKEND_URL || "http://13.60.193.171:5000");
     
     // Test UploadThing endpoint
     const testEndpoint = async () => {
       try {
-        const backendUrl = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+        const backendUrl = process.env.REACT_APP_BACKEND_URL || "http://13.60.193.171:5000";
         const response = await fetch(`${backendUrl}/api/uploadthing`);
         console.log("🧪 UploadThing endpoint test:", response.status, response.statusText);
       } catch (error) {
