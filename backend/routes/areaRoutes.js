@@ -545,7 +545,7 @@ router.delete(
 
       // Check if any members are assigned to this area
       const [members] = await pool.execute(
-        "SELECT COUNT(*) as count FROM members WHERE area_id = ?",
+        "SELECT COUNT(*) as count FROM users WHERE area_id = ?",
         [id]
       );
 
