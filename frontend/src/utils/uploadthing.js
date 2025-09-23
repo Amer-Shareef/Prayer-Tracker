@@ -2,7 +2,7 @@ import { generateUploadButton, generateUploadDropzone, generateReactHelpers } fr
 
 // Generate the upload components with your backend URL
 const getUploadThingUrl = () => {
-  const backendUrl = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+  const backendUrl = process.env.REACT_APP_BACKEND_URL || "http://13.60.193.171:5000";
   return `${backendUrl}/api/uploadthing`;
 };
 
