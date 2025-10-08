@@ -1,4 +1,3 @@
-import React from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -32,7 +31,6 @@ import KnowledgeProgramPage from "./pages/founder/KnowledgeProgramPage";
 import ManageMembers from "./pages/founder/ManageMembers";
 import MeetingsPage from "./pages/founder/MeetingsPage";
 import MosqueWorkPage from "./pages/founder/MosqueWorkPage";
-import PostFeeds from "./pages/founder/PostFeeds";
 import ReminderPage from "./pages/founder/ReminderPage";
 import ScheduleMeeting from "./pages/founder/ScheduleMeeting";
 import SendReminder from "./pages/founder/SendReminder";
@@ -195,14 +193,6 @@ function App() {
             element={
               <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
                 <MosqueWorkPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/founder/post-feeds"
-            element={
-              <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
-                <PostFeeds />
               </ProtectedRoute>
             }
           />

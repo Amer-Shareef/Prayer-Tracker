@@ -221,7 +221,7 @@ const FounderLayout = ({ children }) => {
   const superAdminMenuItems = [
     {
       path: "/founder/area",
-      label: "Area (Legacy)",
+      label: "Area",
       bgColor: "bg-gray-200",
       hoverColor: "hover:bg-gray-100",
       textColor: "text-gray-800",
@@ -438,7 +438,7 @@ const FounderLayout = ({ children }) => {
         } transition-all duration-300 ease-in-out`}
       >
         {/* Page Content */}
-        <main className="p-10 bg-gray-50 min-h-screen">{children}</main>
+        <main className="p-14 bg-gray-50 min-h-screen">{children}</main>
       </div>
     </div>
   );

@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import FounderLayout from "../../components/layouts/FounderLayout";
 import feedsService from "../../services/feedsService";
 import {
-  UploadButton,
-  UploadDropzone,
   uploadFiles,
 } from "../../utils/uploadthing";
 import { useAuth } from "../../context/AuthContext";
