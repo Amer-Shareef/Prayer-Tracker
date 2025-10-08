@@ -36,9 +36,9 @@ const FounderLayout = ({ children }) => {
     {
       path: "/founder/dashboard",
       label: "Dashboard",
-      bgColor: "bg-green-600", // Consistent green for all items
-      hoverColor: "hover:bg-green-500",
-      textColor: "text-white",
+      bgColor: "bg-green-50", // Light green background for better integration
+      hoverColor: "hover:bg-green-100",
+      textColor: "text-gray-800",
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -54,9 +54,9 @@ const FounderLayout = ({ children }) => {
     {
       path: "/founder/manage-members",
       label: "Members",
-      bgColor: "bg-green-600",
-      hoverColor: "hover:bg-green-500",
-      textColor: "text-white",
+      bgColor: "bg-green-50",
+      hoverColor: "hover:bg-green-100",
+      textColor: "text-gray-800",
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -78,9 +78,9 @@ const FounderLayout = ({ children }) => {
     {
       path: "/founder/meetings",
       label: "Meetings",
-      bgColor: "bg-green-600",
-      hoverColor: "hover:bg-green-500",
-      textColor: "text-white",
+      bgColor: "bg-green-50",
+      hoverColor: "hover:bg-green-100",
+      textColor: "text-gray-800",
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -102,9 +102,9 @@ const FounderLayout = ({ children }) => {
     {
       path: "/founder/reminder",
       label: "Daily Reminder",
-      bgColor: "bg-green-600",
-      hoverColor: "hover:bg-green-500",
-      textColor: "text-white",
+      bgColor: "bg-green-50",
+      hoverColor: "hover:bg-green-100",
+      textColor: "text-gray-800",
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -126,9 +126,9 @@ const FounderLayout = ({ children }) => {
     {
       path: "/founder/wake-up-call",
       label: "Call Centre",
-      bgColor: "bg-green-600",
-      hoverColor: "hover:bg-green-500",
-      textColor: "text-white",
+      bgColor: "bg-green-50",
+      hoverColor: "hover:bg-green-100",
+      textColor: "text-gray-800",
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -184,9 +184,9 @@ const FounderLayout = ({ children }) => {
     {
       path: "/founder/transport",
       label: "Transport & Mobility",
-      bgColor: "bg-green-600",
-      hoverColor: "hover:bg-green-500",
-      textColor: "text-white",
+      bgColor: "bg-green-50",
+      hoverColor: "hover:bg-green-100",
+      textColor: "text-gray-800",
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -229,9 +229,9 @@ const FounderLayout = ({ children }) => {
     {
       path: "/founder/area",
       label: "Area",
-      bgColor: "bg-green-600",
-      hoverColor: "hover:bg-green-500",
-      textColor: "text-white",
+      bgColor: "bg-green-50",
+      hoverColor: "hover:bg-green-100",
+      textColor: "text-gray-800",
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -293,12 +293,12 @@ const FounderLayout = ({ children }) => {
         ref={sidebarRef}
         className={`${
           sidebarOpen ? "w-64" : "w-16"
-        } bg-gradient-to-b from-green-700 to-green-400 text-gray-800 transition-all duration-300 ease-in-out fixed h-screen z-10 overflow-y-auto shadow-xl`}
+        } bg-gradient-to-b from-green-100 to-green-200 text-gray-800 transition-all duration-300 ease-in-out fixed h-screen z-10 overflow-y-auto shadow-xl`}
       >
         <div
           className={`${sidebarOpen ? "px-4 py-3" : "px-2 py-3"} flex ${
             sidebarOpen ? "justify-between" : "justify-center"
-          } items-center border-b border-green-800 bg-green-200`}
+          } items-center border-b border-green-400 bg-green-600`}
         >
           {sidebarOpen ? (
             <>
@@ -306,17 +306,17 @@ const FounderLayout = ({ children }) => {
                 <img
                   src="/images/Fajr_Council_Logo.png"
                   alt="FAJR"
-                  className="h-8 w-8 object-contain"
+                  className="h-8 w-8 object-contain bg-white rounded-md p-1 shadow-sm"
                 />
                 <div className="flex flex-col">
-                  <h1 className="text-base font-bold tracking-wide text-gray-800">
+                  <h1 className="text-base font-bold tracking-wide text-white">
                     {user?.role === "SuperAdmin"
                       ? "Super Admin"
                       : user?.role === "Founder"
                       ? "Working Committee"
                       : user?.role || "User"}
                   </h1>
-                  <p className="text-xs text-gray-600">
+                  <p className="text-xs text-green-100">
                     {user?.role === "SuperAdmin"
                       ? "System-wide Access"
                       : user?.role === "Founder" && user?.areaId
@@ -329,7 +329,7 @@ const FounderLayout = ({ children }) => {
               </div>
               <button
                 onClick={toggleSidebar}
-                className="text-gray-800 hover:bg-green-300 rounded-lg p-1.5 transition-colors duration-200"
+                className="text-white hover:bg-green-500 rounded-lg p-1.5 transition-colors duration-200"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -350,91 +350,102 @@ const FounderLayout = ({ children }) => {
           ) : (
             <button
               onClick={toggleSidebar}
-              className="text-gray-800 hover:bg-green-300 rounded-lg p-1.5 transition-colors duration-200"
+              className="text-white hover:bg-green-500 rounded-lg p-1.5 transition-colors duration-200"
               title="Expand menu"
             >
               <img
                 src="/images/Fajr_Council_Logo.png"
                 alt="FAJR"
-                className="h-8 w-8 object-contain"
+                className="h-8 w-8 object-contain bg-white rounded-md p-1 shadow-sm"
               />
             </button>
           )}
         </div>
 
         <nav
-          className={`${sidebarOpen ? "px-2 py-3" : "px-1 py-3"} space-y-1.5`}
+          className={`${
+            sidebarOpen ? "px-3 py-4" : "px-2 py-4"
+          } space-y-2 flex-1 flex flex-col justify-center`}
         >
-          {/* Founder Menu Items */}
-          {menuItems.map((item, index) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`
+          {/* Menu Items Container */}
+          <div className="space-y-2">
+            {/* Founder Menu Items */}
+            {menuItems.map((item, index) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`
                 flex items-center ${
                   sidebarOpen
                     ? "px-3 py-3 rounded-2xl"
                     : "w-12 h-12 rounded-full justify-center"
                 } transition-all duration-200 group relative
-                ${item.textColor} ${
-                item.hoverColor
-              } shadow-sm hover:shadow-md transform hover:scale-102
                 ${
                   location.pathname === item.path
-                    ? `bg-green-700 shadow-md scale-102 ring-2 ring-white ring-opacity-40`
+                    ? "text-white"
+                    : item.textColor
+                } ${
+                  item.hoverColor
+                } shadow-sm hover:shadow-md transform hover:scale-102
+                ${
+                  location.pathname === item.path
+                    ? `bg-green-600 shadow-lg scale-102 ring-2 ring-green-300 ring-opacity-60`
                     : item.bgColor
                 }
               `}
-              title={!sidebarOpen ? item.label : ""}
-            >
-              <span
-                className={`inline-block flex-shrink-0 transition-transform duration-200 group-hover:scale-110`}
+                title={!sidebarOpen ? item.label : ""}
               >
-                {item.icon}
-              </span>
-              {sidebarOpen && (
-                <span className="ml-3 text-sm font-medium transition-opacity duration-300 opacity-100 whitespace-nowrap overflow-hidden text-ellipsis">
-                  {item.label}
+                <span
+                  className={`inline-block flex-shrink-0 transition-transform duration-200 group-hover:scale-110`}
+                >
+                  {item.icon}
                 </span>
-              )}
-            </Link>
-          ))}
+                {sidebarOpen && (
+                  <span className="ml-3 text-sm font-medium transition-opacity duration-300 opacity-100 whitespace-nowrap overflow-hidden text-ellipsis">
+                    {item.label}
+                  </span>
+                )}
+              </Link>
+            ))}
+          </div>
 
-          {/* Logout Button */}
-          <button
-            onClick={logout}
-            className={`
+          {/* Logout Button Container */}
+          <div className="mt-auto">
+            <button
+              onClick={logout}
+              className={`
               flex items-center ${
                 sidebarOpen
                   ? "w-full px-3 py-3 rounded-2xl"
                   : "w-12 h-12 rounded-full justify-center mx-auto"
               } transition-all duration-200 
-              bg-rose-200 hover:bg-rose-300 text-rose-700 border-t border-green-300 ${
+              bg-rose-200 hover:bg-rose-300 text-rose-700 border-t border-green-500 ${
                 sidebarOpen ? "mt-4 pt-3" : "mt-3 pt-3"
               } group shadow-sm hover:shadow-md transform hover:scale-102
             `}
-            title={!sidebarOpen ? "Logout" : ""}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+              title={!sidebarOpen ? "Logout" : ""}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-              />
-            </svg>
-            {sidebarOpen && (
-              <span className="ml-3 text-sm font-medium transition-opacity duration-300 opacity-100 whitespace-nowrap">
-                Logout
-              </span>
-            )}
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                />
+              </svg>
+              {sidebarOpen && (
+                <span className="ml-3 text-sm font-medium transition-opacity duration-300 opacity-100 whitespace-nowrap">
+                  Logout
+                </span>
+              )}
+            </button>
+          </div>
         </nav>
       </div>
 
