@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import FounderLayout from "../../components/layouts/FounderLayout";
 import { memberAPI, areaService } from "../../services/api";
@@ -46,29 +46,8 @@ function ManageMembers() {
   });
   const [areaName, setAreaName] = useState("Loading...");
 
-  // Debounce ref for search inputs
-  const searchTimeoutRef = useRef(null);
+  // Ref for dropdown click outside handling
   const dropdownRef = useRef(null);
-
-  // Debounced search function
-  const debouncedSearch = useCallback((searchFn, delay = 3000) => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    searchTimeoutRef.current = setTimeout(() => {
-      searchFn();
-    }, delay);
-  }, []); // Empty dependencies - this function never changes
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -173,38 +152,14 @@ function ManageMembers() {
     }
   }, [successMessage]);
 
-  // Fetch members and areas from database
+  // Fetch members and areas from database - only on initial load
   useEffect(() => {
     fetchMembers();
     fetchAreas();
   }, []);
 
-  // Refetch data when filters change
-  // Debounced effect for search filters
-  useEffect(() => {
-    if (members.length > 0) {
-      // Only refetch if we have initial data
-      // Use debounced search with 3 second delay
-      debouncedSearch(() => {
-        console.log("🔍 Debounced search triggered");
-        fetchMembers();
-      });
-    }
-  }, [
-    searchTerm,
-    filterRole,
-    filterStatus,
-    filterMemberId,
-    filterFullName,
-    filterMinAge,
-    filterMaxAge,
-    filterUsername,
-    filterEmail,
-    filterMobility,
-    filterArea,
-    filterAdditionalInfo,
-    debouncedSearch,
-  ]);
+  // Note: Filtering is done client-side using filteredMembers
+  // No need to refetch from server when filters change
 
   // Fetch members from API with conditional pagination
   const fetchMembers = async () => {
@@ -652,7 +607,7 @@ function ManageMembers() {
                 d="M12 6v6m0 0v6m0-6h6m-6 0H6"
               />
             </svg>
-            Add New Member
+            Add Member
           </button>
         </div>
         {successMessage && (

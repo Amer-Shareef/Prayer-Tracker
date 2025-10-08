@@ -352,7 +352,7 @@ const AddMemberModal = ({ isOpen, onClose, onMemberAdded }) => {
                   className="text-lg font-semibold text-white"
                   id="modal-title"
                 >
-                  Add New Member
+                  Add Member
                 </h3>
                 <p className="text-sm text-green-100 mt-1">
                   Step {currentStep} of 3
