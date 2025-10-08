@@ -39,7 +39,6 @@ import ScheduleMeeting from "./pages/founder/ScheduleMeeting";
 import AreaPage from "./pages/founder/AreaPage";
 
 // SuperAdmin Pages
-import SuperAdminDashboard from "./components/dashboard/SuperAdminDashboard";
 import SuperAdminDashboardComplete from "./components/dashboard/SuperAdminDashboardComplete";
 import AssignFounder from "./pages/superadmin/AssignFounder";
 import PromoteUser from "./pages/superadmin/PromoteUser";
@@ -267,14 +266,14 @@ function App() {
             }
           />
           {/* SuperAdmin Routes - Use "SuperAdmin" to match database */}
-          <Route
+          {/* <Route
             path="/superadmin"
             element={
               <ProtectedRoute role="SuperAdmin">
                 <Navigate to="/superadmin/dashboard" replace />
               </ProtectedRoute>
             }
-          />{" "}
+          /> */}
           <Route
             path="/superadmin/dashboard"
             element={
