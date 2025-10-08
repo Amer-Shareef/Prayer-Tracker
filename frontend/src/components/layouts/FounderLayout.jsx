@@ -54,7 +54,7 @@ const FounderLayout = ({ children }) => {
     },
     { 
       path: '/founder/meetings', 
-      label: 'Personal Meetings', 
+      label: 'Meetings', 
       bgColor: 'bg-green-500',
       hoverColor: 'hover:bg-green-400',
       textColor: 'text-white',
@@ -142,17 +142,30 @@ const FounderLayout = ({ children }) => {
       {/* Sidebar */}
       <div 
         ref={sidebarRef}
-        className={`${sidebarOpen ? 'w-80' : 'w-20'} bg-gradient-to-b from-green-700 to-green-400 text-gray-800 transition-all duration-300 ease-in-out fixed h-screen z-10 overflow-y-auto shadow-2xl`}
+        className={`${sidebarOpen ? 'w-64' : 'w-16'} bg-gradient-to-b from-green-700 to-green-400 text-gray-800 transition-all duration-300 ease-in-out fixed h-screen z-10 overflow-y-auto shadow-xl`}
       >
-        <div className={`${sidebarOpen ? 'px-6 py-4' : 'px-3 py-4'} flex ${sidebarOpen ? 'justify-between' : 'justify-center'} items-center border-b border-green-800 bg-green-200 transition-all duration-300`}>
+        <div className={`${sidebarOpen ? 'px-4 py-3' : 'px-2 py-3'} flex ${sidebarOpen ? 'justify-between' : 'justify-center'} items-center border-b border-green-800 bg-green-200`}>
           {sidebarOpen ? (
             <>
-              <h1 className="text-xl font-bold text-grey tracking-wide transition-opacity duration-300">
-                <img src="/images/Fajr_Council_Logo.png" alt="FAJR" className="h-12 w-12 object-contain transition-all duration-300"/>
-              </h1>
+              <div className="flex items-center space-x-2">
+                <img src="/images/Fajr_Council_Logo.png" alt="FAJR" className="h-8 w-8 object-contain" />
+                <div className="flex flex-col">
+                  <h1 className="text-base font-bold tracking-wide text-gray-800">
+                    {user?.role === 'Founder' ? 'Working Committee' : user?.role || 'User'}
+                  </h1>
+                  <p className="text-xs text-gray-600">
+                    {user?.role === 'Founder' && user?.areaId 
+                      ? `Area: ${user.areaName || user.areaId}` 
+                      : user?.areaId 
+                        ? `Area: ${user.areaName || user.areaId}` 
+                        : 'No Area Assigned'
+                    }
+                  </p>
+                </div>
+              </div>
               <button 
                 onClick={toggleSidebar}
-                className="text-white hover:bg-green-600 hover:bg-opacity-50 p-2 rounded-lg transition-all duration-200"
+                className="text-gray-800 hover:bg-green-300 rounded-lg p-1.5 transition-colors duration-200"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -160,40 +173,37 @@ const FounderLayout = ({ children }) => {
               </button>
             </>
           ) : (
-            <div className="flex justify-center w-full transition-opacity duration-300">
-              <button 
-                onClick={toggleSidebar}
-                className="text-white hover:bg-green-600 hover:bg-opacity-50 p-2 rounded-lg transition-all duration-200"
-              >
-                {/* Fajr Council Logo */}
-                <img src="/images/Fajr_Council_Logo.png" alt="FAJR" className="h-10 w-10 object-contain transition-all duration-300" />
-              </button>
-            </div>
+            <button 
+              onClick={toggleSidebar}
+              className="text-gray-800 hover:bg-green-300 rounded-lg p-1.5 transition-colors duration-200"
+              title="Expand menu"
+            >
+              <img src="/images/Fajr_Council_Logo.png" alt="FAJR" className="h-8 w-8 object-contain" />
+            </button>
           )}
         </div>
         
-        <nav className="mt-6 px-4 space-y-2">
+        <nav className={`${sidebarOpen ? 'px-2 py-3' : 'px-1 py-3'} space-y-1.5`}>
           {/* Founder Menu Items */}
           {menuItems.map((item, index) => (
             <Link
               key={item.path}
               to={item.path}
               className={`
-                flex items-center px-5 py-4 rounded-3xl transition-all duration-300 ${item.textColor} ${item.hoverColor} shadow-lg transform hover:scale-105 hover:shadow-xl
-                ${location.pathname === item.path ? `${item.bgColor} shadow-2xl scale-105 ring-2 ring-white ring-opacity-50` : item.bgColor}
-                backdrop-blur-sm
-                ${!sidebarOpen ? 'justify-center w-12 h-12 p-0' : ''}
+                flex items-center ${sidebarOpen ? 'px-3 py-3 rounded-2xl' : 'w-12 h-12 rounded-full justify-center'} transition-all duration-200 group relative
+                ${item.textColor} ${item.hoverColor} shadow-sm hover:shadow-md transform hover:scale-102
+                ${location.pathname === item.path 
+                  ? `${item.bgColor} shadow-md scale-102 ring-2 ring-white ring-opacity-40` 
+                  : item.bgColor
+                }
               `}
-              style={{
-                animationDelay: `${index * 0.1}s`
-              }}
               title={!sidebarOpen ? item.label : ''}
             >
-              <span className={`inline-block transform transition-transform duration-200 hover:scale-110 flex-shrink-0 ${!sidebarOpen ? 'flex items-center justify-center' : ''}`}>
+              <span className={`inline-block flex-shrink-0 transition-transform duration-200 group-hover:scale-110`}>
                 {item.icon}
               </span>
               {sidebarOpen && (
-                <span className="ml-4 text-sm font-semibold tracking-wide transition-opacity duration-300 opacity-100 whitespace-nowrap overflow-hidden">
+                <span className="ml-3 text-sm font-medium transition-opacity duration-300 opacity-100 whitespace-nowrap overflow-hidden text-ellipsis">
                   {item.label}
                 </span>
               )}
@@ -203,16 +213,17 @@ const FounderLayout = ({ children }) => {
           {/* Logout Button */}
           <button
             onClick={logout}
-            className={`w-full flex items-center px-4 py-4 mt-8 rounded-3xl transition-all duration-300 hover:bg-rose-200 text-rose-600 bg-rose-200 border-t-2 border-rose-300 shadow-lg transform hover:scale-105 hover:shadow-xl backdrop-blur-sm
-              ${!sidebarOpen ? 'justify-center w-12 h-12 p-0' : ''}
+            className={`
+              flex items-center ${sidebarOpen ? 'w-full px-3 py-3 rounded-2xl' : 'w-12 h-12 rounded-full justify-center mx-auto'} transition-all duration-200 
+              bg-rose-200 hover:bg-rose-300 text-rose-700 border-t border-green-300 ${sidebarOpen ? 'mt-4 pt-3' : 'mt-3 pt-3'} group shadow-sm hover:shadow-md transform hover:scale-102
             `}
             title={!sidebarOpen ? 'Logout' : ''}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 transform transition-transform duration-200 hover:scale-110 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
             {sidebarOpen && (
-              <span className="ml-4 text-sm font-semibold tracking-wide transition-opacity duration-300 opacity-100 whitespace-nowrap overflow-hidden">
+              <span className="ml-3 text-sm font-medium transition-opacity duration-300 opacity-100 whitespace-nowrap">
                 Logout
               </span>
             )}
@@ -221,9 +232,9 @@ const FounderLayout = ({ children }) => {
       </div>
 
       {/* Main Content */}
-      <div className={`flex-1 ${sidebarOpen ? 'ml-80' : 'ml-20'} transition-all duration-300 ease-in-out`}>
+      <div className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-16'} transition-all duration-300 ease-in-out`}>
         {/* Page Content */}
-        <main className="p-8 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+        <main className="p-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
           {children}
         </main>
       </div>

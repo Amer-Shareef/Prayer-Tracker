@@ -7,6 +7,22 @@ const SuperAdminLayout = ({ children }) => {
   const sidebarRef = useRef(null);
   const location = useLocation();
   const { user, logout } = useAuth();
+  const [hijriDate, setHijriDate] = useState('Loading...');
+
+  // Fetch Hijri date
+  useEffect(() => {
+    const today = new Date();
+    try {
+      const hijri = new Intl.DateTimeFormat("en-TN-u-ca-islamic", {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      }).format(today);
+      setHijriDate(hijri);
+    } catch (error) {
+      setHijriDate("Date not available");
+    }
+  }, []);
 
   // Handle click outside sidebar to minimize it
   useEffect(() => {
@@ -84,40 +100,61 @@ const SuperAdminLayout = ({ children }) => {
       {/* Sidebar */}
       <div 
         ref={sidebarRef}
-        className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-purple-700 text-white transition-all duration-300 ease-in-out fixed h-screen z-10 overflow-y-auto`}
+        className={`${sidebarOpen ? 'w-64' : 'w-16'} bg-gradient-to-b from-purple-700 to-purple-800 text-white transition-all duration-300 ease-in-out fixed h-screen z-10 overflow-y-auto shadow-xl`}
       >
-        <div className="p-4 flex justify-between items-center">
+        <div className={`${sidebarOpen ? 'px-4 py-3' : 'px-2 py-3'} flex ${sidebarOpen ? 'justify-between' : 'justify-center'} items-center border-b border-purple-600`}>
           {sidebarOpen ? (
-            <h1 className="text-xl font-bold transition-opacity duration-300">Prayer Tracker</h1>
+            <>
+              <div className="flex flex-col">
+                <h1 className="text-lg font-bold transition-opacity duration-300">Super Admin</h1>
+                <p className="text-xs text-purple-300 mt-0.5">{hijriDate}</p>
+              </div>
+              <button 
+                onClick={toggleSidebar}
+                className="text-white hover:bg-purple-600 rounded-lg p-1.5 transition-colors duration-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            </>
           ) : (
-            <h1 className="text-xl font-bold transition-opacity duration-300">PT</h1>
+            <button 
+              onClick={toggleSidebar}
+              className="text-white hover:bg-purple-600 rounded-lg p-1.5 transition-colors duration-200"
+              title="Expand menu"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
           )}
-          <button 
-            onClick={toggleSidebar}
-            className="text-white hover:bg-purple-600 rounded p-1 transition-colors duration-200"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
         </div>
-        <div className="p-4 text-sm text-purple-200 transition-opacity duration-300">
-          {sidebarOpen ? 'Admin Panel' : 'AP'}
-        </div>
+        {sidebarOpen && (
+          <div className="px-4 py-2 text-xs text-purple-300 font-medium uppercase tracking-wider transition-opacity duration-300">
+            Admin Panel
+          </div>
+        )}
         
-        <nav className="mt-2">
+        <nav className={`${sidebarOpen ? 'px-2 py-3' : 'px-1 py-3'} space-y-1.5`}>
           {menuItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
               className={`
-                flex items-center px-4 py-3 mb-1 transition-all duration-200 hover:bg-purple-800
-                ${location.pathname === item.path ? 'bg-purple-800' : ''}
+                flex items-center ${sidebarOpen ? 'px-3 py-3 rounded-2xl' : 'w-12 h-12 rounded-full justify-center'} transition-all duration-200 group
+                ${location.pathname === item.path 
+                  ? 'bg-purple-800 shadow-lg' 
+                  : 'hover:bg-purple-600 hover:bg-opacity-50'
+                }
               `}
+              title={!sidebarOpen ? item.label : ''}
             >
-              <span className="inline-block flex-shrink-0">{item.icon}</span>
+              <span className={`inline-block flex-shrink-0 ${location.pathname === item.path ? 'text-white' : 'text-purple-200 group-hover:text-white'} transition-colors duration-200`}>
+                {item.icon}
+              </span>
               {sidebarOpen && (
-                <span className="ml-3 transition-opacity duration-300 opacity-100">
+                <span className="ml-3 text-sm font-medium transition-opacity duration-300 opacity-100 whitespace-nowrap">
                   {item.label}
                 </span>
               )}
@@ -127,13 +164,17 @@ const SuperAdminLayout = ({ children }) => {
           {/* Logout Button */}
           <button
             onClick={logout}
-            className="w-full flex items-center px-4 py-3 mb-1 transition-all duration-200 hover:bg-purple-800"
+            className={`
+              flex items-center ${sidebarOpen ? 'w-full px-3 py-3 rounded-2xl' : 'w-12 h-12 rounded-full justify-center mx-auto'} transition-all duration-200 
+              hover:bg-red-500 hover:bg-opacity-20 border-t border-purple-600 ${sidebarOpen ? 'mt-4 pt-3' : 'mt-3 pt-3'} group
+            `}
+            title={!sidebarOpen ? 'Logout' : ''}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0 text-red-300 group-hover:text-red-200 transition-colors duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
             {sidebarOpen && (
-              <span className="ml-3 transition-opacity duration-300 opacity-100">
+              <span className="ml-3 text-sm font-medium transition-opacity duration-300 opacity-100 whitespace-nowrap">
                 Logout
               </span>
             )}
@@ -142,7 +183,7 @@ const SuperAdminLayout = ({ children }) => {
       </div>
       
       {/* Main Content */}
-      <div className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-20'} transition-all duration-300 ease-in-out`}>
+      <div className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-16'} transition-all duration-300 ease-in-out`}>
         {/* Page Content */}
         <main className="p-6">
           {children}
