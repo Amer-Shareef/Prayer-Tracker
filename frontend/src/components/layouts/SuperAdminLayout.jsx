@@ -1,11 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const SuperAdminLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const sidebarRef = useRef(null);
   const location = useLocation();
   const { user, logout } = useAuth();
+
+  // Handle click outside sidebar to minimize it
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Only minimize if sidebar is open and click is outside sidebar
+      if (sidebarOpen && sidebarRef.current && !sidebarRef.current.contains(event.target)) {
+        setSidebarOpen(false);
+      }
+    };
+
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [sidebarOpen]);
   
   const menuItems = [
     { 
@@ -63,23 +82,26 @@ const SuperAdminLayout = ({ children }) => {
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
-      <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-purple-700 text-white transition-width duration-300 ease-in-out fixed h-screen z-10 overflow-y-auto`}>
+      <div 
+        ref={sidebarRef}
+        className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-purple-700 text-white transition-all duration-300 ease-in-out fixed h-screen z-10 overflow-y-auto`}
+      >
         <div className="p-4 flex justify-between items-center">
           {sidebarOpen ? (
-            <h1 className="text-xl font-bold">Prayer Tracker</h1>
+            <h1 className="text-xl font-bold transition-opacity duration-300">Prayer Tracker</h1>
           ) : (
-            <h1 className="text-xl font-bold">PT</h1>
+            <h1 className="text-xl font-bold transition-opacity duration-300">PT</h1>
           )}
           <button 
             onClick={toggleSidebar}
-            className="text-white"
+            className="text-white hover:bg-purple-600 rounded p-1 transition-colors duration-200"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
         </div>
-        <div className="p-4 text-sm text-purple-200">
+        <div className="p-4 text-sm text-purple-200 transition-opacity duration-300">
           {sidebarOpen ? 'Admin Panel' : 'AP'}
         </div>
         
@@ -89,30 +111,38 @@ const SuperAdminLayout = ({ children }) => {
               key={item.path}
               to={item.path}
               className={`
-                flex items-center px-4 py-3 mb-1 transition-colors hover:bg-purple-800
+                flex items-center px-4 py-3 mb-1 transition-all duration-200 hover:bg-purple-800
                 ${location.pathname === item.path ? 'bg-purple-800' : ''}
               `}
             >
-              <span className="inline-block">{item.icon}</span>
-              {sidebarOpen && <span className="ml-3">{item.label}</span>}
+              <span className="inline-block flex-shrink-0">{item.icon}</span>
+              {sidebarOpen && (
+                <span className="ml-3 transition-opacity duration-300 opacity-100">
+                  {item.label}
+                </span>
+              )}
             </Link>
           ))}
           
           {/* Logout Button */}
           <button
             onClick={logout}
-            className="w-full flex items-center px-4 py-3 mb-1 transition-colors hover:bg-purple-800"
+            className="w-full flex items-center px-4 py-3 mb-1 transition-all duration-200 hover:bg-purple-800"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            {sidebarOpen && <span className="ml-3">Logout</span>}
+            {sidebarOpen && (
+              <span className="ml-3 transition-opacity duration-300 opacity-100">
+                Logout
+              </span>
+            )}
           </button>
         </nav>
       </div>
       
       {/* Main Content */}
-      <div className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-20'} transition-margin duration-300 ease-in-out`}>
+      <div className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-20'} transition-all duration-300 ease-in-out`}>
         {/* Page Content */}
         <main className="p-6">
           {children}

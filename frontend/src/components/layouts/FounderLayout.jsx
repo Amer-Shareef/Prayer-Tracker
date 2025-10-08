@@ -1,11 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const FounderLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const sidebarRef = useRef(null);
   const location = useLocation();
   const { user, logout } = useAuth();
+
+  // Handle click outside sidebar to minimize it
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Only minimize if sidebar is open and click is outside sidebar
+      if (sidebarOpen && sidebarRef.current && !sidebarRef.current.contains(event.target)) {
+        setSidebarOpen(false);
+      }
+    };
+
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [sidebarOpen]);
   
   // Create base menu items
   const baseMenuItems = [
@@ -121,11 +140,16 @@ const FounderLayout = ({ children }) => {
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
-      <div className={`${sidebarOpen ? 'w-80' : 'w-20'} bg-gradient-to-b from-green-700 to-green-400 text-gray-800 transition-all duration-300 ease-in-out fixed h-screen z-10 overflow-y-auto shadow-2xl`}>
-        <div className={`${sidebarOpen ? 'px-6 py-4' : 'px-3 py-4'} flex ${sidebarOpen ? 'justify-between' : 'justify-center'} items-center border-b border-green-800 bg-green-200`}>
+      <div 
+        ref={sidebarRef}
+        className={`${sidebarOpen ? 'w-80' : 'w-20'} bg-gradient-to-b from-green-700 to-green-400 text-gray-800 transition-all duration-300 ease-in-out fixed h-screen z-10 overflow-y-auto shadow-2xl`}
+      >
+        <div className={`${sidebarOpen ? 'px-6 py-4' : 'px-3 py-4'} flex ${sidebarOpen ? 'justify-between' : 'justify-center'} items-center border-b border-green-800 bg-green-200 transition-all duration-300`}>
           {sidebarOpen ? (
             <>
-              <h1 className="text-xl font-bold text-grey tracking-wide"><img src="/images/Fajr_Council_Logo.png" alt="FAJR" className="h-12 w-12 object-contain"/></h1>
+              <h1 className="text-xl font-bold text-grey tracking-wide transition-opacity duration-300">
+                <img src="/images/Fajr_Council_Logo.png" alt="FAJR" className="h-12 w-12 object-contain transition-all duration-300"/>
+              </h1>
               <button 
                 onClick={toggleSidebar}
                 className="text-white hover:bg-green-600 hover:bg-opacity-50 p-2 rounded-lg transition-all duration-200"
@@ -136,13 +160,13 @@ const FounderLayout = ({ children }) => {
               </button>
             </>
           ) : (
-            <div className="flex justify-center w-full">
+            <div className="flex justify-center w-full transition-opacity duration-300">
               <button 
                 onClick={toggleSidebar}
                 className="text-white hover:bg-green-600 hover:bg-opacity-50 p-2 rounded-lg transition-all duration-200"
               >
                 {/* Fajr Council Logo */}
-                <img src="/images/Fajr_Council_Logo.png" alt="FAJR" className="h-10 w-10 object-contain" />
+                <img src="/images/Fajr_Council_Logo.png" alt="FAJR" className="h-10 w-10 object-contain transition-all duration-300" />
               </button>
             </div>
           )}
@@ -165,11 +189,13 @@ const FounderLayout = ({ children }) => {
               }}
               title={!sidebarOpen ? item.label : ''}
             >
-              <span className={`inline-block transform transition-transform duration-200 hover:scale-110 ${!sidebarOpen ? 'flex items-center justify-center' : ''}`}>
+              <span className={`inline-block transform transition-transform duration-200 hover:scale-110 flex-shrink-0 ${!sidebarOpen ? 'flex items-center justify-center' : ''}`}>
                 {item.icon}
               </span>
               {sidebarOpen && (
-                <span className="ml-4 text-sm font-semibold tracking-wide">{item.label}</span>
+                <span className="ml-4 text-sm font-semibold tracking-wide transition-opacity duration-300 opacity-100 whitespace-nowrap overflow-hidden">
+                  {item.label}
+                </span>
               )}
             </Link>
           ))}
@@ -182,10 +208,14 @@ const FounderLayout = ({ children }) => {
             `}
             title={!sidebarOpen ? 'Logout' : ''}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 transform transition-transform duration-200 hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 transform transition-transform duration-200 hover:scale-110 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            {sidebarOpen && <span className="ml-4 text-sm font-semibold tracking-wide">Logout</span>}
+            {sidebarOpen && (
+              <span className="ml-4 text-sm font-semibold tracking-wide transition-opacity duration-300 opacity-100 whitespace-nowrap overflow-hidden">
+                Logout
+              </span>
+            )}
           </button>
         </nav>
       </div>
