@@ -12,6 +12,8 @@ const ViewAreas = () => {
     address: '',
     description: ''
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   useEffect(() => {
     fetchAreas();
@@ -51,11 +53,40 @@ const ViewAreas = () => {
     area.address?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Pagination logic
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentAreas = filteredAreas.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredAreas.length / itemsPerPage);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const handlePrevious = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNext = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
   return (
     <SuperAdminLayout>
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Area Management</h1>
+          <div>
+            <h1 className="text-2xl font-bold">Area Management</h1>
+            {filteredAreas.length > 0 && (
+              <p className="text-sm text-gray-600 mt-1">
+                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredAreas.length)} of {filteredAreas.length} areas
+              </p>
+            )}
+          </div>
           <button
             onClick={() => setShowCreateModal(true)}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
@@ -78,14 +109,15 @@ const ViewAreas = () => {
         </div>
 
         {/* Areas Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col" style={{ minHeight: '600px' }}>
           {loading ? (
-            <div className="flex items-center justify-center p-8">
+            <div className="flex items-center justify-center p-8 flex-grow">
               <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-600"></div>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+            <>
+              <div className="overflow-x-auto flex-grow">
+                <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -103,7 +135,7 @@ const ViewAreas = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredAreas.map((area) => (
+                  {currentAreas.map((area) => (
                     <tr key={area.area_id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">{area.area_name}</div>
@@ -128,6 +160,117 @@ const ViewAreas = () => {
                 </div>
               )}
             </div>
+
+            {/* Pagination Controls - Always visible at bottom */}
+            <div className="mt-auto border-t border-gray-200">
+              {filteredAreas.length > 0 && (
+                <div className="bg-white px-4 py-3 flex items-center justify-between sm:px-6">
+                  <div className="flex-1 flex justify-between sm:hidden">
+                    <button
+                      onClick={handlePrevious}
+                      disabled={currentPage === 1}
+                      className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
+                        currentPage === 1
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={handleNext}
+                      disabled={currentPage === totalPages}
+                      className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
+                        currentPage === totalPages
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      Next
+                    </button>
+                  </div>
+                  <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm text-gray-700">
+                        Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
+                        <span className="font-medium">
+                          {Math.min(indexOfLastItem, filteredAreas.length)}
+                        </span>{' '}
+                        of <span className="font-medium">{filteredAreas.length}</span> areas
+                        {totalPages > 1 && (
+                          <span className="text-gray-500"> • Page {currentPage} of {totalPages}</span>
+                        )}
+                      </p>
+                    </div>
+                    {totalPages > 1 && (
+                      <div>
+                        <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                          <button
+                            onClick={handlePrevious}
+                            disabled={currentPage === 1}
+                            className={`relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 text-sm font-medium ${
+                              currentPage === 1
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'bg-white text-gray-500 hover:bg-gray-50'
+                            }`}
+                          >
+                            Previous
+                          </button>
+                          {[...Array(totalPages)].map((_, index) => {
+                            const pageNumber = index + 1;
+                            // Show first page, last page, current page, and pages around current
+                            if (
+                              pageNumber === 1 ||
+                              pageNumber === totalPages ||
+                              (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
+                            ) {
+                              return (
+                                <button
+                                  key={pageNumber}
+                                  onClick={() => handlePageChange(pageNumber)}
+                                  className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                    currentPage === pageNumber
+                                      ? 'z-10 bg-purple-50 border-purple-500 text-purple-600'
+                                      : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {pageNumber}
+                                </button>
+                              );
+                            } else if (
+                              pageNumber === currentPage - 2 ||
+                              pageNumber === currentPage + 2
+                            ) {
+                              return (
+                                <span
+                                  key={pageNumber}
+                                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700"
+                                >
+                                  ...
+                                </span>
+                              );
+                            }
+                            return null;
+                          })}
+                          <button
+                            onClick={handleNext}
+                            disabled={currentPage === totalPages}
+                            className={`relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 text-sm font-medium ${
+                              currentPage === totalPages
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'bg-white text-gray-500 hover:bg-gray-50'
+                            }`}
+                          >
+                            Next
+                          </button>
+                        </nav>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
           )}
         </div>
 
