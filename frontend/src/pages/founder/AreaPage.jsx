@@ -349,39 +349,66 @@ const AreaPage = () => {
                   {currentAreas.map((area) => (
                     <React.Fragment key={area.area_id || area.id}>
                       {/* Main Area Row */}
-                      <tr className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {area.area_name || area.name || 'N/A'}
+                      <tr className="hover:bg-green-50 transition-colors duration-150 ease-in-out">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                              <svg className="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
                             </div>
-                            <div className="text-sm text-gray-500">{area.description}</div>
+                            <div>
+                              <div className="text-sm font-semibold text-gray-900">
+                                {area.area_name || area.name || 'N/A'}
+                              </div>
+                              {area.description && (
+                                <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">{area.description}</div>
+                              )}
+                            </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {area.address || 'N/A'}
+                        <td className="px-6 py-4">
+                          <div className="flex items-start">
+                            <svg className="h-4 w-4 text-gray-400 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <div className="text-sm text-gray-700">
+                              {area.address || <span className="text-gray-400 italic">No address</span>}
+                            </div>
+                          </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <button
-                            onClick={() => handleEdit(area)}
-                            className="text-purple-600 hover:text-purple-900 mr-3"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(area)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Delete
-                          </button>
+                        <td className="px-6 py-4 text-sm font-medium">
+                          <div className="flex items-center space-x-3">
+                            <button
+                              onClick={() => handleEdit(area)}
+                              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+                            >
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDelete(area)}
+                              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                            >
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Delete
+                            </button>
+                          </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => toggleAreaExpansion(area.area_id || area.id)}
-                            className="text-gray-400 hover:text-gray-600 transition-transform duration-200"
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-full text-gray-400 hover:text-green-600 hover:bg-green-100 transition-all duration-200"
                             style={{
                               transform: expandedAreas.has(area.area_id || area.id) ? 'rotate(180deg)' : 'rotate(0deg)'
                             }}
+                            title={expandedAreas.has(area.area_id || area.id) ? 'Collapse sub-areas' : 'Expand sub-areas'}
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -393,35 +420,69 @@ const AreaPage = () => {
                       {/* Sub-areas Section */}
                       {expandedAreas.has(area.area_id || area.id) && (
                         <tr>
-                          <td colSpan="4" className="px-6 py-4 bg-gray-50">
+                          <td colSpan="4" className="px-6 py-4 bg-gradient-to-r from-green-50 to-gray-50">
                             <div className="ml-8">
-                              <h4 className="text-sm font-medium text-gray-700 mb-3">Sub-areas</h4>
+                              <div className="flex items-center justify-between mb-4">
+                                <h4 className="text-sm font-semibold text-gray-700 flex items-center">
+                                  <svg className="w-4 h-4 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                  </svg>
+                                  Sub-areas
+                                  {subAreas[area.area_id || area.id]?.length > 0 && (
+                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                      {subAreas[area.area_id || area.id].length}
+                                    </span>
+                                  )}
+                                </h4>
+                                <button
+                                  onClick={() => openAddSubAreaModal(area.area_id || area.id)}
+                                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                                >
+                                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                  </svg>
+                                  Add Sub Area
+                                </button>
+                              </div>
                               
                               {subAreaLoading[area.area_id || area.id] ? (
-                                <div className="flex justify-center py-4">
-                                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+                                <div className="flex justify-center py-8">
+                                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                                 </div>
                               ) : (
                                 <>
                                   {subAreas[area.area_id || area.id]?.length > 0 ? (
-                                    <div className="space-y-2 mb-3">
+                                    <div className="grid gap-3">
                                       {subAreas[area.area_id || area.id].map((subArea) => (
                                         <div
                                           key={subArea.id}
-                                          className="flex justify-between items-center bg-white p-3 rounded border"
+                                          className="flex justify-between items-center bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-150"
                                         >
-                                          <span className="text-sm text-gray-700">{subArea.address}</span>
-                                          <div className="flex space-x-2">
+                                          <div className="flex items-start flex-1">
+                                            <div className="flex-shrink-0 h-8 w-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                                              <svg className="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                              </svg>
+                                            </div>
+                                            <span className="text-sm text-gray-700 mt-1">{subArea.address}</span>
+                                          </div>
+                                          <div className="flex items-center space-x-2 ml-4">
                                             <button
                                               onClick={() => handleEditSubArea(area.area_id || area.id, subArea)}
-                                              className="text-purple-600 hover:text-purple-900 text-xs"
+                                              className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                                             >
+                                              <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                              </svg>
                                               Edit
                                             </button>
                                             <button
                                               onClick={() => handleDeleteSubArea(area.area_id || area.id, subArea.id)}
-                                              className="text-red-600 hover:text-red-900 text-xs"
+                                              className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
                                             >
+                                              <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                              </svg>
                                               Delete
                                             </button>
                                           </div>
@@ -429,15 +490,14 @@ const AreaPage = () => {
                                       ))}
                                     </div>
                                   ) : (
-                                    <p className="text-sm text-gray-500 mb-3">No sub-areas found</p>
+                                    <div className="text-center py-8 bg-white rounded-lg border-2 border-dashed border-gray-300">
+                                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                      </svg>
+                                      <p className="mt-2 text-sm text-gray-500">No sub-areas found</p>
+                                      <p className="text-xs text-gray-400 mt-1">Click "Add Sub Area" to create one</p>
+                                    </div>
                                   )}
-                                  
-                                  <button
-                                    onClick={() => openAddSubAreaModal(area.area_id || area.id)}
-                                    className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
-                                  >
-                                    + Add Sub Area
-                                  </button>
                                 </>
                               )}
                             </div>
