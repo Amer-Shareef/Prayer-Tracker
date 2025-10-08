@@ -4,6 +4,7 @@ import FounderLayout from "../../components/layouts/FounderLayout";
 import { memberAPI, areaService } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import generateMemberReport from "./GeneratePdf";
+import AddMemberModal from "../../components/shared/AddMemberModal";
 
 function ManageMembers() {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ function ManageMembers() {
   const [areas, setAreas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -25,6 +27,8 @@ function ManageMembers() {
   const [filterArea, setFilterArea] = useState("all");
   const [filterAdditionalInfo, setFilterAdditionalInfo] = useState("all");
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const [operatingMembers, setOperatingMembers] = useState(new Set()); // Track members being operated on
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Sorting state
   const [sortColumn, setSortColumn] = useState("fullName");
@@ -133,6 +137,26 @@ function ManageMembers() {
     }
   }, [user]);
 
+  // Auto-dismiss error after 5 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError("");
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  // Auto-dismiss success message after 3 seconds
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => {
+        setSuccessMessage("");
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
+
   // Fetch members and areas from database
   useEffect(() => {
     fetchMembers();
@@ -172,7 +196,7 @@ function ManageMembers() {
       setLoading(true);
       setError("");
 
-      console.log("� Fetching all members...");
+      console.log("🔄 Fetching all members...");
       let response;
       if (user?.role === "SuperAdmin") {
         // SuperAdmin gets all members across all areas
@@ -185,12 +209,21 @@ function ManageMembers() {
       if (response.success) {
         setMembers(response.data);
         setCurrentPage(1); // Reset to first page
+        console.log("✅ Members fetched successfully:", response.data.length);
       } else {
         setError(response.message || "Failed to fetch members");
+        console.error("❌ Failed to fetch members:", response.message);
       }
     } catch (err) {
-      setError("Error connecting to server");
-      console.error("Error fetching members:", err);
+      const errorMessage =
+        err.response?.data?.message || "Error connecting to server";
+      setError(errorMessage);
+      console.error("❌ Error fetching members:", err);
+
+      // If it's a network error, show a more helpful message
+      if (!err.response) {
+        setError("Network error. Please check your internet connection.");
+      }
     } finally {
       setLoading(false);
     }
@@ -209,24 +242,59 @@ function ManageMembers() {
 
   const handleDeleteMember = async (memberId) => {
     if (window.confirm("Are you sure you want to delete this member?")) {
+      // Add to operating members
+      setOperatingMembers((prev) => new Set([...prev, memberId]));
+
       try {
+        // Optimistic UI update - remove member immediately
+        const memberToDelete = members.find((m) => m.id === memberId);
+        const previousMembers = [...members];
+        setMembers(members.filter((m) => m.id !== memberId));
+        setError(""); // Clear any existing errors
+
+        // Make API call
         const response = await memberAPI.deleteMember(memberId);
-        if (response.success) {
-          // Refresh members after deletion
-          await fetchMembers();
-        } else {
+
+        if (!response.success) {
+          // Revert on failure
+          setMembers(previousMembers);
           setError(response.message || "Failed to delete member");
+        } else {
+          setSuccessMessage("Member deleted successfully");
         }
       } catch (err) {
-        setError("Error deleting member");
+        // Revert on error
+        setError("Error deleting member. Please try again.");
         console.error("Error deleting member:", err);
+        // Refetch to ensure data consistency
+        await fetchMembers();
+      } finally {
+        // Remove from operating members
+        setOperatingMembers((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(memberId);
+          return newSet;
+        });
       }
     }
   };
 
   const handleUpdateStatus = async (memberId, newStatus) => {
+    // Add to operating members
+    setOperatingMembers((prev) => new Set([...prev, memberId]));
+
     try {
-      const member = members.find((m) => m.id === memberId);
+      // Optimistic UI update - update status immediately
+      const previousMembers = [...members];
+      setMembers(
+        members.map((m) =>
+          m.id === memberId ? { ...m, status: newStatus } : m
+        )
+      );
+      setError(""); // Clear any existing errors
+
+      // Make API call
+      const member = previousMembers.find((m) => m.id === memberId);
       const response = await memberAPI.updateMember(memberId, {
         username: member.username,
         email: member.email,
@@ -235,15 +303,30 @@ function ManageMembers() {
         status: newStatus,
       });
 
-      if (response.success) {
-        // Refresh members after status update
-        await fetchMembers();
-      } else {
+      if (!response.success) {
+        // Revert on failure
+        setMembers(previousMembers);
         setError(response.message || "Failed to update member status");
+      } else {
+        setSuccessMessage(
+          `Member ${
+            newStatus === "active" ? "activated" : "deactivated"
+          } successfully`
+        );
       }
     } catch (err) {
-      setError("Error updating member status");
+      // Revert on error
+      setError("Error updating member status. Please try again.");
       console.error("Error updating member status:", err);
+      // Refetch to ensure data consistency
+      await fetchMembers();
+    } finally {
+      // Remove from operating members
+      setOperatingMembers((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(memberId);
+        return newSet;
+      });
     }
   };
 
@@ -525,20 +608,20 @@ function ManageMembers() {
   return (
     <FounderLayout>
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-6 mt-8">
           <div>
-            <h2 className="text-xl font-bold text-gray-800">Manage Members</h2>
-            {sortedMembers.length > 0 && (
+            <h2 className="text-2xl font-bold text-gray-800">Manage Members</h2>
+            {/* {sortedMembers.length > 0 && (
               <p className="text-sm text-gray-600 mt-1">
                 Showing {indexOfFirstItem + 1} to{" "}
                 {Math.min(indexOfLastItem, sortedMembers.length)} of{" "}
                 {sortedMembers.length} members
               </p>
-            )}
+            )} */}
           </div>
           <button
-            onClick={() => navigate("/founder/add-member")}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center shadow-md hover:shadow-lg transition-all duration-200"
+            onClick={() => setIsAddModalOpen(true)}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center shadow-md hover:shadow-lg transition-all duration-200"
           >
             <svg
               className="w-5 h-5 mr-2"
@@ -556,11 +639,48 @@ function ManageMembers() {
             Add New Member
           </button>
         </div>
-        {error && (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-lg">
-            <div className="flex">
+        {successMessage && (
+          <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6 rounded-lg relative animate-fade-in">
+            <div className="flex items-start">
               <svg
-                className="w-5 h-5 mr-2"
+                className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <span className="flex-1">{successMessage}</span>
+              <button
+                onClick={() => setSuccessMessage("")}
+                className="ml-4 text-green-700 hover:text-green-900 transition-colors"
+                title="Dismiss"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+        {error && (
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-lg relative">
+            <div className="flex items-start">
+              <svg
+                className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -570,16 +690,35 @@ function ManageMembers() {
                   clipRule="evenodd"
                 />
               </svg>
-              {error}
+              <span className="flex-1">{error}</span>
+              <button
+                onClick={() => setError("")}
+                className="ml-4 text-red-700 hover:text-red-900 transition-colors"
+                title="Dismiss"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
             </div>
           </div>
         )}
         {/* Enhanced Search and Filters Section */}
-        <div className="bg-white rounded-xl shadow-lg mb-6 overflow-hidden">
+        <div className="bg-white rounded-lg shadow mb-6 overflow-hidden">
           {/* Search Bar */}
-          <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+          <div className="p-4 border-b border-gray-200">
+            <div className="relative max-w-md">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg
                   className="h-5 w-5 text-gray-400"
                   fill="none"
@@ -599,12 +738,12 @@ function ManageMembers() {
                 placeholder="Search by name, username, or email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
+                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-700 placeholder-gray-400"
               />
               {searchTerm && (
                 <button
                   onClick={() => setSearchTerm("")}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
                 >
                   <svg
                     className="h-5 w-5"
@@ -952,9 +1091,10 @@ function ManageMembers() {
                             <div className="flex justify-end items-center space-x-2 action-buttons">
                               {/* Download PDF Report Button */}
                               <button
-                                className="text-green-600 hover:text-green-900 transition-colors duration-150"
+                                className="text-green-600 hover:text-green-900 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                                 onClick={() => generateMemberReport(member)}
                                 title="Download PDF Report"
+                                disabled={operatingMembers.has(member.id)}
                               >
                                 <svg
                                   className="w-5 h-5"
@@ -973,7 +1113,7 @@ function ManageMembers() {
 
                               {/* Activate/Deactivate Button with Tick/Cross */}
                               <button
-                                className={`transition-colors duration-150 ${
+                                className={`transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed ${
                                   member.status === "active"
                                     ? "text-red-600 hover:text-red-900"
                                     : "text-green-600 hover:text-green-900"
@@ -986,13 +1126,37 @@ function ManageMembers() {
                                       : "active"
                                   )
                                 }
+                                disabled={operatingMembers.has(member.id)}
                                 title={
-                                  member.status === "active"
+                                  operatingMembers.has(member.id)
+                                    ? "Processing..."
+                                    : member.status === "active"
                                     ? "Deactivate Member"
                                     : "Activate Member"
                                 }
                               >
-                                {member.status === "active" ? (
+                                {operatingMembers.has(member.id) ? (
+                                  // Loading spinner
+                                  <svg
+                                    className="w-5 h-5 animate-spin"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <circle
+                                      className="opacity-25"
+                                      cx="12"
+                                      cy="12"
+                                      r="10"
+                                      stroke="currentColor"
+                                      strokeWidth="4"
+                                    ></circle>
+                                    <path
+                                      className="opacity-75"
+                                      fill="currentColor"
+                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                    ></path>
+                                  </svg>
+                                ) : member.status === "active" ? (
                                   // Cross/X icon for deactivate
                                   <svg
                                     className="w-5 h-5"
@@ -1027,23 +1191,51 @@ function ManageMembers() {
 
                               {/* Delete Button */}
                               <button
-                                className="text-red-600 hover:text-red-900 transition-colors duration-150"
+                                className="text-red-600 hover:text-red-900 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                                 onClick={() => handleDeleteMember(member.id)}
-                                title="Delete Member"
+                                disabled={operatingMembers.has(member.id)}
+                                title={
+                                  operatingMembers.has(member.id)
+                                    ? "Processing..."
+                                    : "Delete Member"
+                                }
                               >
-                                <svg
-                                  className="w-5 h-5"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                  />
-                                </svg>
+                                {operatingMembers.has(member.id) ? (
+                                  // Loading spinner
+                                  <svg
+                                    className="w-5 h-5 animate-spin"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <circle
+                                      className="opacity-25"
+                                      cx="12"
+                                      cy="12"
+                                      r="10"
+                                      stroke="currentColor"
+                                      strokeWidth="4"
+                                    ></circle>
+                                    <path
+                                      className="opacity-75"
+                                      fill="currentColor"
+                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                    ></path>
+                                  </svg>
+                                ) : (
+                                  <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                    />
+                                  </svg>
+                                )}
                               </button>
 
                               {/* Expand/Collapse Button */}
@@ -1356,6 +1548,15 @@ function ManageMembers() {
             </div>
           )}
         </div>
+        {/* Add Member Modal */}
+        <AddMemberModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          onMemberAdded={() => {
+            setSuccessMessage("Member added successfully!");
+            fetchMembers(); // Refresh the member list
+          }}
+        />
       </div>
     </FounderLayout>
   );
