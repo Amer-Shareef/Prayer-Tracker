@@ -30,13 +30,14 @@ const FounderLayout = ({ children }) => {
     };
   }, [sidebarOpen]);
 
-  // Create base menu items
+  // Create base menu items - organized by priority for organizers
   const baseMenuItems = [
+    // 1. Dashboard - Overview and quick access (highest priority)
     {
       path: "/founder/dashboard",
       label: "Dashboard",
-      bgColor: "bg-green-700", // Darkest green
-      hoverColor: "hover:bg-green-600",
+      bgColor: "bg-green-600", // Consistent green for all items
+      hoverColor: "hover:bg-green-500",
       textColor: "text-white",
       icon: (
         <svg
@@ -49,6 +50,55 @@ const FounderLayout = ({ children }) => {
         </svg>
       ),
     },
+    // 2. Members - Core people management
+    {
+      path: "/founder/manage-members",
+      label: "Members",
+      bgColor: "bg-green-600",
+      hoverColor: "hover:bg-green-500",
+      textColor: "text-white",
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-6 w-6"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+          />
+        </svg>
+      ),
+    },
+    // 3. Meetings - Planning and organizing gatherings
+    {
+      path: "/founder/meetings",
+      label: "Meetings",
+      bgColor: "bg-green-600",
+      hoverColor: "hover:bg-green-500",
+      textColor: "text-white",
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-6 w-6"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          />
+        </svg>
+      ),
+    },
+    // 4. Daily Reminder - Daily operations and communications
     {
       path: "/founder/reminder",
       label: "Daily Reminder",
@@ -72,34 +122,12 @@ const FounderLayout = ({ children }) => {
         </svg>
       ),
     },
-    {
-      path: "/founder/meetings",
-      label: "Meetings",
-      bgColor: "bg-green-500",
-      hoverColor: "hover:bg-green-400",
-      textColor: "text-white",
-      icon: (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-          />
-        </svg>
-      ),
-    },
+    // 5. Call Centre - Wake-up call management
     {
       path: "/founder/wake-up-call",
       label: "Call Centre",
-      bgColor: "bg-green-400",
-      hoverColor: "hover:bg-green-300",
+      bgColor: "bg-green-600",
+      hoverColor: "hover:bg-green-500",
       textColor: "text-white",
       icon: (
         <svg
@@ -152,12 +180,13 @@ const FounderLayout = ({ children }) => {
         </svg>
       ),
     },
+    // 6. Transport & Mobility - Logistics support
     {
       path: "/founder/transport",
       label: "Transport & Mobility",
-      bgColor: "bg-green-300",
-      hoverColor: "hover:bg-green-200",
-      textColor: "text-gray-800",
+      bgColor: "bg-green-600",
+      hoverColor: "hover:bg-green-500",
+      textColor: "text-white",
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -172,8 +201,8 @@ const FounderLayout = ({ children }) => {
     // {
     //   path: "/founder/knowledge-program",
     //   label: "Knowledge & Motivation",
-    //   bgColor: "bg-green-200",
-    //   hoverColor: "hover:bg-green-100",
+    //   bgColor: "bg-green-100",
+    //   hoverColor: "hover:bg-green-50",
     //   textColor: "text-gray-800",
     //   icon: (
     //     <svg
@@ -192,39 +221,17 @@ const FounderLayout = ({ children }) => {
     //     </svg>
     //   ),
     // },
-    {
-      path: "/founder/manage-members",
-      label: "Members",
-      bgColor: "bg-green-100",
-      hoverColor: "hover:bg-green-50",
-      textColor: "text-gray-800",
-      icon: (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-          />
-        </svg>
-      ),
-    },
   ];
 
-  // SuperAdmin-only menu items
+  // SuperAdmin-only menu items - system configuration
   const superAdminMenuItems = [
+    // 7. Area - Administrative setup (SuperAdmin only)
     {
       path: "/founder/area",
       label: "Area",
-      bgColor: "bg-gray-200",
-      hoverColor: "hover:bg-gray-100",
-      textColor: "text-gray-800",
+      bgColor: "bg-green-600",
+      hoverColor: "hover:bg-green-500",
+      textColor: "text-white",
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -374,7 +381,7 @@ const FounderLayout = ({ children }) => {
               } shadow-sm hover:shadow-md transform hover:scale-102
                 ${
                   location.pathname === item.path
-                    ? `${item.bgColor} shadow-md scale-102 ring-2 ring-white ring-opacity-40`
+                    ? `bg-green-700 shadow-md scale-102 ring-2 ring-white ring-opacity-40`
                     : item.bgColor
                 }
               `}
