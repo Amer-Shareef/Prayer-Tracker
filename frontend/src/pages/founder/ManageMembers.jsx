@@ -29,6 +29,7 @@ function ManageMembers() {
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [operatingMembers, setOperatingMembers] = useState(new Set()); // Track members being operated on
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState(null); // Track which dropdown is open
 
   // Sorting state
   const [sortColumn, setSortColumn] = useState("fullName");
@@ -47,6 +48,7 @@ function ManageMembers() {
 
   // Debounce ref for search inputs
   const searchTimeoutRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   // Debounced search function
   const debouncedSearch = useCallback((searchFn, delay = 3000) => {
@@ -65,6 +67,20 @@ function ManageMembers() {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
+    };
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setOpenDropdown(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -1088,182 +1104,196 @@ function ManageMembers() {
 
                           {/* Actions */}
                           <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div className="flex justify-end items-center space-x-2 action-buttons">
-                              {/* Download PDF Report Button */}
+                            <div className="relative inline-block text-left action-buttons">
+                              {/* Three-dot menu button */}
                               <button
-                                className="text-green-600 hover:text-green-900 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-                                onClick={() => generateMemberReport(member)}
-                                title="Download PDF Report"
-                                disabled={operatingMembers.has(member.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenDropdown(
+                                    openDropdown === member.id
+                                      ? null
+                                      : member.id
+                                  );
+                                }}
+                                className="inline-flex items-center justify-center w-8 h-8 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 rounded-full hover:bg-gray-100 transition-colors duration-150"
+                                title="Actions"
                               >
                                 <svg
                                   className="w-5 h-5"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
                                 >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                  />
+                                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
                                 </svg>
                               </button>
 
-                              {/* Activate/Deactivate Button with Tick/Cross */}
-                              <button
-                                className={`transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed ${
-                                  member.status === "active"
-                                    ? "text-red-600 hover:text-red-900"
-                                    : "text-green-600 hover:text-green-900"
-                                }`}
-                                onClick={() =>
-                                  handleUpdateStatus(
-                                    member.id,
-                                    member.status === "active"
-                                      ? "inactive"
-                                      : "active"
-                                  )
-                                }
-                                disabled={operatingMembers.has(member.id)}
-                                title={
-                                  operatingMembers.has(member.id)
-                                    ? "Processing..."
-                                    : member.status === "active"
-                                    ? "Deactivate Member"
-                                    : "Activate Member"
-                                }
-                              >
-                                {operatingMembers.has(member.id) ? (
-                                  // Loading spinner
-                                  <svg
-                                    className="w-5 h-5 animate-spin"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <circle
-                                      className="opacity-25"
-                                      cx="12"
-                                      cy="12"
-                                      r="10"
-                                      stroke="currentColor"
-                                      strokeWidth="4"
-                                    ></circle>
-                                    <path
-                                      className="opacity-75"
-                                      fill="currentColor"
-                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                    ></path>
-                                  </svg>
-                                ) : member.status === "active" ? (
-                                  // Cross/X icon for deactivate
-                                  <svg
-                                    className="w-5 h-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M6 18L18 6M6 6l12 12"
-                                    />
-                                  </svg>
-                                ) : (
-                                  // Tick/Check icon for activate
-                                  <svg
-                                    className="w-5 h-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M5 13l4 4L19 7"
-                                    />
-                                  </svg>
-                                )}
-                              </button>
-
-                              {/* Delete Button */}
-                              <button
-                                className="text-red-600 hover:text-red-900 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-                                onClick={() => handleDeleteMember(member.id)}
-                                disabled={operatingMembers.has(member.id)}
-                                title={
-                                  operatingMembers.has(member.id)
-                                    ? "Processing..."
-                                    : "Delete Member"
-                                }
-                              >
-                                {operatingMembers.has(member.id) ? (
-                                  // Loading spinner
-                                  <svg
-                                    className="w-5 h-5 animate-spin"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <circle
-                                      className="opacity-25"
-                                      cx="12"
-                                      cy="12"
-                                      r="10"
-                                      stroke="currentColor"
-                                      strokeWidth="4"
-                                    ></circle>
-                                    <path
-                                      className="opacity-75"
-                                      fill="currentColor"
-                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                    ></path>
-                                  </svg>
-                                ) : (
-                                  <svg
-                                    className="w-5 h-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                    />
-                                  </svg>
-                                )}
-                              </button>
-
-                              {/* Expand/Collapse Button */}
-                              <button
-                                onClick={() => toggleRowExpansion(member.id)}
-                                className="p-1 text-gray-400 hover:text-gray-600 focus:outline-none transition-colors duration-150"
-                                title={
-                                  isExpanded
-                                    ? "Collapse details"
-                                    : "Expand details"
-                                }
-                              >
-                                <svg
-                                  className={`w-4 h-4 transform transition-transform duration-200 ${
-                                    isExpanded ? "rotate-180" : ""
-                                  }`}
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
+                              {/* Dropdown menu */}
+                              {openDropdown === member.id && (
+                                <div
+                                  ref={dropdownRef}
+                                  className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M19 9l-7 7-7-7"
-                                  />
-                                </svg>
-                              </button>
+                                  <div className="py-1">
+                                    {/* Download PDF Report */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        generateMemberReport(member);
+                                        setOpenDropdown(null);
+                                      }}
+                                      disabled={operatingMembers.has(member.id)}
+                                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+                                    >
+                                      <svg
+                                        className="w-5 h-5 mr-3 text-green-600"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                        />
+                                      </svg>
+                                      Download PDF Report
+                                    </button>
+
+                                    {/* Activate/Deactivate */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleUpdateStatus(
+                                          member.id,
+                                          member.status === "active"
+                                            ? "inactive"
+                                            : "active"
+                                        );
+                                        setOpenDropdown(null);
+                                      }}
+                                      disabled={operatingMembers.has(member.id)}
+                                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+                                    >
+                                      {operatingMembers.has(member.id) ? (
+                                        <>
+                                          <svg
+                                            className="w-5 h-5 mr-3 animate-spin text-gray-400"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                          >
+                                            <circle
+                                              className="opacity-25"
+                                              cx="12"
+                                              cy="12"
+                                              r="10"
+                                              stroke="currentColor"
+                                              strokeWidth="4"
+                                            ></circle>
+                                            <path
+                                              className="opacity-75"
+                                              fill="currentColor"
+                                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                            ></path>
+                                          </svg>
+                                          Processing...
+                                        </>
+                                      ) : member.status === "active" ? (
+                                        <>
+                                          <svg
+                                            className="w-5 h-5 mr-3 text-red-600"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                          >
+                                            <path
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              strokeWidth={2}
+                                              d="M6 18L18 6M6 6l12 12"
+                                            />
+                                          </svg>
+                                          Deactivate Member
+                                        </>
+                                      ) : (
+                                        <>
+                                          <svg
+                                            className="w-5 h-5 mr-3 text-green-600"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                          >
+                                            <path
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              strokeWidth={2}
+                                              d="M5 13l4 4L19 7"
+                                            />
+                                          </svg>
+                                          Activate Member
+                                        </>
+                                      )}
+                                    </button>
+
+                                    {/* Divider */}
+                                    <div className="border-t border-gray-100"></div>
+
+                                    {/* Delete */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteMember(member.id);
+                                        setOpenDropdown(null);
+                                      }}
+                                      disabled={operatingMembers.has(member.id)}
+                                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+                                    >
+                                      {operatingMembers.has(member.id) ? (
+                                        <>
+                                          <svg
+                                            className="w-5 h-5 mr-3 animate-spin"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                          >
+                                            <circle
+                                              className="opacity-25"
+                                              cx="12"
+                                              cy="12"
+                                              r="10"
+                                              stroke="currentColor"
+                                              strokeWidth="4"
+                                            ></circle>
+                                            <path
+                                              className="opacity-75"
+                                              fill="currentColor"
+                                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                            ></path>
+                                          </svg>
+                                          Processing...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <svg
+                                            className="w-5 h-5 mr-3"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                          >
+                                            <path
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              strokeWidth={2}
+                                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                            />
+                                          </svg>
+                                          Delete Member
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </td>
                         </tr>
