@@ -28,9 +28,7 @@ function ManageMembers() {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalMembers, setTotalMembers] = useState(0);
-  const [pagination, setPagination] = useState({});
+  const [itemsPerPage] = useState(10);
 
   // Add date and area state
   const [currentDate, setCurrentDate] = useState({
@@ -129,7 +127,7 @@ function ManageMembers() {
 
   // Fetch members and areas from database
   useEffect(() => {
-    fetchMembers(1); // Start with page 1
+    fetchMembers();
     fetchAreas();
   }, []);
 
@@ -140,7 +138,7 @@ function ManageMembers() {
       // Use debounced search with 3 second delay
       debouncedSearch(() => {
         console.log('🔍 Debounced search triggered');
-        fetchMembers(1);
+        fetchMembers();
       });
     }
   }, [searchTerm, filterRole, filterStatus, filterMemberId, filterFullName, 
@@ -148,61 +146,25 @@ function ManageMembers() {
       filterArea, filterAdditionalInfo, debouncedSearch]);
 
   // Fetch members from API with conditional pagination
-  const fetchMembers = async (page = 1) => {
+  const fetchMembers = async () => {
     try {
       setLoading(true);
       setError('');
       
-      const hasFilters = hasActiveFilters();
-      console.log('🔍 Has active filters:', hasFilters);
-
+      console.log('� Fetching all members...');
       let response;
-      if (hasFilters) {
-        // When filters are active, fetch ALL data for client-side filtering
-        console.log('📊 Fetching all members for filtering...');
-        if (user?.role === 'SuperAdmin') {
-          // SuperAdmin gets all members across all areas
-          response = await memberAPI.getAllMembers();
-        } else {
-          // Founder/WCM get their area members
-          response = await memberAPI.getMembers();
-        }
-        
-        if (response.success) {
-          setMembers(response.data);
-          // Reset pagination when filtering
-          setPagination({});
-          setCurrentPage(1);
-          setTotalPages(1);
-          setTotalMembers(response.data.length);
-        }
+      if (user?.role === 'SuperAdmin') {
+        // SuperAdmin gets all members across all areas
+        response = await memberAPI.getAllMembers();
       } else {
-        // When no filters, use server-side pagination
-        console.log(`📄 Fetching paginated members (page ${page})...`);
-        if (user?.role === 'SuperAdmin') {
-          // SuperAdmin gets paginated global view
-          response = await memberAPI.getAllMembers({
-            page: page,
-            limit: 15 // SuperAdmin default limit
-          });
-        } else {
-          // Founder/WCM get paginated area view
-          response = await memberAPI.getMembers({
-            page: page,
-            limit: 15 // Area-specific default limit
-          });
-        }
-        
-        if (response.success) {
-          setMembers(response.data);
-          setPagination(response.pagination);
-          setCurrentPage(response.pagination.page);
-          setTotalPages(response.pagination.totalPages);
-          setTotalMembers(response.pagination.total);
-        }
+        // Founder/WCM get their area members
+        response = await memberAPI.getMembers();
       }
-
-      if (!response.success) {
+      
+      if (response.success) {
+        setMembers(response.data);
+        setCurrentPage(1); // Reset to first page
+      } else {
         setError(response.message || 'Failed to fetch members');
       }
     } catch (err) {
@@ -229,8 +191,8 @@ function ManageMembers() {
       try {
         const response = await memberAPI.deleteMember(memberId);
         if (response.success) {
-          // Refresh current page after deletion
-          await fetchMembers(currentPage);
+          // Refresh members after deletion
+          await fetchMembers();
         } else {
           setError(response.message || 'Failed to delete member');
         }
@@ -253,8 +215,8 @@ function ManageMembers() {
       });
       
       if (response.success) {
-        // Refresh current page after status update
-        await fetchMembers(currentPage);
+        // Refresh members after status update
+        await fetchMembers();
       } else {
         setError(response.message || 'Failed to update member status');
       }
@@ -326,21 +288,18 @@ function ManageMembers() {
 
   // Pagination functions
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setCurrentPage(newPage);
-      fetchMembers(newPage);
-    }
+    setCurrentPage(newPage);
   };
 
   const handlePreviousPage = () => {
     if (currentPage > 1) {
-      handlePageChange(currentPage - 1);
+      setCurrentPage(currentPage - 1);
     }
   };
 
   const handleNextPage = () => {
     if (currentPage < totalPages) {
-      handlePageChange(currentPage + 1);
+      setCurrentPage(currentPage + 1);
     }
   };
 
@@ -375,6 +334,12 @@ function ManageMembers() {
            matchesArea && matchesAdditionalInfo && matchesMinAge && matchesMaxAge;
   });
 
+  // Client-side pagination
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentMembers = filteredMembers.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredMembers.length / itemsPerPage);
+
   if (loading) {
     return (
       <FounderLayout>
@@ -402,9 +367,9 @@ function ManageMembers() {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h2 className="text-xl font-bold text-gray-800">Manage Members</h2>
-            {totalMembers > 0 && (
+            {filteredMembers.length > 0 && (
               <p className="text-sm text-gray-600 mt-1">
-                Showing {members.length} of {totalMembers} members (page {currentPage} of {totalPages})
+                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredMembers.length)} of {filteredMembers.length} members
               </p>
             )}
           </div>
@@ -578,8 +543,8 @@ function ManageMembers() {
         </div>
 
         {/* Members Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto flex flex-col min-h-[500px]">
+        <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col" style={{ minHeight: '600px' }}>
+          <div className="overflow-x-auto flex-grow">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -601,7 +566,7 @@ function ManageMembers() {
                     </td>
                   </tr>
                 ) : (
-                  filteredMembers.map((member) => {
+                  currentMembers.map((member) => {
                     const isExpanded = expandedRows.has(member.id);
                     return (
                       <React.Fragment key={member.id}>
@@ -815,68 +780,116 @@ function ManageMembers() {
               </tbody>
             </table>
 
-            {/* Pagination Controls - Only show when no filters are active */}
-            {!hasActiveFilters() && totalPages > 1 && (
-              <div className="mt-auto mb-8 flex items-center justify-between">
-                <div className="text-sm text-gray-700 pl-3">
-                  Showing page {currentPage} of {totalPages} ({totalMembers} total members)
-                </div>
-                <div className="flex items-center space-x-2 pr-3">
-                  <button
-                    onClick={handlePreviousPage}
-                    disabled={currentPage === 1}
-                    className={`px-3 py-1 rounded ${
-                      currentPage === 1
-                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                        : 'bg-blue-500 text-white hover:bg-blue-600'
-                    }`}
-                  >
-                    Previous
-                  </button>
-                  
-                  <div className="flex space-x-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <button
-                        key={page}
-                        onClick={() => handlePageChange(page)}
-                        className={`px-3 py-1 rounded ${
-                          currentPage === page
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    ))}
+            {/* Pagination Controls - Always visible at bottom */}
+            <div className="mt-auto border-t border-gray-200">
+              {filteredMembers.length > 0 && (
+                <div className="bg-white px-4 py-3 flex items-center justify-between sm:px-6">
+                  <div className="flex-1 flex justify-between sm:hidden">
+                    <button
+                      onClick={handlePreviousPage}
+                      disabled={currentPage === 1}
+                      className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
+                        currentPage === 1
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={handleNextPage}
+                      disabled={currentPage === totalPages}
+                      className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
+                        currentPage === totalPages
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      Next
+                    </button>
                   </div>
-
-                  <button
-                    onClick={handleNextPage}
-                    disabled={currentPage === totalPages}
-                    className={`px-3 py-1 rounded ${
-                      currentPage === totalPages
-                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                        : 'bg-blue-500 text-white hover:bg-blue-600'
-                    }`}
-                  >
-                    Next
-                  </button>
+                  <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm text-gray-700">
+                        Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
+                        <span className="font-medium">
+                          {Math.min(indexOfLastItem, filteredMembers.length)}
+                        </span>{' '}
+                        of <span className="font-medium">{filteredMembers.length}</span> members
+                        {totalPages > 1 && (
+                          <span className="text-gray-500"> • Page {currentPage} of {totalPages}</span>
+                        )}
+                      </p>
+                    </div>
+                    {totalPages > 1 && (
+                      <div>
+                        <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                          <button
+                            onClick={handlePreviousPage}
+                            disabled={currentPage === 1}
+                            className={`relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 text-sm font-medium ${
+                              currentPage === 1
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'bg-white text-gray-500 hover:bg-gray-50'
+                            }`}
+                          >
+                            Previous
+                          </button>
+                          {[...Array(totalPages)].map((_, index) => {
+                            const pageNumber = index + 1;
+                            // Show first page, last page, current page, and pages around current
+                            if (
+                              pageNumber === 1 ||
+                              pageNumber === totalPages ||
+                              (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
+                            ) {
+                              return (
+                                <button
+                                  key={pageNumber}
+                                  onClick={() => handlePageChange(pageNumber)}
+                                  className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                    currentPage === pageNumber
+                                      ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                                      : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {pageNumber}
+                                </button>
+                              );
+                            } else if (
+                              pageNumber === currentPage - 2 ||
+                              pageNumber === currentPage + 2
+                            ) {
+                              return (
+                                <span
+                                  key={pageNumber}
+                                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700"
+                                >
+                                  ...
+                                </span>
+                              );
+                            }
+                            return null;
+                          })}
+                          <button
+                            onClick={handleNextPage}
+                            disabled={currentPage === totalPages}
+                            className={`relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 text-sm font-medium ${
+                              currentPage === totalPages
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'bg-white text-gray-500 hover:bg-gray-50'
+                            }`}
+                          >
+                            Next
+                          </button>
+                        </nav>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-          
-          {/* Show filtering info when filters are active */}
-          {hasActiveFilters() && (
-            <div className="px-4 py-3 bg-blue-50 border-t border-blue-200">
-              <div className="flex items-center text-sm text-blue-700">
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Showing {filteredMembers.length} filtered results.
-              </div>
+              )}
             </div>
-          )}
+          </div>
           
           {filteredMembers.length === 0 && !loading && (
             <div className="text-center py-8">
@@ -885,9 +898,7 @@ function ManageMembers() {
               </svg>
               <h3 className="mt-2 text-sm font-medium text-gray-900">No members found</h3>
               <p className="mt-1 text-sm text-gray-500">
-                {hasActiveFilters()
-                  ? 'Try adjusting your search criteria.' 
-                  : 'Get started by adding your first member.'}
+                Try adjusting your search criteria or get started by adding your first member.
               </p>
             </div>
           )}
