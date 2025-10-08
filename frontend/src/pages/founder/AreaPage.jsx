@@ -150,17 +150,24 @@ const AreaPage = () => {
       if (editingArea) {
         // Update existing area
         await areaService.updateArea(editingArea.area_id || editingArea.id, submissionData);
+        // Update state without full refresh
+        setAreas(prevAreas => prevAreas.map(area => 
+          (area.area_id || area.id) === (editingArea.area_id || editingArea.id)
+            ? { ...area, ...submissionData }
+            : area
+        ));
         setShowEditModal(false);
         setEditingArea(null);
       } else {
         // Add new area
-        await areaService.createArea(submissionData);
+        const response = await areaService.createArea(submissionData);
+        // Add to state without full refresh
+        setAreas(prevAreas => [...prevAreas, response.data || submissionData]);
         setShowAddModal(false);
       }
-      
-      await fetchAreas(); // Refresh the list
     } catch (error) {
       console.error('Error saving area:', error);
+      alert('Failed to save area. Please try again.');
     }
     
     // Reset form
@@ -184,22 +191,35 @@ const AreaPage = () => {
       if (editingSubArea) {
         // Update existing sub-area
         await areaService.updateSubArea(currentAreaId, editingSubArea.id, subAreaFormData.address);
+        // Update state without full refresh
+        setSubAreas(prev => ({
+          ...prev,
+          [currentAreaId]: prev[currentAreaId].map(sa =>
+            sa.id === editingSubArea.id
+              ? { ...sa, address: subAreaFormData.address }
+              : sa
+          )
+        }));
         setShowEditSubAreaModal(false);
         setEditingSubArea(null);
       } else {
         // Create new sub-area
-        await areaService.createSubArea(currentAreaId, subAreaFormData.address);
+        const response = await areaService.createSubArea(currentAreaId, subAreaFormData.address);
+        // Add to state without full refresh
+        const newSubArea = response.data?.subArea || { id: Date.now(), address: subAreaFormData.address };
+        setSubAreas(prev => ({
+          ...prev,
+          [currentAreaId]: [...(prev[currentAreaId] || []), newSubArea]
+        }));
         setShowSubAreaModal(false);
       }
-      
-      // Refresh sub-areas for this area
-      await fetchSubAreas(currentAreaId);
       
       // Reset form
       setSubAreaFormData({ address: '' });
       setCurrentAreaId(null);
     } catch (error) {
       console.error('Error saving sub-area:', error);
+      alert('Failed to save sub-area. Please try again.');
     }
   };
 
@@ -217,9 +237,25 @@ const AreaPage = () => {
     if (window.confirm('Are you sure you want to delete this area?')) {
       try {
         await areaService.deleteArea(area.area_id || area.id);
-        await fetchAreas(); // Refresh the list
+        // Remove from state without full refresh
+        setAreas(prevAreas => prevAreas.filter(a => 
+          (a.area_id || a.id) !== (area.area_id || area.id)
+        ));
+        // Clean up related sub-areas from state
+        setSubAreas(prev => {
+          const updated = { ...prev };
+          delete updated[area.area_id || area.id];
+          return updated;
+        });
+        // Remove from expanded areas if it was expanded
+        setExpandedAreas(prev => {
+          const updated = new Set(prev);
+          updated.delete(area.area_id || area.id);
+          return updated;
+        });
       } catch (error) {
         console.error('Error deleting area:', error);
+        alert('Failed to delete area. Please try again.');
       }
     }
   };
@@ -228,9 +264,14 @@ const AreaPage = () => {
     if (window.confirm('Are you sure you want to delete this sub-area?')) {
       try {
         await areaService.deleteSubArea(areaId, subAreaId);
-        await fetchSubAreas(areaId); // Refresh sub-areas
+        // Remove from state without full refresh
+        setSubAreas(prev => ({
+          ...prev,
+          [areaId]: prev[areaId].filter(sa => sa.id !== subAreaId)
+        }));
       } catch (error) {
         console.error('Error deleting sub-area:', error);
+        alert('Failed to delete sub-area. Please try again.');
       }
     }
   };
@@ -303,11 +344,6 @@ const AreaPage = () => {
           <div>
             <h2 className="text-xl font-bold text-gray-800">Area Management</h2>
             <p className="text-gray-600 mt-1">Manage geographical areas and their associated founders and members</p>
-            {areas.length > 0 && (
-              <p className="text-sm text-gray-600 mt-1">
-                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, areas.length)} of {areas.length} areas
-              </p>
-            )}
           </div>
           <button
             onClick={() => setShowAddModal(true)}
@@ -318,14 +354,6 @@ const AreaPage = () => {
             </svg>
             Add New Area
           </button>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-6">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-2xl font-bold text-purple-600">{areas.length}</div>
-            <div className="text-sm text-gray-500">Total Areas</div>
-          </div>
         </div>
 
         {/* Areas Table */}

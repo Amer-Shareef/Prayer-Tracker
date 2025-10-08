@@ -38,7 +38,9 @@ const ViewAreas = () => {
     try {
       const response = await areaService.createArea(newArea);
       if (response.data.success) {
-        setAreas([...areas, response.data.data]);
+        // Add new area to state without full refresh
+        const newAreaData = response.data.data;
+        setAreas(prevAreas => [...prevAreas, { ...newAreaData, member_count: 0 }]);
         setNewArea({ area_name: '', address: '', description: '' });
         setShowCreateModal(false);
       }
@@ -72,6 +74,28 @@ const ViewAreas = () => {
   const handleNext = () => {
     if (currentPage < totalPages) {
       setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handleEditArea = (area) => {
+    setNewArea({
+      area_name: area.area_name,
+      address: area.address || '',
+      description: area.description || ''
+    });
+    setShowCreateModal(true);
+  };
+
+  const handleDeleteArea = async (area) => {
+    if (window.confirm(`Are you sure you want to delete "${area.area_name}"?`)) {
+      try {
+        await areaService.deleteArea(area.area_id);
+        // Remove area from state without full refresh
+        setAreas(prevAreas => prevAreas.filter(a => a.area_id !== area.area_id));
+      } catch (error) {
+        console.error('Error deleting area:', error);
+        alert('Failed to delete area');
+      }
     }
   };
 
@@ -132,6 +156,9 @@ const ViewAreas = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Members
                     </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -174,6 +201,30 @@ const ViewAreas = () => {
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
                           {area.member_count || 0}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end space-x-2">
+                          <button
+                            onClick={() => handleEditArea(area)}
+                            className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-purple-700 bg-purple-100 hover:bg-purple-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors"
+                            title="Edit area"
+                          >
+                            <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteArea(area)}
+                            className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                            title="Delete area"
+                          >
+                            <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
