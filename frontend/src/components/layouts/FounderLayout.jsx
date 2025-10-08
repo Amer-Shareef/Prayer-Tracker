@@ -438,7 +438,7 @@ const FounderLayout = ({ children }) => {
         } transition-all duration-300 ease-in-out`}
       >
         {/* Page Content */}
-        <main className="p-6 mt-8 bg-gray-50 min-h-screen">{children}</main>
+        <main className="p-10 bg-gray-50 min-h-screen">{children}</main>
       </div>
     </div>
   );

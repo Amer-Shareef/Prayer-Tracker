@@ -390,7 +390,7 @@ const AreaPage = () => {
                 d="M12 6v6m0 0v6m0-6h6m-6 0H6"
               />
             </svg>
-            Add New Area
+            Add Area
           </button>
         </div>
 
@@ -605,7 +605,7 @@ const AreaPage = () => {
                                   onClick={() =>
                                     openAddSubAreaModal(area.area_id || area.id)
                                   }
-                                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                                 >
                                   <svg
                                     className="w-4 h-4 mr-1"
@@ -874,7 +874,7 @@ const AreaPage = () => {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
             <div className="bg-white rounded-lg p-6 max-w-md w-full">
               <h3 className="text-lg font-bold mb-4">
-                {editingArea ? "Edit Area" : "Add New Area"}
+                {editingArea ? "Edit Area" : "Add Area"}
               </h3>
 
               <form onSubmit={handleSubmit}>
@@ -989,7 +989,7 @@ const AreaPage = () => {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                   >
                     Add Sub-Area
                   </button>
