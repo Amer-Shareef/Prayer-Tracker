@@ -26,6 +26,10 @@ function ManageMembers() {
   const [filterAdditionalInfo, setFilterAdditionalInfo] = useState("all");
   const [expandedRows, setExpandedRows] = useState(new Set());
 
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState("fullName");
+  const [sortDirection, setSortDirection] = useState("asc");
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
@@ -333,6 +337,68 @@ function ManageMembers() {
     }
   };
 
+  // Sorting function
+  const handleSort = (column) => {
+    if (sortColumn === column) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      // Set new column and default to ascending
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  // Sort icon component
+  const SortIcon = ({ column }) => {
+    if (sortColumn !== column) {
+      return (
+        <svg
+          className="w-4 h-4 text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
+          />
+        </svg>
+      );
+    }
+    return sortDirection === "asc" ? (
+      <svg
+        className="w-4 h-4 text-blue-600"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M5 15l7-7 7 7"
+        />
+      </svg>
+    ) : (
+      <svg
+        className="w-4 h-4 text-blue-600"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M19 9l-7 7-7-7"
+        />
+      </svg>
+    );
+  };
+
   // Filter members based on search and filters
   const filteredMembers = members.filter((member) => {
     const matchesSearch =
@@ -395,14 +461,55 @@ function ManageMembers() {
     );
   });
 
+  // Sort filtered members
+  const sortedMembers = [...filteredMembers].sort((a, b) => {
+    let aValue, bValue;
+
+    switch (sortColumn) {
+      case "memberId":
+        aValue = a.memberId || "";
+        bValue = b.memberId || "";
+        break;
+      case "fullName":
+        aValue = a.fullName || "";
+        bValue = b.fullName || "";
+        break;
+      case "attendance":
+        aValue = a.attendance_rate || 0;
+        bValue = b.attendance_rate || 0;
+        break;
+      case "role":
+        aValue = a.role || "";
+        bValue = b.role || "";
+        break;
+      case "status":
+        aValue = a.status || "";
+        bValue = b.status || "";
+        break;
+      case "joined":
+        aValue = new Date(a.joined_date || 0).getTime();
+        bValue = new Date(b.joined_date || 0).getTime();
+        break;
+      default:
+        aValue = "";
+        bValue = "";
+    }
+
+    // Handle numeric sorting
+    if (typeof aValue === "number" && typeof bValue === "number") {
+      return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
+    }
+
+    // Handle string sorting
+    const comparison = aValue.toString().localeCompare(bValue.toString());
+    return sortDirection === "asc" ? comparison : -comparison;
+  });
+
   // Client-side pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentMembers = filteredMembers.slice(
-    indexOfFirstItem,
-    indexOfLastItem
-  );
-  const totalPages = Math.ceil(filteredMembers.length / itemsPerPage);
+  const currentMembers = sortedMembers.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(sortedMembers.length / itemsPerPage);
 
   if (loading) {
     return (
@@ -421,17 +528,17 @@ function ManageMembers() {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h2 className="text-xl font-bold text-gray-800">Manage Members</h2>
-            {filteredMembers.length > 0 && (
+            {sortedMembers.length > 0 && (
               <p className="text-sm text-gray-600 mt-1">
                 Showing {indexOfFirstItem + 1} to{" "}
-                {Math.min(indexOfLastItem, filteredMembers.length)} of{" "}
-                {filteredMembers.length} members
+                {Math.min(indexOfLastItem, sortedMembers.length)} of{" "}
+                {sortedMembers.length} members
               </p>
             )}
           </div>
           <button
             onClick={() => navigate("/founder/add-member")}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center shadow-md hover:shadow-lg transition-all duration-200"
           >
             <svg
               className="w-5 h-5 mr-2"
@@ -449,9 +556,8 @@ function ManageMembers() {
             Add New Member
           </button>
         </div>
-
         {error && (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6">
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-lg">
             <div className="flex">
               <svg
                 className="w-5 h-5 mr-2"
@@ -468,168 +574,198 @@ function ManageMembers() {
             </div>
           </div>
         )}
-
-        {/* Filters */}
-        <div className="bg-white p-4 rounded-lg shadow mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* General Search */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                General Search
-              </label>
+        {/* Enhanced Search and Filters Section */}
+        <div className="bg-white rounded-xl shadow-lg mb-6 overflow-hidden">
+          {/* Search Bar */}
+          <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <svg
+                  className="h-5 w-5 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </div>
               <input
                 type="text"
-                placeholder="Search by name, username or email..."
+                placeholder="Search by name, username, or email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700 placeholder-gray-400"
               />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
             </div>
+          </div>
 
-            {/* Age Range Filters */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Age Range
-              </label>
-              <div className="flex space-x-2">
+          {/* Simplified Filters */}
+          <div className="p-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {/* Role Filter */}
+              <div>
+                <select
+                  value={filterRole}
+                  onChange={(e) => setFilterRole(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-700"
+                >
+                  <option value="all">All Roles</option>
+                  <option value="Member">Member</option>
+                  <option value="WCM">WC</option>
+                  <option value="Founder">WC Admin</option>
+                  <option value="SuperAdmin">Super Admin</option>
+                </select>
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-700"
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="pending">Pending</option>
+                </select>
+              </div>
+
+              {/* Area Filter */}
+              <div>
+                <select
+                  value={filterArea}
+                  onChange={(e) => setFilterArea(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-700"
+                >
+                  <option value="all">All Areas</option>
+                  {areas.map((area) => (
+                    <option key={area.area_id} value={area.area_name}>
+                      {area.area_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Mobility Filter */}
+              <div>
+                <select
+                  value={filterMobility}
+                  onChange={(e) => setFilterMobility(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-700"
+                >
+                  <option value="all">All Mobility</option>
+                  <option value="Walking">Walking</option>
+                  <option value="Bicycle">Bicycle</option>
+                  <option value="Motorbike">Motorbike</option>
+                  <option value="Car">Car</option>
+                  <option value="Public Transport">Public Transport</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              {/* Additional Info Filter */}
+              <div>
+                <select
+                  value={filterAdditionalInfo}
+                  onChange={(e) => setFilterAdditionalInfo(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-700"
+                >
+                  <option value="all">Additional Info</option>
+                  <option value="zakath">Zakath Eligible</option>
+                  <option value="rent">On Rent</option>
+                  <option value="disabled">Differently Abled</option>
+                  <option value="convert">Convert</option>
+                </select>
+              </div>
+
+              {/* Age Range - Combined */}
+              <div className="flex space-x-1">
                 <input
                   type="number"
                   placeholder="Min Age"
                   value={filterMinAge}
                   onChange={(e) => setFilterMinAge(e.target.value)}
-                  className="w-1/2 px-2 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-1/2 px-2 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-700"
                   min="0"
                   max="120"
                 />
                 <input
                   type="number"
-                  placeholder="Max Age"
+                  placeholder="Max"
                   value={filterMaxAge}
                   onChange={(e) => setFilterMaxAge(e.target.value)}
-                  className="w-1/2 px-2 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-1/2 px-2 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-700"
                   min="0"
                   max="120"
                 />
               </div>
             </div>
 
-            {/* Mobility Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Mobility
-              </label>
-              <select
-                value={filterMobility}
-                onChange={(e) => setFilterMobility(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">All Mobility</option>
-                <option value="Walking">Walking</option>
-                <option value="Bicycle">Bicycle</option>
-                <option value="Motorbike">Motorbike</option>
-                <option value="Car">Car</option>
-                <option value="Public Transport">Public Transport</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            {/* Area Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Area
-              </label>
-              <select
-                value={filterArea}
-                onChange={(e) => setFilterArea(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">All Areas</option>
-                {areas.map((area) => (
-                  <option key={area.area_id} value={area.area_name}>
-                    {area.area_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Additional Info Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Additional Info
-              </label>
-              <select
-                value={filterAdditionalInfo}
-                onChange={(e) => setFilterAdditionalInfo(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">All Additional Info</option>
-                <option value="zakath">Zakath Eligible</option>
-                <option value="rent">On Rent</option>
-                <option value="disabled">Differently Abled</option>
-                <option value="convert">Muallafathil Quloob</option>
-              </select>
-            </div>
-
-            {/* Role Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Role
-              </label>
-              <select
-                value={filterRole}
-                onChange={(e) => setFilterRole(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">All Roles</option>
-                <option value="Member">Member</option>
-                <option value="WCM">Working Committee Member</option>
-                <option value="Founder">Working Committee Admin</option>
-                <option value="SuperAdmin">Super Admin</option>
-              </select>
-            </div>
-
-            {/* Status Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Status
-              </label>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="pending">Pending</option>
-              </select>
-            </div>
-
-            {/* Clear Filters Button */}
-            <div className="flex items-end">
-              <button
-                onClick={() => {
-                  setSearchTerm("");
-                  setFilterMemberId("");
-                  setFilterFullName("");
-                  setFilterMinAge("");
-                  setFilterMaxAge("");
-                  setFilterUsername("");
-                  setFilterEmail("");
-                  setFilterMobility("all");
-                  setFilterArea("all");
-                  setFilterAdditionalInfo("all");
-                  setFilterRole("all");
-                  setFilterStatus("all");
-                }}
-                className="w-full px-3 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
-              >
-                Clear All Filters
-              </button>
-            </div>
+            {/* Clear Filters - Only show when filters are active */}
+            {hasActiveFilters() && (
+              <div className="mt-3 flex justify-end">
+                <button
+                  onClick={() => {
+                    setSearchTerm("");
+                    setFilterMemberId("");
+                    setFilterFullName("");
+                    setFilterMinAge("");
+                    setFilterMaxAge("");
+                    setFilterUsername("");
+                    setFilterEmail("");
+                    setFilterMobility("all");
+                    setFilterArea("all");
+                    setFilterAdditionalInfo("all");
+                    setFilterRole("all");
+                    setFilterStatus("all");
+                  }}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center transition-colors duration-200"
+                >
+                  <svg
+                    className="w-4 h-4 mr-1"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                  Clear Filters
+                </button>
+              </div>
+            )}
           </div>
-        </div>
-
+        </div>{" "}
         {/* Members Table */}
         <div
           className="bg-white rounded-lg shadow overflow-hidden flex flex-col"
@@ -637,25 +773,61 @@ function ManageMembers() {
         >
           <div className="overflow-x-auto flex-grow">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Member ID
+                  <th
+                    onClick={() => handleSort("memberId")}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150"
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Member ID</span>
+                      <SortIcon column="memberId" />
+                    </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Full Name
+                  <th
+                    onClick={() => handleSort("fullName")}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150"
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Full Name</span>
+                      <SortIcon column="fullName" />
+                    </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Prayer Attendance
+                  <th
+                    onClick={() => handleSort("attendance")}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150"
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Prayer Attendance</span>
+                      <SortIcon column="attendance" />
+                    </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Role
+                  <th
+                    onClick={() => handleSort("role")}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150"
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Role</span>
+                      <SortIcon column="role" />
+                    </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
+                  <th
+                    onClick={() => handleSort("status")}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150"
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Status</span>
+                      <SortIcon column="status" />
+                    </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Joined
+                  <th
+                    onClick={() => handleSort("joined")}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150"
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Joined</span>
+                      <SortIcon column="joined" />
+                    </div>
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -675,8 +847,16 @@ function ManageMembers() {
                     const isExpanded = expandedRows.has(member.id);
                     return (
                       <React.Fragment key={member.id}>
-                        {/* Main Row */}
-                        <tr className="hover:bg-gray-50">
+                        {/* Main Row - Clickable */}
+                        <tr
+                          className="hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                          onClick={(e) => {
+                            // Don't expand if clicking on action buttons
+                            if (!e.target.closest(".action-buttons")) {
+                              toggleRowExpansion(member.id);
+                            }
+                          }}
+                        >
                           {/* Member ID */}
                           <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {member.memberId || "-"}
@@ -769,10 +949,10 @@ function ManageMembers() {
 
                           {/* Actions */}
                           <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div className="flex justify-end items-center space-x-2">
+                            <div className="flex justify-end items-center space-x-2 action-buttons">
                               {/* Download PDF Report Button */}
                               <button
-                                className="text-green-600 hover:text-green-900"
+                                className="text-green-600 hover:text-green-900 transition-colors duration-150"
                                 onClick={() => generateMemberReport(member)}
                                 title="Download PDF Report"
                               >
@@ -793,7 +973,7 @@ function ManageMembers() {
 
                               {/* Activate/Deactivate Button with Tick/Cross */}
                               <button
-                                className={`${
+                                className={`transition-colors duration-150 ${
                                   member.status === "active"
                                     ? "text-red-600 hover:text-red-900"
                                     : "text-green-600 hover:text-green-900"
@@ -847,7 +1027,7 @@ function ManageMembers() {
 
                               {/* Delete Button */}
                               <button
-                                className="text-red-600 hover:text-red-900"
+                                className="text-red-600 hover:text-red-900 transition-colors duration-150"
                                 onClick={() => handleDeleteMember(member.id)}
                                 title="Delete Member"
                               >
@@ -869,7 +1049,7 @@ function ManageMembers() {
                               {/* Expand/Collapse Button */}
                               <button
                                 onClick={() => toggleRowExpansion(member.id)}
-                                className="p-1 text-gray-400 hover:text-gray-600 focus:outline-none"
+                                className="p-1 text-gray-400 hover:text-gray-600 focus:outline-none transition-colors duration-150"
                                 title={
                                   isExpanded
                                     ? "Collapse details"
@@ -877,7 +1057,7 @@ function ManageMembers() {
                                 }
                               >
                                 <svg
-                                  className={`w-4 h-4 transform transition-transform ${
+                                  className={`w-4 h-4 transform transition-transform duration-200 ${
                                     isExpanded ? "rotate-180" : ""
                                   }`}
                                   fill="none"
@@ -1030,7 +1210,7 @@ function ManageMembers() {
 
             {/* Pagination Controls - Always visible at bottom */}
             <div className="mt-auto border-t border-gray-200">
-              {filteredMembers.length > 0 && (
+              {sortedMembers.length > 0 && (
                 <div className="bg-white px-4 py-3 flex items-center justify-between sm:px-6">
                   <div className="flex-1 flex justify-between sm:hidden">
                     <button
@@ -1065,11 +1245,11 @@ function ManageMembers() {
                         </span>{" "}
                         to{" "}
                         <span className="font-medium">
-                          {Math.min(indexOfLastItem, filteredMembers.length)}
+                          {Math.min(indexOfLastItem, sortedMembers.length)}
                         </span>{" "}
                         of{" "}
                         <span className="font-medium">
-                          {filteredMembers.length}
+                          {sortedMembers.length}
                         </span>{" "}
                         members
                         {totalPages > 1 && (
@@ -1151,7 +1331,7 @@ function ManageMembers() {
             </div>
           </div>
 
-          {filteredMembers.length === 0 && !loading && (
+          {sortedMembers.length === 0 && !loading && (
             <div className="text-center py-8">
               <svg
                 className="mx-auto h-12 w-12 text-gray-400"
