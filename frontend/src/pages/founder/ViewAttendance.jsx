@@ -455,7 +455,11 @@ const ViewAttendance = () => {
               </h1>
               <div className="mt-2 flex items-center space-x-3">
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-800 border border-blue-200">
-                  {role === "SuperAdmin" ? "👑 SuperAdmin" : "📍 Area Founder"}
+                  {role === "SuperAdmin"
+                    ? "SuperAdmin"
+                    : role === "WCM"
+                    ? "WC Member"
+                    : "WC Admin"}
                 </span>
                 {overviewData?.areaInfo && (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-50 text-green-800 border border-green-200">
@@ -759,7 +763,7 @@ const ViewAttendance = () => {
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 relative">
                   <div className="p-6 border-b border-gray-200">
                     <h2 className="text-lg font-semibold text-gray-900">
-                      Area Performance (Weighted Ranking)
+                      Area Performance
                     </h2>
                     <p className="text-xs text-gray-500 mt-1">
                       Ranked by weighted score: attendance consistency + Fajr
