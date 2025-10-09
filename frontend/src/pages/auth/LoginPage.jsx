@@ -83,15 +83,15 @@ const LoginPage = () => {
           setMaskedEmail(response.data.email);
           setError("");
 
-          // In development, show the test OTP
-          if (response.data.testOtp) {
-            setTestOtp(response.data.testOtp);
-            console.log("🧪 Test OTP:", response.data.testOtp);
-          }
-        } else {
-          // Complete login with comprehensive user data
-          localStorage.setItem("token", response.data.token);
-          localStorage.setItem("user", JSON.stringify(response.data.user));
+        //   // In development, show the test OTP
+        //   if (response.data.testOtp) {
+        //     setTestOtp(response.data.testOtp);
+        //     console.log("🧪 Test OTP:", response.data.testOtp);
+        //   }
+        // } else {
+        //   // Complete login with comprehensive user data
+        //   localStorage.setItem("token", response.data.token);
+        //   localStorage.setItem("user", JSON.stringify(response.data.user));
 
           // Pass refresh token to login function
           login(
@@ -277,7 +277,7 @@ const LoginPage = () => {
                   Enter the 4-digit code sent to your email
                 </p>
 
-                {testOtp && (
+                {/* {testOtp && (
                   <div className="mt-3 p-3 bg-yellow-50 border border-yellow-300 rounded">
                     <p className="text-sm text-yellow-700 font-medium">
                       🧪 Development Mode:
@@ -293,7 +293,7 @@ const LoginPage = () => {
                       Auto-fill OTP
                     </button>
                   </div>
-                )}
+                )} */}
               </div>
             )}
 
