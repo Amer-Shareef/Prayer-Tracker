@@ -9,10 +9,10 @@ const router = express.Router();
 // Helper function to remove SQL comments that might interfere with placeholders
 const cleanSQL = (sql) => {
   // Remove single-line comments (-- and #)
-  let cleaned = sql.replace(/--[^\n]*\n/g, '\n');
-  cleaned = cleaned.replace(/#[^\n]*/g, '');
+  let cleaned = sql.replace(/--[^\n]*\n/g, "\n");
+  cleaned = cleaned.replace(/#[^\n]*/g, "");
   // Remove multi-line comments (/* */)
-  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
+  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, "");
   return cleaned;
 };
 
@@ -30,7 +30,7 @@ router.get(
   async (req, res) => {
     try {
       const { user } = req;
-      const { role } = req.query;
+      const { role, period = "7" } = req.query;
 
       if (!role || !["Founder", "SuperAdmin"].includes(role)) {
         return res.status(400).json({
@@ -55,25 +55,26 @@ router.get(
 
       const isFounder = role === "Founder";
       const areaFilter = isFounder ? user.area_id : null;
+      const days = parseInt(period) || 7;
 
       let overviewData = {};
 
       // Get area info
       if (areaFilter) {
         const [areaInfo] = await pool.execute(
-          'SELECT area_id, area_name FROM areas WHERE area_id = ?',
+          "SELECT area_id, area_name FROM areas WHERE area_id = ?",
           [areaFilter]
         );
         if (areaInfo.length > 0) {
           overviewData.areaInfo = {
             name: areaInfo[0].area_name,
-            id: areaInfo[0].area_id
+            id: areaInfo[0].area_id,
           };
         }
       }
 
-      // Yesterday's attendance
-      const yesterdayQuery = cleanSQL(`
+      // Period attendance (instead of just yesterday)
+      const periodQuery = cleanSQL(`
         SELECT 
           COUNT(DISTINCT p.user_id) as active_members,
           SUM(p.fajr + p.dhuhr + p.asr + p.maghrib + p.isha) as total_prayers,
@@ -81,24 +82,22 @@ router.get(
             areaFilter ? "AND area_id = ?" : ""
           }) as total_members
         FROM prayers p
-        WHERE p.prayer_date = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
+        WHERE p.prayer_date >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)
         ${areaFilter ? "AND p.area_id = ?" : ""}
       `);
 
-      const [yesterdayResult] = await pool.execute(
-        yesterdayQuery,
+      const [periodResult] = await pool.execute(
+        periodQuery,
         areaFilter ? [areaFilter, areaFilter] : []
       );
 
-      const totalPossible = yesterdayResult[0].total_members * 5;
+      const totalPossible = periodResult[0].total_members * 5 * days; // 5 prayers per day for the period
       overviewData.yesterday = {
         percentage:
           totalPossible > 0
-            ? Math.round(
-                (yesterdayResult[0].total_prayers / totalPossible) * 100
-              )
+            ? Math.round((periodResult[0].total_prayers / totalPossible) * 100)
             : 0,
-        count: yesterdayResult[0].total_prayers || 0,
+        count: periodResult[0].total_prayers || 0,
         total: totalPossible,
       };
 
@@ -135,10 +134,10 @@ router.get(
             (SELECT COUNT(*) FROM users WHERE status = 'active' AND area_id = a.area_id) as total_members
           FROM areas a
           LEFT JOIN prayers p ON p.area_id = a.area_id 
-            AND p.prayer_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            AND p.prayer_date >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)
           GROUP BY a.area_id, a.area_name
           HAVING total_members > 0
-          ORDER BY (total_prayers / (total_members * 7 * 5)) DESC
+          ORDER BY (total_prayers / (total_members * ${days} * 5)) DESC
           LIMIT 1
         `);
 
@@ -146,7 +145,7 @@ router.get(
 
         if (topAreaResult.length > 0) {
           const topArea = topAreaResult[0];
-          const weekPossible = topArea.total_members * 7 * 5;
+          const periodPossible = topArea.total_members * days * 5;
           overviewData.topArea = {
             name: topArea.area_name,
             percentage: Math.round(
@@ -161,11 +160,11 @@ router.get(
             SUM(p.fajr + p.dhuhr + p.asr + p.maghrib + p.isha) as total_prayers,
             (SELECT COUNT(*) FROM users WHERE status = 'active') as total_members
           FROM prayers p
-          WHERE p.prayer_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+          WHERE p.prayer_date >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)
         `);
 
         const [avgRateResult] = await pool.execute(avgRateQuery);
-        const weekTotalPossible = avgRateResult[0].total_members * 7 * 5;
+        const periodTotalPossible = avgRateResult[0].total_members * days * 5;
 
         overviewData.avgRate7d = {
           percentage:
@@ -184,10 +183,10 @@ router.get(
             (SELECT COUNT(*) FROM users WHERE status = 'active' AND area_id = a.area_id) as total_members
           FROM areas a
           LEFT JOIN prayers p ON p.area_id = a.area_id 
-            AND p.prayer_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            AND p.prayer_date >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)
           GROUP BY a.area_id, a.area_name
           HAVING total_members > 0
-          ORDER BY (total_prayers / (total_members * 7 * 5)) DESC
+          ORDER BY (total_prayers / (total_members * ${days} * 5)) DESC
         `);
 
         const [areaStats] = await pool.execute(areaStatsQuery);
@@ -198,9 +197,9 @@ router.get(
 
         if (userAreaIndex !== -1) {
           const userAreaStats = areaStats[userAreaIndex];
-          const weekPossible = userAreaStats.total_members * 7 * 5;
+          const periodPossible = userAreaStats.total_members * days * 5;
           const percentage = Math.round(
-            (userAreaStats.total_prayers / weekPossible) * 100
+            (userAreaStats.total_prayers / periodPossible) * 100
           );
 
           overviewData.areaRank = {
@@ -490,11 +489,11 @@ router.get(
 
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - periodDays);
-      const formattedStartDate = startDate.toISOString().split('T')[0];
-      
+      const formattedStartDate = startDate.toISOString().split("T")[0];
+
       const yesterdayDate = new Date();
       yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-      const formattedYesterday = yesterdayDate.toISOString().split('T')[0];
+      const formattedYesterday = yesterdayDate.toISOString().split("T")[0];
 
       let whereConditions = ["u.status = ?"];
       let params = ["active"];
@@ -543,8 +542,8 @@ router.get(
         });
       }
 
-      const userIds = usersData.map(u => u.id);
-      const placeholders = userIds.map(() => '?').join(',');
+      const userIds = usersData.map((u) => u.id);
+      const placeholders = userIds.map(() => "?").join(",");
 
       const periodPrayersQuery = `
         SELECT 
@@ -557,10 +556,10 @@ router.get(
         GROUP BY user_id
       `;
 
-      const [periodPrayers] = await pool.execute(
-        periodPrayersQuery, 
-        [...userIds, formattedStartDate]
-      );
+      const [periodPrayers] = await pool.execute(periodPrayersQuery, [
+        ...userIds,
+        formattedStartDate,
+      ]);
 
       const yesterdayPrayersQuery = `
         SELECT 
@@ -575,44 +574,48 @@ router.get(
         AND prayer_date = ?
       `;
 
-      const [yesterdayPrayers] = await pool.execute(
-        yesterdayPrayersQuery,
-        [...userIds, formattedYesterday]
-      );
+      const [yesterdayPrayers] = await pool.execute(yesterdayPrayersQuery, [
+        ...userIds,
+        formattedYesterday,
+      ]);
 
       const periodPrayersMap = {};
-      periodPrayers.forEach(p => {
+      periodPrayers.forEach((p) => {
         periodPrayersMap[p.user_id] = {
           total_prayers: p.total_prayers || 0,
-          total_fajr: p.total_fajr || 0
+          total_fajr: p.total_fajr || 0,
         };
       });
 
       const yesterdayPrayersMap = {};
-      yesterdayPrayers.forEach(p => {
+      yesterdayPrayers.forEach((p) => {
         yesterdayPrayersMap[p.user_id] = {
           fajr: Boolean(p.fajr),
           dhuhr: Boolean(p.dhuhr),
           asr: Boolean(p.asr),
           maghrib: Boolean(p.maghrib),
-          isha: Boolean(p.isha)
+          isha: Boolean(p.isha),
         };
       });
 
       const formattedMembers = usersData.map((member) => {
-        const periodData = periodPrayersMap[member.id] || { total_prayers: 0, total_fajr: 0 };
+        const periodData = periodPrayersMap[member.id] || {
+          total_prayers: 0,
+          total_fajr: 0,
+        };
         const yesterdayData = yesterdayPrayersMap[member.id] || {
           fajr: false,
           dhuhr: false,
           asr: false,
           maghrib: false,
-          isha: false
+          isha: false,
         };
 
         const totalPossible = periodDays * 5;
-        const periodPercentage = totalPossible > 0
-          ? Math.round((periodData.total_prayers / totalPossible) * 100)
-          : 0;
+        const periodPercentage =
+          totalPossible > 0
+            ? Math.round((periodData.total_prayers / totalPossible) * 100)
+            : 0;
 
         return {
           id: member.id,
