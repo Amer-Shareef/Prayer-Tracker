@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import FounderLayout from '../../components/layouts/FounderLayout';
 
-// Simple Tooltip Component
+// Simple Tooltip Component with higher z-index
 const Tooltip = ({ text, children }) => {
   const [show, setShow] = useState(false);
 
@@ -15,11 +15,30 @@ const Tooltip = ({ text, children }) => {
         {children}
       </div>
       {show && (
-        <div className="absolute z-50 px-3 py-2 text-xs text-white bg-gray-800 rounded-md shadow-lg -top-10 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
+        <div className="absolute z-[9999] px-3 py-2 text-xs text-white bg-gray-900 rounded-md shadow-xl -top-10 left-1/2 transform -translate-x-1/2 whitespace-nowrap pointer-events-none">
           {text}
-          <div className="absolute w-2 h-2 bg-gray-800 transform rotate-45 -bottom-1 left-1/2 -translate-x-1/2"></div>
+          <div className="absolute w-2 h-2 bg-gray-900 transform rotate-45 -bottom-1 left-1/2 -translate-x-1/2"></div>
         </div>
       )}
+    </div>
+  );
+};
+
+// Prayer Dots Component
+const PrayerDots = ({ prayers }) => {
+  const prayerOrder = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+  
+  return (
+    <div className="flex items-center space-x-1">
+      {prayerOrder.map((prayer) => (
+        <Tooltip key={prayer} text={prayer.charAt(0).toUpperCase() + prayer.slice(1)}>
+          <div
+            className={`w-2 h-2 rounded-full ${
+              prayers[prayer] ? 'bg-green-500' : 'bg-gray-300'
+            }`}
+          />
+        </Tooltip>
+      ))}
     </div>
   );
 };
@@ -129,7 +148,8 @@ const ViewAttendance = () => {
   const [searchTerm, setSearchTerm] = useState('');
   
   // Detailed analytics filters
-  const [timePeriod, setTimePeriod] = useState('7'); // '7', '30', '180', '365'
+  const [timePeriod, setTimePeriod] = useState('7');
+  const [selectedArea, setSelectedArea] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
   
@@ -146,6 +166,12 @@ const ViewAttendance = () => {
     { value: '365', label: 'Last Year' }
   ];
 
+  // Get period label for column header
+  const getPeriodLabel = () => {
+    const option = timePeriodOptions.find(opt => opt.value === timePeriod);
+    return option ? option.label : 'Period';
+  };
+
   useEffect(() => {
     const fetchAttendanceData = async () => {
       setLoading(true);
@@ -153,35 +179,33 @@ const ViewAttendance = () => {
       
       if (role === 'superadmin') {
         const globalOverview = {
-          prayerAttendanceRate: {
-            percentage: 80,
-            count: 800,
+          areaInfo: founderAreaInfo,
+          yesterdayAttendanceRate: {
+            percentage: 82,
+            count: 820,
             total: 1000,
-            tooltip: "Total prayers logged today ÷ (members × 5 prayers)"
+            tooltip: "Total prayers logged yesterday across ALL areas ÷ (total members × 5)"
           },
           topPerformingArea: {
             name: "Downtown Masjid",
             percentage: 85,
-            tooltip: "Area with highest attendance in last 7 days"
+            tooltip: "Area with highest weighted score (last 7 days)"
           },
-          consistencyScore: {
-            percentage: 75,
-            count: 150,
+          newMembers: {
+            count: 23,
             total: 200,
-            tooltip: "Members who prayed at least once on 4+ days (last 7 days)"
+            tooltip: "Members who joined in the last 30 days across all areas"
           },
-          fajrChallengeRate: {
-            percentage: 65,
-            count: 130,
-            total: 200,
-            tooltip: "Members who prayed Fajr today"
+          avgAttendanceRate: {
+            percentage: 78,
+            tooltip: "Average attendance rate across all areas (last 7 days)"
           },
           prayerBreakdown: {
-            fajr: { todayCount: 130, todayPercent: 65, weekPercent: 62, monthPercent: 60 },
-            dhuhr: { todayCount: 165, todayPercent: 82, weekPercent: 80, monthPercent: 78 },
-            asr: { todayCount: 170, todayPercent: 85, weekPercent: 83, monthPercent: 81 },
-            maghrib: { todayCount: 180, todayPercent: 90, weekPercent: 88, monthPercent: 86 },
-            isha: { todayCount: 175, todayPercent: 87, weekPercent: 85, monthPercent: 83 }
+            fajr: { yesterdayCount: 135, yesterdayPercent: 67, weekPercent: 62, monthPercent: 60 },
+            dhuhr: { yesterdayCount: 168, yesterdayPercent: 84, weekPercent: 80, monthPercent: 78 },
+            asr: { yesterdayCount: 172, yesterdayPercent: 86, weekPercent: 83, monthPercent: 81 },
+            maghrib: { yesterdayCount: 182, yesterdayPercent: 91, weekPercent: 88, monthPercent: 86 },
+            isha: { yesterdayCount: 178, yesterdayPercent: 89, weekPercent: 85, monthPercent: 83 }
           },
           areas: generateAreaData(8)
         };
@@ -189,63 +213,62 @@ const ViewAttendance = () => {
       } else {
         const founderOverview = {
           areaInfo: founderAreaInfo,
-          todayAttendance: {
-            percentage: 78,
-            count: 156,
+          yesterdayAttendance: {
+            percentage: 80,
+            count: 160,
             total: 200,
-            tooltip: "Total prayers logged today ÷ (50 members × 5 prayers)"
+            tooltip: "Total prayers logged yesterday in YOUR area ÷ (50 members × 5)"
           },
           areaRank: {
             position: 2,
             totalAreas: 8,
             percentage: 78,
-            tooltip: "Ranking based on last 7 days attendance"
+            tooltip: "Your area's weighted ranking (last 7 days)"
           },
-          consistencyScore: {
-            count: 12,
-            members: ['Ahmad', 'Fatima', 'Yusuf', 'Aisha', 'Omar', 'Zainab'],
-            tooltip: "Members with at least one prayer on 4+ days (last 7 days)"
-          },
-          needsOutreach: {
+          newMembers: {
             count: 5,
-            members: [
-              { id: 15, name: 'Abdullah', daysActive: 1 },
-              { id: 23, name: 'Ibrahim', daysActive: 0 },
-              { id: 31, name: 'Ismail', daysActive: 1 }
-            ],
-            tooltip: "Members with prayer activity on fewer than 2 days (last 7 days)"
+            total: 50,
+            tooltip: "Members who joined your area in the last 30 days"
+          },
+          weeklyAttendance: {
+            percentage: 76,
+            tooltip: "Average attendance rate for your area (last 7 days)"
           },
           prayerBreakdown: {
-            fajr: { todayCount: 30, todayPercent: 60, weekPercent: 58, monthPercent: 55 },
-            dhuhr: { todayCount: 41, todayPercent: 82, weekPercent: 80, monthPercent: 78 },
-            asr: { todayCount: 42, todayPercent: 84, weekPercent: 82, monthPercent: 80 },
-            maghrib: { todayCount: 45, todayPercent: 90, weekPercent: 88, monthPercent: 86 },
-            isha: { todayCount: 43, todayPercent: 86, weekPercent: 84, monthPercent: 82 }
+            fajr: { yesterdayCount: 32, yesterdayPercent: 64, weekPercent: 58, monthPercent: 55 },
+            dhuhr: { yesterdayCount: 42, yesterdayPercent: 84, weekPercent: 80, monthPercent: 78 },
+            asr: { yesterdayCount: 43, yesterdayPercent: 86, weekPercent: 82, monthPercent: 80 },
+            maghrib: { yesterdayCount: 46, yesterdayPercent: 92, weekPercent: 88, monthPercent: 86 },
+            isha: { yesterdayCount: 44, yesterdayPercent: 88, weekPercent: 84, monthPercent: 82 }
           }
         };
         setOverviewData(founderOverview);
       }
       
+      const membersData = role === 'superadmin' && selectedArea !== 'all'
+        ? generateMemberData(25, parseInt(timePeriod), selectedArea)
+        : generateMemberData(150, parseInt(timePeriod));
+      
       setDetailedData({
-        members: generateMemberData(150, parseInt(timePeriod)),
-        dailyBreakdown: generateDailyBreakdown(parseInt(timePeriod)),
-        monthComparison: {
-          lastMonth: { overallAttendance: 72, fajrAttendance: 55, consistentMembers: 25 },
-          thisMonth: { overallAttendance: 78, fajrAttendance: 62, consistentMembers: 30 },
-          change: { overallAttendance: 6, fajrAttendance: 7, consistentMembers: 5 }
-        }
+        members: membersData,
+        areas: role === 'superadmin' ? generateAreaData(8) : []
       });
       
       setLoading(false);
     };
     
     fetchAttendanceData();
-  }, [role, timePeriod]);
+  }, [role, timePeriod, selectedArea]);
 
-  // Reset to page 1 when search term or time period changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, timePeriod]);
+  }, [searchTerm, timePeriod, selectedArea]);
+
+  useEffect(() => {
+    if (role === 'founder') {
+      setSelectedArea('all');
+    }
+  }, [role]);
 
   const generateAreaData = (count) => {
     const areaNames = [
@@ -253,26 +276,32 @@ const ViewAttendance = () => {
       'South Valley', 'Central Community', 'Riverside Masjid', 'Hilltop Center'
     ];
     
-    return Array.from({ length: count }, (_, i) => {
-      const todayPercent = Math.floor(Math.random() * 30) + 65;
+    const areas = Array.from({ length: count }, (_, i) => {
+      const members = Math.floor(Math.random() * 50) + 20;
+      const yesterdayPercent = Math.floor(Math.random() * 30) + 65;
       const weekPercent = Math.floor(Math.random() * 30) + 60;
       const monthPercent = Math.floor(Math.random() * 30) + 55;
-      const lastWeekPercent = weekPercent + (Math.floor(Math.random() * 21) - 10);
+      const fajrPercent = Math.floor(Math.random() * 30) + 50;
+      
+      const consistencyBonus = (yesterdayPercent + fajrPercent) / 2;
+      const weightedScore = (weekPercent * 0.7) + (consistencyBonus * 0.3);
       
       return {
         id: i + 1,
         name: areaNames[i],
-        members: Math.floor(Math.random() * 50) + 20,
-        todayPercent,
+        members,
+        yesterdayPercent,
         weekPercent,
         monthPercent,
-        trend: weekPercent > lastWeekPercent ? 'up' : weekPercent < lastWeekPercent ? 'down' : 'stable',
-        fajrPercent: Math.floor(Math.random() * 30) + 50
+        fajrPercent,
+        weightedScore: Math.round(weightedScore)
       };
-    }).sort((a, b) => b.weekPercent - a.weekPercent);
+    });
+    
+    return areas.sort((a, b) => b.weightedScore - a.weightedScore);
   };
 
-  const generateMemberData = (count, days) => {
+  const generateMemberData = (count, days, areaFilter = null) => {
     const names = [
       'Ahmad Hassan', 'Fatima Ali', 'Yusuf Ahmed', 'Aisha Khan', 'Omar Farooq',
       'Zainab Rahman', 'Ibrahim Malik', 'Khadija Siddique', 'Abdullah Rizwan',
@@ -312,70 +341,29 @@ const ViewAttendance = () => {
       const daysActive = Math.floor(Math.random() * (maxDaysActive + 1));
       const totalPossiblePrayers = days * 5;
       const attendedPrayers = Math.floor(Math.random() * (daysActive * 5 + 1));
-      const weekPercentage = Math.floor((attendedPrayers / totalPossiblePrayers) * 100);
+      const periodPercentage = Math.floor((attendedPrayers / totalPossiblePrayers) * 100);
       
-      const todayPrayers = Math.floor(Math.random() * 6);
-      const fajrCount = Math.floor(Math.random() * (Math.min(days, 7) + 1));
+      const yesterdayPrayers = {
+        fajr: Math.random() > 0.4,
+        dhuhr: Math.random() > 0.2,
+        asr: Math.random() > 0.2,
+        maghrib: Math.random() > 0.1,
+        isha: Math.random() > 0.2
+      };
+      
+      const fajrCount = Math.floor(Math.random() * (days + 1));
       
       return {
         id: i + 1,
         name: names[i % names.length] + (i >= names.length ? ` ${Math.floor(i / names.length) + 1}` : ''),
-        weekPercentage,
-        todayPrayers,
-        fajrThisWeek: fajrCount,
-        daysActive,
+        periodPercentage,
+        yesterdayPrayers,
+        fajrCount,
         totalDays: days,
-        trend: Math.random() > 0.5 ? 'up' : Math.random() > 0.5 ? 'down' : 'stable',
+        areaId: areaFilter ? parseInt(areaFilter) : Math.floor(Math.random() * 8) + 1,
         phone: `+94 ${70 + Math.floor(Math.random() * 9)} ${Math.floor(Math.random() * 900) + 100} ${Math.floor(Math.random() * 9000) + 1000}`
       };
-    }).sort((a, b) => b.weekPercentage - a.weekPercentage);
-  };
-
-  const generateDailyBreakdown = (days) => {
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const today = new Date();
-    
-    // For large time periods, show weekly aggregates instead of daily
-    if (days > 30) {
-      const weeks = Math.ceil(days / 7);
-      return Array.from({ length: weeks }, (_, i) => {
-        const weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - ((weeks - i) * 7));
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 6);
-        
-        const fajr = Math.floor(Math.random() * 25) + 55;
-        const dhuhr = Math.floor(Math.random() * 20) + 75;
-        const asr = Math.floor(Math.random() * 20) + 75;
-        const maghrib = Math.floor(Math.random() * 15) + 80;
-        const isha = Math.floor(Math.random() * 20) + 75;
-        
-        return {
-          day: `Week ${weeks - i}`,
-          date: `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
-          totalPercentage: Math.floor((fajr + dhuhr + asr + maghrib + isha) / 5),
-          fajr, dhuhr, asr, maghrib, isha
-        };
-      });
-    }
-    
-    return Array.from({ length: days }, (_, i) => {
-      const date = new Date(today);
-      date.setDate(date.getDate() - (days - 1 - i));
-      
-      const fajr = Math.floor(Math.random() * 25) + 55;
-      const dhuhr = Math.floor(Math.random() * 20) + 75;
-      const asr = Math.floor(Math.random() * 20) + 75;
-      const maghrib = Math.floor(Math.random() * 15) + 80;
-      const isha = Math.floor(Math.random() * 20) + 75;
-      
-      return {
-        day: dayNames[date.getDay()],
-        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        totalPercentage: Math.floor((fajr + dhuhr + asr + maghrib + isha) / 5),
-        fajr, dhuhr, asr, maghrib, isha
-      };
-    });
+    }).sort((a, b) => b.periodPercentage - a.periodPercentage);
   };
 
   const getColorClass = (percentage) => {
@@ -390,10 +378,29 @@ const ViewAttendance = () => {
     return 'bg-red-500';
   };
 
-  // Filter and paginate members
-  const filteredMembers = detailedData?.members.filter(member =>
+  // Download report handler
+  const handleDownloadReport = (member) => {
+    console.log('Downloading report for:', {
+      memberId: member.id,
+      memberName: member.name,
+      attendance: member.periodPercentage,
+      period: getPeriodLabel(),
+      yesterdayPrayers: member.yesterdayPrayers,
+      fajrCount: member.fajrCount,
+      totalDays: member.totalDays,
+      phone: member.phone
+    });
+  };
+
+  let filteredMembers = detailedData?.members.filter(member =>
     member.name.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
+
+  if (role === 'superadmin' && selectedArea !== 'all') {
+    filteredMembers = filteredMembers.filter(member => 
+      member.areaId === parseInt(selectedArea)
+    );
+  }
 
   const totalPages = Math.ceil(filteredMembers.length / itemsPerPage);
   const paginatedMembers = filteredMembers.slice(
@@ -417,76 +424,75 @@ const ViewAttendance = () => {
   return (
     <FounderLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
+        {/* Header with Role and Area Info */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Attendance Dashboard</h1>
               <div className="mt-2 flex items-center space-x-3">
-                {role === 'founder' && overviewData?.areaInfo && (
-                  <>
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-50 text-green-800 border border-green-200">
-                      <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      {overviewData.areaInfo.name}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      {overviewData.areaInfo.totalMembers} members
-                    </span>
-                  </>
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-800 border border-blue-200">
+                  {role === 'superadmin' ? '👑 SuperAdmin' : '📍 Area Founder'}
+                </span>
+                {overviewData?.areaInfo && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-50 text-green-800 border border-green-200">
+                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    {overviewData.areaInfo.name}
+                  </span>
                 )}
               </div>
             </div>
             
-            <div className="bg-gray-100 rounded-lg p-1 inline-flex">
-              <button
-                onClick={() => setRole('founder')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  role === 'founder'
-                    ? 'bg-white text-gray-900 shadow'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Founder View
-              </button>
-              <button
-                onClick={() => setRole('superadmin')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  role === 'superadmin'
-                    ? 'bg-white text-gray-900 shadow'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                SuperAdmin View
-              </button>
+            <div className="flex items-center space-x-3">
+              <div className="bg-white rounded-lg shadow-sm p-1 inline-flex border border-gray-200">
+                <button
+                  onClick={() => setView('overview')}
+                  className={`px-6 py-2 rounded-md text-sm font-medium transition-colors ${
+                    view === 'overview'
+                      ? 'bg-green-600 text-white'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Overview
+                </button>
+                <button
+                  onClick={() => setView('detailed')}
+                  className={`px-6 py-2 rounded-md text-sm font-medium transition-colors ${
+                    view === 'detailed'
+                      ? 'bg-green-600 text-white'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Detailed Analytics
+                </button>
+              </div>
+
+              <div className="bg-gray-100 rounded-lg p-1 inline-flex">
+                <button
+                  onClick={() => setRole('founder')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    role === 'founder'
+                      ? 'bg-white text-gray-900 shadow'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Founder
+                </button>
+                <button
+                  onClick={() => setRole('superadmin')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    role === 'superadmin'
+                      ? 'bg-white text-gray-900 shadow'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  SuperAdmin
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* View Toggle */}
-        <div className="mb-6 bg-white rounded-lg shadow-sm p-1 inline-flex border border-gray-200">
-          <button
-            onClick={() => setView('overview')}
-            className={`px-6 py-2 rounded-md text-sm font-medium transition-colors ${
-              view === 'overview'
-                ? 'bg-green-600 text-white'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Overview
-          </button>
-          <button
-            onClick={() => setView('detailed')}
-            className={`px-6 py-2 rounded-md text-sm font-medium transition-colors ${
-              view === 'detailed'
-                ? 'bg-green-600 text-white'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Detailed Analytics
-          </button>
         </div>
 
         {view === 'overview' ? (
@@ -495,19 +501,19 @@ const ViewAttendance = () => {
             <div className="space-y-6">
               {/* Quick Metrics */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Tooltip text={overviewData.prayerAttendanceRate.tooltip}>
+                <Tooltip text={overviewData.yesterdayAttendanceRate.tooltip}>
                   <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-help">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-medium text-gray-700">Prayer Attendance</h3>
+                      <h3 className="text-sm font-medium text-gray-700">Yesterday</h3>
                       <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
                     <div className="text-3xl font-bold text-gray-900 mb-1">
-                      {overviewData.prayerAttendanceRate.percentage}%
+                      {overviewData.yesterdayAttendanceRate.percentage}%
                     </div>
                     <p className="text-xs text-gray-500">
-                      {overviewData.prayerAttendanceRate.count}/{overviewData.prayerAttendanceRate.total} prayers today
+                      {overviewData.yesterdayAttendanceRate.count}/{overviewData.yesterdayAttendanceRate.total} prayers
                     </p>
                   </div>
                 </Tooltip>
@@ -515,7 +521,7 @@ const ViewAttendance = () => {
                 <Tooltip text={overviewData.topPerformingArea.tooltip}>
                   <div className="bg-white rounded-lg p-6 border border-green-200 shadow-sm hover:shadow-md transition-shadow cursor-help">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-medium text-green-900">Top Area (7 days)</h3>
+                      <h3 className="text-sm font-medium text-green-900">Top Area (7d)</h3>
                       <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                       </svg>
@@ -524,41 +530,41 @@ const ViewAttendance = () => {
                       {overviewData.topPerformingArea.name}
                     </div>
                     <p className="text-xs text-gray-600">
-                      {overviewData.topPerformingArea.percentage}% attendance
+                      {overviewData.topPerformingArea.percentage}% score
                     </p>
                   </div>
                 </Tooltip>
 
-                <Tooltip text={overviewData.consistencyScore.tooltip}>
+                <Tooltip text={overviewData.newMembers.tooltip}>
                   <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-help">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-medium text-gray-700">Consistency (7 days)</h3>
+                      <h3 className="text-sm font-medium text-gray-700">New Members (30d)</h3>
                       <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                       </svg>
                     </div>
                     <div className="text-3xl font-bold text-gray-900 mb-1">
-                      {overviewData.consistencyScore.percentage}%
+                      {overviewData.newMembers.count}
                     </div>
                     <p className="text-xs text-gray-500">
-                      {overviewData.consistencyScore.count}/{overviewData.consistencyScore.total} prayed 4+ days
+                      {Math.round((overviewData.newMembers.count / overviewData.newMembers.total) * 100)}% growth rate
                     </p>
                   </div>
                 </Tooltip>
 
-                <Tooltip text={overviewData.fajrChallengeRate.tooltip}>
+                <Tooltip text={overviewData.avgAttendanceRate.tooltip}>
                   <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-6 border-2 border-green-400 shadow-md hover:shadow-lg transition-shadow cursor-help">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-medium text-green-900">🌅 Fajr Today</h3>
+                      <h3 className="text-sm font-medium text-green-900">Avg Rate (7d)</h3>
                       <svg className="w-8 h-8 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
                     </div>
                     <div className="text-3xl font-bold text-green-900 mb-1">
-                      {overviewData.fajrChallengeRate.percentage}%
+                      {overviewData.avgAttendanceRate.percentage}%
                     </div>
                     <p className="text-xs text-green-800">
-                      {overviewData.fajrChallengeRate.count}/{overviewData.fajrChallengeRate.total} members
+                      Across all areas
                     </p>
                   </div>
                 </Tooltip>
@@ -567,12 +573,12 @@ const ViewAttendance = () => {
               {/* Prayer Breakdown */}
               <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-semibold text-gray-900">Prayer Time Breakdown</h2>
-                  <span className="text-xs text-gray-500">7d = last 7 days | 30d = last 30 days</span>
+                  <h2 className="text-lg font-semibold text-gray-900">Global Prayer Breakdown</h2>
+                  <span className="text-xs text-gray-500">Yesterday | 7d = last 7 days | 30d = last 30 days</span>
                 </div>
                 <div className="grid grid-cols-5 gap-4">
                   {Object.entries(overviewData.prayerBreakdown).map(([prayer, data]) => (
-                    <Tooltip key={prayer} text={`Today: ${data.todayPercent}% | 7d: ${data.weekPercent}% | 30d: ${data.monthPercent}%`}>
+                    <Tooltip key={prayer} text={`Yesterday: ${data.yesterdayPercent}% | 7d: ${data.weekPercent}% | 30d: ${data.monthPercent}%`}>
                       <div
                         className={`rounded-lg p-4 cursor-help transition-all hover:scale-105 ${
                           prayer === 'fajr'
@@ -589,8 +595,8 @@ const ViewAttendance = () => {
                           </div>
                           
                           <div className="mb-3">
-                            <div className="text-2xl font-bold text-gray-900">{data.todayPercent}%</div>
-                            <div className="text-xs text-gray-500">Today ({data.todayCount})</div>
+                            <div className="text-2xl font-bold text-gray-900">{data.yesterdayPercent}%</div>
+                            <div className="text-xs text-gray-500">Yesterday ({data.yesterdayCount})</div>
                           </div>
                           
                           <div className="space-y-2">
@@ -627,23 +633,63 @@ const ViewAttendance = () => {
                 </div>
               </div>
 
-              {/* Area Table */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              {/* Area Performance Table with Fixed Tooltips */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 relative">
                 <div className="p-6 border-b border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-900">Area Performance (Last 7 Days)</h2>
+                  <h2 className="text-lg font-semibold text-gray-900">Area Performance (Weighted Ranking)</h2>
+                  <p className="text-xs text-gray-500 mt-1">Ranked by weighted score: attendance consistency + Fajr rate</p>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto relative z-0">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">#</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Area</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Members</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Today</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">7 Days</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">30 Days</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">🌅 Fajr</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Trend</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">
+                          <div className="inline-flex items-center cursor-help group relative">
+                            Members
+                            <div className="hidden group-hover:block absolute z-[9999] px-3 py-2 text-xs text-white bg-gray-900 rounded-md shadow-xl -top-10 left-1/2 transform -translate-x-1/2 whitespace-nowrap pointer-events-none">
+                              Number of registered members
+                              <div className="absolute w-2 h-2 bg-gray-900 transform rotate-45 -bottom-1 left-1/2 -translate-x-1/2"></div>
+                            </div>
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">
+                          <div className="inline-flex items-center cursor-help group relative">
+                            🌅 Fajr (7d)
+                            <div className="hidden group-hover:block absolute z-[9999] px-3 py-2 text-xs text-white bg-gray-900 rounded-md shadow-xl -top-10 left-1/2 transform -translate-x-1/2 whitespace-nowrap pointer-events-none">
+                              🌅 Fajr attendance rate (last 7 days)
+                              <div className="absolute w-2 h-2 bg-gray-900 transform rotate-45 -bottom-1 left-1/2 -translate-x-1/2"></div>
+                            </div>
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">
+                          <div className="inline-flex items-center cursor-help group relative">
+                            Yesterday
+                            <div className="hidden group-hover:block absolute z-[9999] px-3 py-2 text-xs text-white bg-gray-900 rounded-md shadow-xl -top-10 left-1/2 transform -translate-x-1/2 whitespace-nowrap pointer-events-none">
+                              Overall attendance rate yesterday
+                              <div className="absolute w-2 h-2 bg-gray-900 transform rotate-45 -bottom-1 left-1/2 -translate-x-1/2"></div>
+                            </div>
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">
+                          <div className="inline-flex items-center cursor-help group relative">
+                            7 Days
+                            <div className="hidden group-hover:block absolute z-[9999] px-3 py-2 text-xs text-white bg-gray-900 rounded-md shadow-xl -top-10 left-1/2 transform -translate-x-1/2 whitespace-nowrap pointer-events-none">
+                              Overall attendance rate (last 7 days)
+                              <div className="absolute w-2 h-2 bg-gray-900 transform rotate-45 -bottom-1 left-1/2 -translate-x-1/2"></div>
+                            </div>
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">
+                          <div className="inline-flex items-center cursor-help group relative">
+                            30 Days
+                            <div className="hidden group-hover:block absolute z-[9999] px-3 py-2 text-xs text-white bg-gray-900 rounded-md shadow-xl -top-10 left-1/2 transform -translate-x-1/2 whitespace-nowrap pointer-events-none">
+                              Overall attendance rate (last 30 days)
+                              <div className="absolute w-2 h-2 bg-gray-900 transform rotate-45 -bottom-1 left-1/2 -translate-x-1/2"></div>
+                            </div>
+                          </div>
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -662,8 +708,13 @@ const ViewAttendance = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{area.name}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{area.members}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getColorClass(area.todayPercent)}`}>
-                              {area.todayPercent}%
+                            <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getColorClass(area.fajrPercent)}`}>
+                              {area.fajrPercent}%
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getColorClass(area.yesterdayPercent)}`}>
+                              {area.yesterdayPercent}%
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -676,16 +727,6 @@ const ViewAttendance = () => {
                               {area.monthPercent}%
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getColorClass(area.fajrPercent)}`}>
-                              {area.fajrPercent}%
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            {area.trend === 'up' && <span className="text-green-600 text-xl">↑</span>}
-                            {area.trend === 'down' && <span className="text-red-600 text-xl">↓</span>}
-                            {area.trend === 'stable' && <span className="text-gray-400 text-xl">→</span>}
-                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -697,19 +738,19 @@ const ViewAttendance = () => {
             /* ==================== FOUNDER OVERVIEW ==================== */
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Tooltip text={overviewData.todayAttendance.tooltip}>
+                <Tooltip text={overviewData.yesterdayAttendance.tooltip}>
                   <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-help">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-medium text-gray-700">Today's Attendance</h3>
+                      <h3 className="text-sm font-medium text-gray-700">Yesterday</h3>
                       <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
                     <div className="text-3xl font-bold text-gray-900 mb-1">
-                      {overviewData.todayAttendance.percentage}%
+                      {overviewData.yesterdayAttendance.percentage}%
                     </div>
                     <p className="text-xs text-gray-500">
-                      {overviewData.todayAttendance.count}/{overviewData.todayAttendance.total} prayers
+                      {overviewData.yesterdayAttendance.count}/{overviewData.yesterdayAttendance.total} prayers
                     </p>
                   </div>
                 </Tooltip>
@@ -717,7 +758,7 @@ const ViewAttendance = () => {
                 <Tooltip text={overviewData.areaRank.tooltip}>
                   <div className="bg-white rounded-lg p-6 border border-green-200 shadow-sm hover:shadow-md transition-shadow cursor-help">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-medium text-green-900">Rank (7 days)</h3>
+                      <h3 className="text-sm font-medium text-green-900">Area Rank (7d)</h3>
                       <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                       </svg>
@@ -726,45 +767,41 @@ const ViewAttendance = () => {
                       <span className="text-3xl font-bold text-gray-900">#{overviewData.areaRank.position}</span>
                       <span className="text-lg text-gray-600">/ {overviewData.areaRank.totalAreas}</span>
                     </div>
-                    <p className="text-xs text-gray-600 mt-1">{overviewData.areaRank.percentage}%</p>
+                    <p className="text-xs text-gray-600 mt-1">{overviewData.areaRank.percentage}% score</p>
                   </div>
                 </Tooltip>
 
-                <Tooltip text={overviewData.consistencyScore.tooltip}>
+                <Tooltip text={overviewData.newMembers.tooltip}>
                   <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-help">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-medium text-gray-700">Consistent (7d)</h3>
+                      <h3 className="text-sm font-medium text-gray-700">New Members (30d)</h3>
                       <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                       </svg>
                     </div>
-                    <div className="text-3xl font-bold text-gray-900 mb-2">
-                      {overviewData.consistencyScore.count}
+                    <div className="text-3xl font-bold text-gray-900 mb-1">
+                      {overviewData.newMembers.count}
                     </div>
-                    <div className="flex -space-x-2">
-                      {overviewData.consistencyScore.members.slice(0, 5).map((name, i) => (
-                        <div key={i} className="w-7 h-7 rounded-full bg-green-100 border-2 border-white flex items-center justify-center text-xs font-medium text-green-800">
-                          {name[0]}
-                        </div>
-                      ))}
-                    </div>
+                    <p className="text-xs text-gray-500">
+                      {Math.round((overviewData.newMembers.count / overviewData.newMembers.total) * 100)}% growth rate
+                    </p>
                   </div>
                 </Tooltip>
 
-                <Tooltip text={overviewData.needsOutreach.tooltip}>
-                  <div className="bg-white rounded-lg p-6 border border-red-200 shadow-sm hover:shadow-md transition-shadow cursor-help">
+                <Tooltip text={overviewData.weeklyAttendance.tooltip}>
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-6 border-2 border-green-400 shadow-md hover:shadow-lg transition-shadow cursor-help">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-medium text-red-900">Needs Outreach</h3>
-                      <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      <h3 className="text-sm font-medium text-green-900">Week Avg (7d)</h3>
+                      <svg className="w-8 h-8 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
                     </div>
-                    <div className="text-3xl font-bold text-gray-900 mb-2">
-                      {overviewData.needsOutreach.count}
+                    <div className="text-3xl font-bold text-green-900 mb-1">
+                      {overviewData.weeklyAttendance.percentage}%
                     </div>
-                    <button className="w-full px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-medium hover:bg-red-700 transition-colors">
-                      View Members
-                    </button>
+                    <p className="text-xs text-green-800">
+                      Last 7 days average
+                    </p>
                   </div>
                 </Tooltip>
               </div>
@@ -773,11 +810,11 @@ const ViewAttendance = () => {
               <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-lg font-semibold text-gray-900">Prayer Performance</h2>
-                  <span className="text-xs text-gray-500">7d = last 7 days | 30d = last 30 days</span>
+                  <span className="text-xs text-gray-500">Yesterday | 7d = last 7 days | 30d = last 30 days</span>
                 </div>
                 <div className="grid grid-cols-5 gap-4">
                   {Object.entries(overviewData.prayerBreakdown).map(([prayer, data]) => (
-                    <Tooltip key={prayer} text={`Today: ${data.todayPercent}% | 7d: ${data.weekPercent}% | 30d: ${data.monthPercent}%`}>
+                    <Tooltip key={prayer} text={`Yesterday: ${data.yesterdayPercent}% | 7d: ${data.weekPercent}% | 30d: ${data.monthPercent}%`}>
                       <div
                         className={`rounded-lg p-4 cursor-help transition-all hover:scale-105 ${
                           prayer === 'fajr'
@@ -794,8 +831,8 @@ const ViewAttendance = () => {
                           </div>
                           
                           <div className="mb-3">
-                            <div className="text-2xl font-bold text-gray-900">{data.todayPercent}%</div>
-                            <div className="text-xs text-gray-500">Today ({data.todayCount})</div>
+                            <div className="text-2xl font-bold text-gray-900">{data.yesterdayPercent}%</div>
+                            <div className="text-xs text-gray-500">Yesterday ({data.yesterdayCount})</div>
                           </div>
                           
                           <div className="space-y-2">
@@ -827,46 +864,55 @@ const ViewAttendance = () => {
             </div>
           )
         ) : (
-          /* ==================== DETAILED ANALYTICS WITH FILTERS & PAGINATION ==================== */
+          /* ==================== DETAILED ANALYTICS WITH DOWNLOAD ACTION ==================== */
           <div className="space-y-6">
-            {/* Time Period Filter */}
-            <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-gray-700">Time Period</h3>
-                <div className="flex space-x-2">
-                  {timePeriodOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => setTimePeriod(option.value)}
-                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                        timePeriod === option.value
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Member List with Pagination */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
               <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900">
-                      Member Attendance ({timePeriodOptions.find(o => o.value === timePeriod)?.label})
-                    </h2>
+                    <h2 className="text-lg font-semibold text-gray-900">Member Attendance</h2>
                     <p className="text-sm text-gray-500 mt-1">
-                      Showing {filteredMembers.length} members
+                      {filteredMembers.length} members found
                     </p>
                   </div>
+                  
+                  <div className="flex flex-col items-end space-y-2">
+                    <div className="flex space-x-2">
+                      {timePeriodOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => setTimePeriod(option.value)}
+                          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                            timePeriod === option.value
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                    
+                    {role === 'superadmin' && detailedData?.areas && (
+                      <select
+                        value={selectedArea}
+                        onChange={(e) => setSelectedArea(e.target.value)}
+                        className="px-3 py-1.5 border border-gray-300 rounded-md text-xs font-medium focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      >
+                        <option value="all">All Areas</option>
+                        {detailedData.areas.map((area) => (
+                          <option key={area.id} value={area.id}>
+                            {area.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                 </div>
+                
                 <input
                   type="text"
-                  placeholder="Search members..."
+                  placeholder="Search members by name..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
@@ -878,7 +924,9 @@ const ViewAttendance = () => {
                   <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                   </svg>
-                  <p className="mt-4 text-sm text-gray-600">No members found matching "{searchTerm}"</p>
+                  <p className="mt-4 text-sm text-gray-600">
+                    No members found {searchTerm && `matching "${searchTerm}"`}
+                  </p>
                 </div>
               ) : (
                 <>
@@ -888,16 +936,17 @@ const ViewAttendance = () => {
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Member</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">
-                            {timePeriod}d %
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Today</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">
-                            🌅 Fajr ({Math.min(parseInt(timePeriod), 7)}d)
+                            Attendance ({getPeriodLabel()})
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">
-                            Days Active
+                            Yesterday
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Trend</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">
+                            🌅 Fajr Count
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">
+                            Action
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -915,23 +964,26 @@ const ViewAttendance = () => {
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${getColorClass(member.weekPercentage)}`}>
-                                {member.weekPercentage}%
+                              <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${getColorClass(member.periodPercentage)}`}>
+                                {member.periodPercentage}%
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {member.todayPrayers}/5
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <PrayerDots prayers={member.yesterdayPrayers} />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {member.fajrThisWeek}/{Math.min(parseInt(timePeriod), 7)}
+                              {member.fajrCount}/{member.totalDays}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {member.daysActive}/{member.totalDays}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
-                              {member.trend === 'up' && <span className="text-green-600 text-xl">↑</span>}
-                              {member.trend === 'down' && <span className="text-red-600 text-xl">↓</span>}
-                              {member.trend === 'stable' && <span className="text-gray-400 text-xl">→</span>}
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <button
+                                onClick={() => handleDownloadReport(member)}
+                                className="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-md transition-colors"
+                              >
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Report
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -939,7 +991,6 @@ const ViewAttendance = () => {
                     </table>
                   </div>
 
-                  {/* Pagination */}
                   {totalPages > 1 && (
                     <Pagination
                       currentPage={currentPage}
@@ -950,57 +1001,6 @@ const ViewAttendance = () => {
                     />
                   )}
                 </>
-              )}
-            </div>
-
-            {/* Daily/Weekly Breakdown */}
-            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">
-                {parseInt(timePeriod) > 30 ? 'Weekly' : 'Daily'} Prayer Breakdown
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="min-w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">
-                        {parseInt(timePeriod) > 30 ? 'Week' : 'Day'}
-                      </th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Total %</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">🌅 Fajr</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Dhuhr</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Asr</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Maghrib</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Isha</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detailedData.dailyBreakdown.slice(0, 10).map((day, index) => (
-                      <tr key={index} className="border-b last:border-0 hover:bg-gray-50">
-                        <td className="py-3 px-4">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{day.day}</div>
-                            <div className="text-xs text-gray-500">{day.date}</div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className={`inline-flex px-2 py-1 rounded text-sm font-medium ${getColorClass(day.totalPercentage)}`}>
-                            {day.totalPercentage}%
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-sm text-gray-700">{day.fajr}%</td>
-                        <td className="py-3 px-4 text-sm text-gray-700">{day.dhuhr}%</td>
-                        <td className="py-3 px-4 text-sm text-gray-700">{day.asr}%</td>
-                        <td className="py-3 px-4 text-sm text-gray-700">{day.maghrib}%</td>
-                        <td className="py-3 px-4 text-sm text-gray-700">{day.isha}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {detailedData.dailyBreakdown.length > 10 && (
-                <p className="text-xs text-gray-500 text-center mt-4">
-                  Showing first 10 of {detailedData.dailyBreakdown.length} {parseInt(timePeriod) > 30 ? 'weeks' : 'days'}
-                </p>
               )}
             </div>
           </div>
