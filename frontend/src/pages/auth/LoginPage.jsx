@@ -83,15 +83,15 @@ const LoginPage = () => {
           setMaskedEmail(response.data.email);
           setError("");
 
-        //   // In development, show the test OTP
-        //   if (response.data.testOtp) {
-        //     setTestOtp(response.data.testOtp);
-        //     console.log("🧪 Test OTP:", response.data.testOtp);
-        //   }
-        // } else {
-        //   // Complete login with comprehensive user data
-        //   localStorage.setItem("token", response.data.token);
-        //   localStorage.setItem("user", JSON.stringify(response.data.user));
+          // In development, show the test OTP
+          if (response.data.testOtp) {
+            setTestOtp(response.data.testOtp);
+            // console.log("🧪 Test OTP:", response.data.testOtp);
+          }
+        } else {
+          // Complete login with comprehensive user data
+          localStorage.setItem("token", response.data.token);
+          localStorage.setItem("user", JSON.stringify(response.data.user));
 
           // Pass refresh token to login function
           login(
