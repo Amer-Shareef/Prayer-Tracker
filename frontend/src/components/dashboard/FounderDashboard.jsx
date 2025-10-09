@@ -478,7 +478,7 @@ const FounderDashboard = () => {
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Recent Feeds</h2>
               <Link
-                to="/founder/post-feeds"
+                to="/founder/reminder"
                 className="text-green-600 hover:text-green-800 text-sm font-medium"
               >
                 Manage All
@@ -529,63 +529,134 @@ const FounderDashboard = () => {
                 </Link>
               </div>
             ) : (
-              <div className="space-y-4">
-                {feeds.map((feed) => (
-                  <div
-                    key={feed.id}
-                    className="border-l-4 border-green-500 pl-4 py-2 flex justify-between"
-                  >
-                    <div>
-                      <h3 className="font-bold">{feed.title}</h3>
-                      <p className="text-sm text-gray-600 line-clamp-1 mb-1">
-                        {feed.content}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {new Date(feed.created_at).toLocaleDateString()}
-                      </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {feeds.map((feed) => {
+                  // Helper function to extract YouTube thumbnail
+                  const getYouTubeThumbnail = (url) => {
+                    const regex =
+                      /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+                    const match = url.match(regex);
+                    if (match) {
+                      return `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`;
+                    }
+                    return "";
+                  };
+
+                  return (
+                    <div
+                      key={feed.id}
+                      className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex gap-4">
+                        {/* Media Preview */}
+                        {feed.video_url ? (
+                          <a
+                            href={feed.video_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-shrink-0 group"
+                            title="Watch video"
+                          >
+                            <img
+                              src={getYouTubeThumbnail(feed.video_url)}
+                              alt="Video thumbnail"
+                              className="w-32 h-20 object-cover rounded-lg border-[3px] border-red-500 group-hover:border-red-600 transition-all shadow-sm"
+                            />
+                          </a>
+                        ) : feed.image_url ? (
+                          <div className="flex-shrink-0">
+                            <img
+                              src={feed.image_url}
+                              alt="Feed image"
+                              className="w-32 h-20 object-cover rounded-lg border-2 border-gray-200 shadow-sm"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-32 h-20 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <svg
+                              className="w-8 h-8 text-gray-400"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
+                            </svg>
+                          </div>
+                        )}
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-gray-900 mb-1 line-clamp-1">
+                            {feed.title}
+                          </h3>
+                          <p className="text-sm text-gray-600 line-clamp-2 mb-2">
+                            {feed.content}
+                          </p>
+                          <div className="flex items-center gap-4 text-xs text-gray-500">
+                            <span className="flex items-center gap-1">
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                />
+                              </svg>
+                              {new Date(feed.created_at).toLocaleDateString(
+                                "en-US",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                }
+                              )}
+                            </span>
+                            {feed.video_url && (
+                              <span className="flex items-center gap-1 text-red-600">
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path d="M8 5v14l11-7z" />
+                                </svg>
+                                Video
+                              </span>
+                            )}
+                            {feed.image_url && !feed.video_url && (
+                              <span className="flex items-center gap-1 text-blue-600">
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                  />
+                                </svg>
+                                Image
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-start space-x-2">
-                      <button
-                        className="text-gray-400 hover:text-gray-600"
-                        onClick={() => handleDeleteFeed(feed.id)}
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={3}
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                          />
-                        </svg>
-                      </button>
-                      <Link
-                        to={`/founder/post-feeds?edit=${feed.id}`}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                          />
-                        </svg>
-                      </Link>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
