@@ -316,13 +316,9 @@ const FounderLayout = ({ children }) => {
                       ? "Working Committee"
                       : user?.role || "User"}
                   </h1>
-                  <p className="text-xs text-green-100">
-                    {user?.role === "SuperAdmin"
-                      ? "System-wide Access"
-                      : user?.role === "Founder" && user?.areaId
-                      ? `Area: ${user.areaName || user.areaId}`
-                      : user?.areaId
-                      ? `Area: ${user.areaName || user.areaId}`
+                  <p className="text-xs font-semibold text-green-100">
+                    {user?.areaId
+                      ? `${user.areaName || user.areaId}`
                       : "No Area Assigned"}
                   </p>
                 </div>
