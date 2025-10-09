@@ -32,14 +32,9 @@ const corsOptions = {
   origin: getAllowedOrigins(),
   credentials: true,
   optionsSuccessStatus: 200,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Ensure all methods are allowed
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "x-uploadthing-package",
-    "traceparent", // Required by UploadThing for distributed tracing
-    "tracestate", // Optional but related to traceparent
-  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"], // Ensure all methods are allowed
+  allowedHeaders: "*", // Allow all headers - needed for UploadThing's dynamic headers
+  exposedHeaders: ["*"], // Expose all response headers
 };
 
 app.use(cors(corsOptions));
@@ -63,10 +58,10 @@ app.use((req, res, next) => {
 // UploadThing route handler - MUST be before other routes
 const uploadthingHandler = createRouteHandler({
   router: uploadRouter,
-  config: {
-    uploadthingSecret: process.env.UPLOADTHING_SECRET,
-    uploadthingId: process.env.UPLOADTHING_APP_ID,
-  },
+  // config: {
+  //   uploadthingSecret: process.env.UPLOADTHING_SECRET,
+  //   uploadthingId: process.env.UPLOADTHING_APP_ID,
+  // },
 });
 
 app.use("/api/uploadthing", uploadthingHandler);

@@ -37,6 +37,8 @@ const PostFeeds = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [videoThumbnail, setVideoThumbnail] = useState("");
   const [selectedImageFile, setSelectedImageFile] = useState(null);
+  const [imageUploadError, setImageUploadError] = useState("");
+  const [videoUrlError, setVideoUrlError] = useState("");
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -102,12 +104,21 @@ const PostFeeds = () => {
     }
   }, [user]);
 
+  // Helper function to validate YouTube URL
+  const isValidYouTubeUrl = (url) => {
+    if (!url || !url.trim()) return true; // Empty URL is valid (optional field)
+    
+    const youtubeRegex =
+      /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})(\S*)?$/;
+    return youtubeRegex.test(url);
+  };
+
   // Helper function to extract YouTube video ID and generate thumbnail
   const getYouTubeThumbnail = (url) => {
     const regex =
       /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
     const match = url.match(regex);
-    if (match) {
+    if (match && match[1]) {
       return `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`;
     }
     return "";
@@ -137,6 +148,15 @@ const PostFeeds = () => {
   const handleImageFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Check file size (5MB = 5 * 1024 * 1024 bytes)
+      const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+      if (file.size > maxSize) {
+        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        setImageUploadError(`Image file is too large (${fileSizeMB}MB). Maximum allowed size is 5MB.`);
+        e.target.value = ""; // Clear the file input
+        return;
+      }
+
       // Show alert if video URL exists
       if (formData.video_url.trim()) {
         const confirmed = window.confirm(
@@ -147,6 +167,9 @@ const PostFeeds = () => {
           return;
         }
       }
+
+      // Clear any previous errors
+      setImageUploadError("");
 
       // Clear video data
       clearVideoData();
@@ -262,23 +285,39 @@ const PostFeeds = () => {
     const { name, value, type, checked } = e.target;
 
     if (name === "video_url") {
-      // Show alert if image is selected
-      if (value.trim() && (uploadedImageUrl || selectedImageFile)) {
-        const confirmed = window.confirm(
-          "You have an image selected. Entering a video URL will remove the selected image. Do you want to continue?"
-        );
-        if (!confirmed) {
-          return;
-        }
-      }
-
-      // Clear image data when video URL is entered
+      // Validate YouTube URL
       if (value.trim()) {
-        clearImageData();
-        // Generate YouTube thumbnail
-        const thumbnail = getYouTubeThumbnail(value);
-        setVideoThumbnail(thumbnail);
+        if (!isValidYouTubeUrl(value)) {
+          setVideoUrlError(
+            "Invalid YouTube URL. Please enter a valid YouTube video link (e.g., https://www.youtube.com/watch?v=... or https://youtu.be/...)"
+          );
+          setVideoThumbnail("");
+        } else {
+          setVideoUrlError("");
+          
+          // Show alert if image is selected
+          if (uploadedImageUrl || selectedImageFile) {
+            const confirmed = window.confirm(
+              "You have an image selected. Entering a video URL will remove the selected image. Do you want to continue?"
+            );
+            if (!confirmed) {
+              return;
+            }
+          }
+
+          // Clear image data when video URL is entered
+          clearImageData();
+          
+          // Generate YouTube thumbnail
+          const thumbnail = getYouTubeThumbnail(value);
+          if (thumbnail) {
+            setVideoThumbnail(thumbnail);
+          } else {
+            setVideoUrlError("Could not generate video thumbnail. Please check the YouTube URL.");
+          }
+        }
       } else {
+        setVideoUrlError("");
         setVideoThumbnail("");
       }
     }
@@ -292,6 +331,7 @@ const PostFeeds = () => {
   // Remove uploaded image
   const removeUploadedImage = () => {
     clearImageData();
+    setImageUploadError(""); // Clear image upload error
     // Clear the file input if it exists
     const fileInput = document.getElementById("imageFileInput");
     if (fileInput) {
@@ -561,6 +601,8 @@ const PostFeeds = () => {
               setSelectedFile(null);
               setSelectedImageFile(null);
               setVideoThumbnail("");
+              setImageUploadError("");
+              setVideoUrlError("");
               const fileInput = document.getElementById("imageFileInput");
               if (fileInput) {
                 fileInput.value = "";
@@ -878,6 +920,8 @@ const PostFeeds = () => {
                   onClick={() => {
                     setShowModal(false);
                     setIsEditing(false);
+                    setImageUploadError("");
+                    setVideoUrlError("");
                     if (editId) {
                       navigate("/founder/reminder");
                     }
@@ -1040,8 +1084,32 @@ const PostFeeds = () => {
 
                     <p className="text-sm text-gray-500 mt-2">
                       Select an image to preview. It will be uploaded when you
-                      publish the feed.
+                      publish the feed. Maximum file size: 5MB.
                     </p>
+
+                    {/* Image Upload Error */}
+                    {imageUploadError && (
+                      <div className="mt-3 bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded">
+                        <div className="flex items-start">
+                          <div className="flex-shrink-0">
+                            <svg
+                              className="h-5 w-5 text-red-500"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium">{imageUploadError}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Video URL */}
@@ -1081,13 +1149,39 @@ const PostFeeds = () => {
                         name="video_url"
                         value={formData.video_url}
                         onChange={handleInputChange}
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        className={`flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                          videoUrlError ? "border-red-500" : "border-gray-300"
+                        }`}
                         placeholder="https://www.youtube.com/watch?v=..."
                       />
                     </div>
                     <p className="text-sm text-gray-500 mt-1">
-                      Add a YouTube or video URL to embed with your feed.
+                      Add a YouTube video URL to embed with your feed.
                     </p>
+
+                    {/* Video URL Error */}
+                    {videoUrlError && (
+                      <div className="mt-3 bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded">
+                        <div className="flex items-start">
+                          <div className="flex-shrink-0">
+                            <svg
+                              className="h-5 w-5 text-red-500"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium">{videoUrlError}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Submit Button */}
@@ -1097,6 +1191,8 @@ const PostFeeds = () => {
                       onClick={() => {
                         setShowModal(false);
                         setIsEditing(false);
+                        setImageUploadError("");
+                        setVideoUrlError("");
                         if (editId) {
                           navigate("/founder/reminder");
                         }
