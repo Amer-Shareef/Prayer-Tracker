@@ -32,10 +32,10 @@ const FounderLayout = ({ children }) => {
 
   // Create base menu items - organized by priority for organizers
   const baseMenuItems = [
-    // 1. Dashboard - Overview and quick access (highest priority)
+    // 1. View Attendance - Overview and quick access (highest priority)
     {
-      path: "/founder/dashboard",
-      label: "Dashboard",
+      path: "/founder/view-attendance",
+      label: "Member Attendance",
       bgColor: "bg-green-50", // Light green background for better integration
       hoverColor: "hover:bg-green-100",
       textColor: "text-gray-800",
@@ -43,10 +43,16 @@ const FounderLayout = ({ children }) => {
         <svg
           xmlns="http://www.w3.org/2000/svg"
           className="h-6 w-6"
-          fill="currentColor"
-          viewBox="0 0 130 125"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
         >
-          <path d="M12.01 111.6a1.794 1.794 0 0 0 1.794 1.794h100.388a1.794 1.794 0 0 0 1.794-1.794V51.926a.852.852 0 0 0 0-.66V37.245a1.711 1.711 0 0 0 .067-.33 12.7 12.7 0 0 0-10.9-12.553V16.4a1.794 1.794 0 0 0-3.588 0v7.961a12.7 12.7 0 0 0-10.9 12.554 1.7 1.7 0 0 0 .067.33v20.582a30.3 30.3 0 0 0-24.9-15.919V34a1.794 1.794 0 0 0-3.588 0v7.91a30.294 30.294 0 0 0-24.973 16.055v-6.039a.852.852 0 0 0 0-.66V37.245a1.7 1.7 0 0 0 .067-.33 12.7 12.7 0 0 0-10.9-12.553V16.4a1.794 1.794 0 1 0-3.588 0v7.961a12.7 12.7 0 0 0-10.9 12.553 1.7 1.7 0 0 0 .063.313zm21.673-61.8H15.6V38.709h18.083zM15.6 53.389h18.083v56.416H15.6zm75.127 56.416H75.171V95.034a11.173 11.173 0 1 0-22.346 0v14.771H37.271V73.894h53.455zm-19.143 0h-15.17V95.034a7.585 7.585 0 1 1 15.169 0zm22.731-71.1H112.4V49.8H94.314zm9.044-10.9a9.12 9.12 0 0 1 8.926 7.313H94.429a9.123 9.123 0 0 1 8.929-7.31zm-9.045 25.584H112.4v56.416H94.314zm-30.282-7.984a26.708 26.708 0 0 1 26.6 24.9H37.428a26.708 26.708 0 0 1 26.604-24.9zm-39.389-17.6a9.12 9.12 0 0 1 8.926 7.313H15.716a9.12 9.12 0 0 1 8.926-7.31z" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+          />
         </svg>
       ),
     },
@@ -378,16 +384,9 @@ const FounderLayout = ({ children }) => {
                 } transition-all duration-200 group relative
                 ${
                   location.pathname === item.path
-                    ? "text-white"
-                    : item.textColor
-                } ${
-                  item.hoverColor
-                } shadow-sm hover:shadow-md transform hover:scale-102
-                ${
-                  location.pathname === item.path
-                    ? `bg-green-600 shadow-lg scale-102 ring-2 ring-green-300 ring-opacity-60`
-                    : item.bgColor
-                }
+                    ? "text-white bg-green-600 shadow-lg scale-102 ring-2 ring-green-300 ring-opacity-60 hover:bg-green-700 hover:ring-green-400"
+                    : `${item.textColor} ${item.bgColor} ${item.hoverColor} shadow-sm`
+                } hover:shadow-md transform hover:scale-102
               `}
                 title={!sidebarOpen ? item.label : ""}
               >
