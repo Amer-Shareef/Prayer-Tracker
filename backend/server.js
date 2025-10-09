@@ -88,6 +88,7 @@ const wakeUpCallRoutes = require("./routes/wakeUpCallRoutes"); // Add this line
 const meetingRoutes = require("./routes/meetingRoutes");
 const smartMeetingsRoutes = require("./routes/smartMeetingsRoutes");
 const areaRoutes = require("./routes/areaRoutes");
+const statRoutes = require("./routes/statRoutes");
 
 // // Import the weekly meeting scheduler
 // const WeeklyMeetingScheduler = require("./jobs/weeklyMeetingScheduler");
@@ -110,6 +111,7 @@ app.use("/api", wakeUpCallRoutes);
 // app.use("/api", weeklyMeetingsRoutes);
 app.use("/api", smartMeetingsRoutes);
 app.use("/api", areaRoutes);
+app.use("/api", statRoutes);
 
 // Enhanced health endpoint
 app.get("/api/health", async (req, res) => {
