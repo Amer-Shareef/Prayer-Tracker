@@ -426,7 +426,12 @@ const AreaPage = () => {
                   {currentAreas.map((area) => (
                     <React.Fragment key={area.area_id || area.id}>
                       {/* Main Area Row */}
-                      <tr className="hover:bg-green-50 transition-colors duration-150 ease-in-out">
+                      <tr
+                        className="hover:bg-green-50 transition-colors duration-150 ease-in-out cursor-pointer"
+                        onClick={() =>
+                          toggleAreaExpansion(area.area_id || area.id)
+                        }
+                      >
                         <td className="px-6 py-4">
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
@@ -495,7 +500,10 @@ const AreaPage = () => {
                         <td className="px-6 py-4 text-sm font-medium">
                           <div className="flex items-center space-x-3">
                             <button
-                              onClick={() => handleEdit(area)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(area);
+                              }}
                               className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
                             >
                               <svg
@@ -514,7 +522,10 @@ const AreaPage = () => {
                               Edit
                             </button>
                             <button
-                              onClick={() => handleDelete(area)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(area);
+                              }}
                               className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
                             >
                               <svg
@@ -536,9 +547,10 @@ const AreaPage = () => {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <button
-                            onClick={() =>
-                              toggleAreaExpansion(area.area_id || area.id)
-                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleAreaExpansion(area.area_id || area.id);
+                            }}
                             className="inline-flex items-center justify-center h-8 w-8 rounded-full text-gray-400 hover:text-green-600 hover:bg-green-100 transition-all duration-200"
                             style={{
                               transform: expandedAreas.has(

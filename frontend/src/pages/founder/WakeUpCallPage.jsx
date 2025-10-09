@@ -252,13 +252,6 @@ const WakeUpCallPage = () => {
               Track automatic wake-up call responses from members
             </p>
           </div>
-          <button
-            onClick={fetchWakeUpCalls}
-            disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading ? "Loading..." : "Refresh"}
-          </button>
         </div>
 
         {/* Error Message */}
