@@ -10,38 +10,36 @@ const uploadRouter = {
        * For full list of options and defaults, see the File Route API reference
        * @see https://docs.uploadthing.com/file-routes#route-config
        */
-      maxFileSize: "4MB",
+      maxFileSize: "5MB",
       maxFileCount: 1,
     },
   })
-    .middleware(async ({ req }) => {
-      // This code runs on your server before upload
-      console.log("🔐 UploadThing middleware - checking authorization");
-      
+    .middleware(async ({ req, res }) => {
+      console.log("📋 Request headers:", req.headers);
+
       // You can add authentication here if needed
       // For now, we'll allow uploads but you can add JWT validation
-      
+
       return { userId: "anonymous" }; // Return any data you want to use in onUploadComplete
     })
     .onUploadComplete(async ({ metadata, file }) => {
-      console.log("📁 Upload completed", {
-        userId: metadata.userId,
-        file: {
-          name: file.name,
-          size: file.size,
-          url: file.url,
-          key: file.key,
-        },
+      console.log("📁 Upload completed successfully!");
+      console.log("📋 Metadata:", metadata);
+      console.log("📋 File info:", {
+        name: file.name,
+        size: file.size,
+        url: file.url,
+        key: file.key,
       });
-      
+
       // This code RUNS ON YOUR SERVER after upload
       // Return anything you want to the client
-      return { 
+      return {
         uploadedBy: metadata.userId,
         url: file.url,
         name: file.name,
         size: file.size,
-        key: file.key
+        key: file.key,
       };
     }),
 };

@@ -30,7 +30,7 @@ const ProtectedRoute = ({ children, role, roles }) => {
       // Redirect to appropriate dashboard based on user's actual role
       if (userRoleForUI === "Member") {
         return <Navigate to="/member/dashboard" replace />;
-      } else if (userRoleForUI === "Founder" || user.role === "SuperAdmin") {
+      } else if (userRoleForUI === "Founder" || userRoleForUI === "SuperAdmin" || userRoleForUI === "WCM") {
         return <Navigate to="/founder/dashboard" replace />;
       } else {
         return <Navigate to="/login" replace />;

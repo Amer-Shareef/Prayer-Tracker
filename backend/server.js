@@ -17,7 +17,12 @@ const getAllowedOrigins = () => {
     ? process.env.CORS_ORIGINS.split(",")
         .map((o) => o.trim())
         .filter(Boolean)
-    : ["http://13.60.193.171:3000", "http://13.60.193.171:5000"];
+    : [
+        "http://13.60.193.171:3000",
+        "http://13.60.193.171:5000",
+        "http://localhost:3000", // Add localhost for development
+        "http://localhost:5000",
+      ];
 
   console.log("🌐 Allowed CORS origins:", origins);
   return origins;
@@ -27,6 +32,9 @@ const corsOptions = {
   origin: getAllowedOrigins(),
   credentials: true,
   optionsSuccessStatus: 200,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"], // Ensure all methods are allowed
+  allowedHeaders: "*", // Allow all headers - needed for UploadThing's dynamic headers
+  exposedHeaders: ["*"], // Expose all response headers
 };
 
 app.use(cors(corsOptions));
@@ -47,13 +55,16 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(
-  "/api/uploadthing",
-  createRouteHandler({
-    router: uploadRouter,
-    config: { env: { UPLOADTHING_TOKEN: process.env.UPLOADTHING_TOKEN } },
-  })
-);
+// UploadThing route handler - MUST be before other routes
+const uploadthingHandler = createRouteHandler({
+  router: uploadRouter,
+  // config: {
+  //   uploadthingSecret: process.env.UPLOADTHING_SECRET,
+  //   uploadthingId: process.env.UPLOADTHING_APP_ID,
+  // },
+});
+
+app.use("/api/uploadthing", uploadthingHandler);
 
 // Import database config
 const { testConnection } = require("./config/database");
@@ -72,6 +83,7 @@ const wakeUpCallRoutes = require("./routes/wakeUpCallRoutes"); // Add this line
 const meetingRoutes = require("./routes/meetingRoutes");
 const smartMeetingsRoutes = require("./routes/smartMeetingsRoutes");
 const areaRoutes = require("./routes/areaRoutes");
+const statRoutes = require("./routes/statRoutes");
 
 // // Import the weekly meeting scheduler
 // const WeeklyMeetingScheduler = require("./jobs/weeklyMeetingScheduler");
@@ -94,6 +106,7 @@ app.use("/api", wakeUpCallRoutes);
 // app.use("/api", weeklyMeetingsRoutes);
 app.use("/api", smartMeetingsRoutes);
 app.use("/api", areaRoutes);
+app.use("/api", statRoutes);
 
 // Enhanced health endpoint
 app.get("/api/health", async (req, res) => {

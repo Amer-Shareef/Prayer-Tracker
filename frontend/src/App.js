@@ -1,4 +1,3 @@
-import React from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -6,10 +5,12 @@ import {
   Navigate,
 } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import ProtectedRoute from "./utils/ProtectedRoute";
+
+// Auth Pages
 import LoginPage from "./pages/auth/LoginPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
-import ProtectedRoute from "./utils/ProtectedRoute";
 
 // Member Pages
 import Dashboard from "./pages/member/Dashboard";
@@ -19,40 +20,23 @@ import MyStats from "./pages/member/MyStats";
 import Profile from "./pages/member/Profile";
 import RequestPickup from "./pages/member/RequestPickup";
 import DailyActivities from "./pages/member/DailyActivities";
-import ChangePassword from "./pages/member/ChangePassword"; // NEW IMPORT
+import ChangePassword from "./pages/member/ChangePassword";
 
 // Founder Pages
 import FounderDashboard from "./components/dashboard/FounderDashboard";
-import ApprovePickup from "./pages/founder/ApprovePickup";
-import PostFeeds from "./pages/founder/PostFeeds";
-import ViewAttendance from "./pages/founder/ViewAttendance";
-import ManageMembers from "./pages/founder/ManageMembers";
-import SendReminder from "./pages/founder/SendReminder";
 import AddMember from "./pages/founder/AddMember";
-import ReminderPage from "./pages/founder/ReminderPage";
-import MeetingsPage from "./pages/founder/MeetingsPage";
-import WakeUpCallPage from "./pages/founder/WakeUpCallPage";
-import TransportPage from "./pages/founder/TransportPage";
-import MosqueWorkPage from "./pages/founder/MosqueWorkPage";
-import KnowledgeProgramPage from "./pages/founder/KnowledgeProgramPage";
-import ScheduleMeeting from "./pages/founder/ScheduleMeeting";
+import ApprovePickup from "./pages/founder/ApprovePickup";
 import AreaPage from "./pages/founder/AreaPage";
-
-// SuperAdmin Pages
-import SuperAdminDashboard from "./components/dashboard/SuperAdminDashboard";
-import SuperAdminDashboardComplete from "./components/dashboard/SuperAdminDashboardComplete";
-import AssignFounder from "./pages/superadmin/AssignFounder";
-import PromoteUser from "./pages/superadmin/PromoteUser";
-import ViewAreas from "./pages/superadmin/ViewAreas";
-import SuperAdminManageMembers from "./pages/superadmin/SuperAdminManageMembers";
-import SuperAdminPostFeeds from "./pages/superadmin/SuperAdminPostFeeds";
-import SuperAdminViewAttendance from "./pages/superadmin/SuperAdminViewAttendance";
-import SuperAdminTransportPage from "./pages/superadmin/SuperAdminTransportPage";
-import SuperAdminReminderPage from "./pages/superadmin/SuperAdminReminderPage";
-import SuperAdminMeetingsPage from "./pages/superadmin/SuperAdminMeetingsPage";
-import SuperAdminWakeUpCallPage from "./pages/superadmin/SuperAdminWakeUpCallPage";
-import SuperAdminKnowledgeProgramPage from "./pages/superadmin/SuperAdminKnowledgeProgramPage";
-
+import KnowledgeProgramPage from "./pages/founder/KnowledgeProgramPage";
+import ManageMembers from "./pages/founder/ManageMembers";
+import MeetingsPage from "./pages/founder/MeetingsPage";
+import MosqueWorkPage from "./pages/founder/MosqueWorkPage";
+import ReminderPage from "./pages/founder/ReminderPage";
+import ScheduleMeeting from "./pages/founder/ScheduleMeeting";
+import SendReminder from "./pages/founder/SendReminder";
+import TransportPage from "./pages/founder/TransportPage";
+import ViewAttendance from "./pages/founder/ViewAttendance";
+import WakeUpCallPage from "./pages/founder/WakeUpCallPage";
 
 function App() {
   return (
@@ -60,10 +44,11 @@ function App() {
       <AuthProvider>
         <Routes>
           {/* Public Routes */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/" element={<Navigate to="/login" replace />} />
+
           {/* Member Routes */}
           <Route
             path="/member"
@@ -136,12 +121,13 @@ function App() {
                 <ChangePassword />
               </ProtectedRoute>
             }
-          />{" "}
+          />
+
           {/* Founder Routes */}
           <Route
             path="/founder"
             element={
-              <ProtectedRoute roles={["Founder", "Admin"]}>
+              <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
                 <Navigate to="/founder/dashboard" replace />
               </ProtectedRoute>
             }
@@ -149,112 +135,24 @@ function App() {
           <Route
             path="/founder/dashboard"
             element={
-              <ProtectedRoute roles={["Founder", "Admin"]}>
+              <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
                 <FounderDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/founder/approve-pickup"
-            element={
-              <ProtectedRoute roles={["Founder", "Admin"]}>
-                <ApprovePickup />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/founder/schedule-meeting"
-            element={
-              <ProtectedRoute roles={["Founder", "Admin"]}>
-                <ScheduleMeeting />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/founder/post-feeds"
-            element={
-              <ProtectedRoute roles={["Founder", "Admin"]}>
-                <PostFeeds />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/founder/view-attendance"
-            element={
-              <ProtectedRoute roles={["Founder", "Admin"]}>
-                <ViewAttendance />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/founder/manage-members"
-            element={
-              <ProtectedRoute roles={["Founder", "Admin"]}>
-                <ManageMembers />
               </ProtectedRoute>
             }
           />
           <Route
             path="/founder/add-member"
             element={
-              <ProtectedRoute roles={["Founder", "Admin"]}>
+              <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
                 <AddMember />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/founder/send-reminder"
+            path="/founder/approve-pickup"
             element={
-              <ProtectedRoute roles={["Founder", "Admin"]}>
-                <SendReminder />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/founder/reminder"
-            element={
-              <ProtectedRoute roles={["Founder", "Admin"]}>
-                <ReminderPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/founder/meetings"
-            element={
-              <ProtectedRoute roles={["Founder", "Admin"]}>
-                <MeetingsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/founder/wake-up-call"
-            element={
-              <ProtectedRoute roles={["Founder", "Admin"]}>
-                <WakeUpCallPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/founder/transport"
-            element={
-              <ProtectedRoute roles={["Founder", "Admin"]}>
-                <TransportPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/founder/mosque-work"
-            element={
-              <ProtectedRoute roles={["Founder", "Admin"]}>
-                <MosqueWorkPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/founder/knowledge-program"
-            element={
-              <ProtectedRoute roles={["Founder", "Admin"]}>
-                <KnowledgeProgramPage />
+              <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
+                <ApprovePickup />
               </ProtectedRoute>
             }
           />
@@ -266,112 +164,94 @@ function App() {
               </ProtectedRoute>
             }
           />
-          {/* SuperAdmin Routes - Use "SuperAdmin" to match database */}
           <Route
-            path="/superadmin"
+            path="/founder/knowledge-program"
             element={
-              <ProtectedRoute role="SuperAdmin">
-                <Navigate to="/superadmin/dashboard" replace />
-              </ProtectedRoute>
-            }
-          />{" "}
-          <Route
-            path="/superadmin/dashboard"
-            element={
-              <ProtectedRoute role="SuperAdmin">
-                <SuperAdminDashboardComplete />
+              <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
+                <KnowledgeProgramPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/superadmin/assign-founder"
+            path="/founder/manage-members"
             element={
-              <ProtectedRoute role="SuperAdmin">
-                <AssignFounder />
+              <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
+                <ManageMembers />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/superadmin/promote-user"
+            path="/founder/meetings"
             element={
-              <ProtectedRoute role="SuperAdmin">
-                <PromoteUser />
-              </ProtectedRoute>
-            }
-          />{" "}
-          <Route
-            path="/superadmin/view-areas"
-            element={
-              <ProtectedRoute role="SuperAdmin">
-                <ViewAreas />
+              <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
+                <MeetingsPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/superadmin/manage-members"
+            path="/founder/mosque-work"
             element={
-              <ProtectedRoute role="SuperAdmin">
-                <SuperAdminManageMembers />
+              <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
+                <MosqueWorkPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/superadmin/post-feeds"
+            path="/founder/reminder"
             element={
-              <ProtectedRoute role="SuperAdmin">
-                <SuperAdminPostFeeds />
+              <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
+                <ReminderPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/superadmin/view-attendance"
+            path="/founder/schedule-meeting"
             element={
-              <ProtectedRoute role="SuperAdmin">
-                <SuperAdminViewAttendance />
+              <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
+                <ScheduleMeeting />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/superadmin/transport"
+            path="/founder/send-reminder"
             element={
-              <ProtectedRoute role="SuperAdmin">
-                <SuperAdminTransportPage />
+              <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
+                <SendReminder />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/superadmin/reminder"
+            path="/founder/transport"
             element={
-              <ProtectedRoute role="SuperAdmin">
-                <SuperAdminReminderPage />
+              <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
+                <TransportPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/superadmin/meetings"
+            path="/founder/view-attendance"
             element={
-              <ProtectedRoute role="SuperAdmin">
-                <SuperAdminMeetingsPage />
+              <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
+                <ViewAttendance />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/superadmin/wake-up-call"
+            path="/founder/wake-up-call"
             element={
-              <ProtectedRoute role="SuperAdmin">
-                <SuperAdminWakeUpCallPage />
+              <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
+                <WakeUpCallPage />
               </ProtectedRoute>
             }
           />
+
+          {/* Legacy SuperAdmin routes - redirect to founder routes */}
           <Route
-            path="/superadmin/knowledge-program"
-            element={
-              <ProtectedRoute role="SuperAdmin">
-                <SuperAdminKnowledgeProgramPage />
-              </ProtectedRoute>
-            }
+            path="/superadmin/*"
+            element={<Navigate to="/founder/dashboard" replace />}
           />
-          {/* 404 Route */}
+
+          {/* 404 Fallback */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </AuthProvider>

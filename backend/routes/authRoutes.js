@@ -17,25 +17,6 @@ const generateOtp = () => {
   return Math.floor(1000 + Math.random() * 9000).toString();
 };
 
-// Check if account is locked
-const isAccountLocked = (user) => {
-  if (user.account_locked_until) {
-    return new Date() < new Date(user.account_locked_until);
-  }
-  return false;
-};
-
-// Lock account after failed attempts
-const lockAccount = async (userId) => {
-  const lockUntil = new Date();
-  lockUntil.setMinutes(lockUntil.getMinutes() + 30); // Lock for 30 minutes
-
-  await pool.execute(
-    "UPDATE users SET account_locked_until = ?, login_attempts = 0 WHERE id = ?",
-    [lockUntil, userId]
-  );
-};
-
 // ENHANCED LOGIN ROUTE WITH OTP
 router.post("/login", async (req, res) => {
   try {
@@ -99,41 +80,13 @@ router.post("/login", async (req, res) => {
       user = rows[0];
       loginIdentifier = username;
 
-      // Check if account is locked
-      if (isAccountLocked(user)) {
-        return res.status(423).json({
-          success: false,
-          message:
-            "Account is temporarily locked due to multiple failed attempts. Please try again later.",
-          accountLocked: true,
-        });
-      }
-
       // Verify password for dashboard login
       const isValidPassword = await bcrypt.compare(password, user.password);
 
       if (!isValidPassword) {
-        const newAttempts = (user.login_attempts || 0) + 1;
-        await pool.execute("UPDATE users SET login_attempts = ? WHERE id = ?", [
-          newAttempts,
-          user.id,
-        ]);
-
-        if (newAttempts >= 5) {
-          await lockAccount(user.id);
-          return res.status(423).json({
-            success: false,
-            message:
-              "Account locked due to multiple failed attempts. Please try again in 30 minutes.",
-            accountLocked: true,
-          });
-        }
-
         return res.status(401).json({
           success: false,
-          message: `Invalid credentials. ${
-            5 - newAttempts
-          } attempts remaining.`,
+          message: "Invalid credentials",
         });
       }
     }
@@ -155,7 +108,7 @@ router.post("/login", async (req, res) => {
       }
 
       await pool.execute(
-        "UPDATE users SET otp_code = NULL, otp_expires = NULL, otp_verified = TRUE, login_attempts = 0, last_login = CURRENT_TIMESTAMP WHERE id = ?",
+        "UPDATE users SET otp_code = NULL, otp_expires = NULL, otp_verified = TRUE, last_login = CURRENT_TIMESTAMP WHERE id = ?",
         [user.id]
       );
 
