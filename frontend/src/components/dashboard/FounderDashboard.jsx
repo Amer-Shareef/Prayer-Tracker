@@ -327,16 +327,16 @@ const FounderDashboard = () => {
       setFeedsLoading(true);
       setFeedsError(null);
       try {
-        // Fetch feeds with pagination - limit to 3 for dashboard
+        // Fetch feeds with pagination - limit to 10 for dashboard
         const response = await feedsService.getFeeds({
           page: 1,
-          limit: 3,
+          limit: 10,
         });
 
         if (response && response.success && response.data) {
           setFeeds(response.data);
           console.log(
-            "✅ Latest 3 feeds loaded successfully:",
+            "✅ Latest 10 feeds loaded successfully:",
             response.data.length
           );
         } else {
