@@ -490,7 +490,7 @@ const ViewAttendance = () => {
                     : "text-gray-600 hover:text-gray-900"
                 }`}
               >
-                Detailed Analytics
+               Member Overview
               </button>
             </div>
           </div>

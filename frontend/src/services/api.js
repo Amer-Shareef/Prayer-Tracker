@@ -4,7 +4,6 @@ import { ENV_CONFIG, getFullUrl } from "../config/environment";
 // Use environment-based configuration instead of hardcoded URL
 const API_URL = ENV_CONFIG.API_URL;
 
-
 const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -35,44 +34,51 @@ api.interceptors.response.use(
     console.error("API Error:", error.response?.data || error.message);
 
     // Handle token expiry with automatic refresh
-    if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
+    if (
+      (error.response?.status === 401 || error.response?.status === 403) &&
+      !originalRequest._retry
+    ) {
       console.log("🔒 Access token expired, attempting to refresh...");
-      
+
       const refreshToken = localStorage.getItem("refreshToken");
-      
+
       if (refreshToken) {
         originalRequest._retry = true;
-        
+
         try {
           console.log("🔄 Calling refresh endpoint...");
-          
+
           // Call refresh endpoint with refresh token in body
-          const refreshResponse = await axios.post(`${API_URL}/refresh`, {
-            refreshToken: refreshToken
-          }, {
-            headers: {
-              'Content-Type': 'application/json'
+          const refreshResponse = await axios.post(
+            `${API_URL}/refresh`,
+            {
+              refreshToken: refreshToken,
             },
-            withCredentials: true // This will send cookies too as backup
-          });
-          
+            {
+              headers: {
+                "Content-Type": "application/json",
+              },
+              withCredentials: true, // This will send cookies too as backup
+            }
+          );
+
           if (refreshResponse.data.success && refreshResponse.data.token) {
             const newToken = refreshResponse.data.token;
             const newRefreshToken = refreshResponse.data.refreshToken;
-            
+
             console.log("✅ Token refreshed successfully");
             console.log("🔑 New access token expires in: 1 minute");
-            
+
             // Update tokens in localStorage
             localStorage.setItem("token", newToken);
             if (newRefreshToken) {
               localStorage.setItem("refreshToken", newRefreshToken);
               console.log("🔄 Refresh token also updated");
             }
-            
+
             // Update the authorization header for the original request
             originalRequest.headers.Authorization = `Bearer ${newToken}`;
-            
+
             // Retry the original request with new token
             console.log("🔄 Retrying original request with new token...");
             return api(originalRequest);
@@ -82,18 +88,18 @@ api.interceptors.response.use(
         } catch (refreshError) {
           console.error("❌ Token refresh failed:", refreshError);
           console.log("🚪 Refresh failed, redirecting to login page...");
-          
+
           // Refresh failed, clear tokens and redirect to login
           localStorage.removeItem("token");
           localStorage.removeItem("refreshToken");
           localStorage.removeItem("user");
           localStorage.removeItem("role");
-          
+
           // Only redirect if not already on login page
-          if (!window.location.pathname.includes('/login')) {
+          if (!window.location.pathname.includes("/login")) {
             window.location.href = "/login";
           }
-          
+
           return Promise.reject(refreshError);
         }
       } else {
@@ -103,12 +109,12 @@ api.interceptors.response.use(
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("user");
         localStorage.removeItem("role");
-        
+
         // Only redirect if not already on login page
-        if (!window.location.pathname.includes('/login')) {
+        if (!window.location.pathname.includes("/login")) {
           window.location.href = "/login";
         }
-        
+
         return Promise.reject(error);
       }
     }
@@ -428,27 +434,39 @@ export const prayerService = {
 // Mosque service - DEPRECATED, replaced with Area service
 export const mosqueService = {
   getMosques: () => {
-    console.warn("⚠️ mosqueService.getMosques() is deprecated. Using area service instead.");
+    console.warn(
+      "⚠️ mosqueService.getMosques() is deprecated. Using area service instead."
+    );
     return areaService.getAreas();
   },
   getMosqueById: (id) => {
-    console.warn("⚠️ mosqueService.getMosqueById() is deprecated. Using area service instead.");
+    console.warn(
+      "⚠️ mosqueService.getMosqueById() is deprecated. Using area service instead."
+    );
     return areaService.getAreaById(id);
   },
   createMosque: (data) => {
-    console.warn("⚠️ mosqueService.createMosque() is deprecated. Using area service instead.");
+    console.warn(
+      "⚠️ mosqueService.createMosque() is deprecated. Using area service instead."
+    );
     return areaService.createArea(data);
   },
   updateMosque: (id, data) => {
-    console.warn("⚠️ mosqueService.updateMosque() is deprecated. Using area service instead.");
+    console.warn(
+      "⚠️ mosqueService.updateMosque() is deprecated. Using area service instead."
+    );
     return areaService.updateArea(id, data);
   },
   getAttendanceStats: (id, period = 30) => {
-    console.warn("⚠️ mosqueService.getAttendanceStats() is deprecated. Using area-based stats.");
+    console.warn(
+      "⚠️ mosqueService.getAttendanceStats() is deprecated. Using area-based stats."
+    );
     return api.get(`/areas/${id}/attendance?period=${period}`);
   },
   getGeneralAttendanceStats: (period = 30) => {
-    console.warn("⚠️ mosqueService.getGeneralAttendanceStats() is deprecated. Using area-based stats.");
+    console.warn(
+      "⚠️ mosqueService.getGeneralAttendanceStats() is deprecated. Using area-based stats."
+    );
     return api.get(`/attendance/general?period=${period}`);
   },
 };
@@ -481,9 +499,14 @@ export const memberAPI = {
   },
   getMemberPrayerStats: async (memberId, params = {}) => {
     try {
-      console.log(`📊 Fetching prayer statistics for member ${memberId} with params:`, params);
+      console.log(
+        `📊 Fetching prayer statistics for member ${memberId} with params:`,
+        params
+      );
       const queryParams = new URLSearchParams(params).toString();
-      const url = `/members/${memberId}/prayer-stats${queryParams ? `?${queryParams}` : ""}`;
+      const url = `/members/${memberId}/prayer-stats${
+        queryParams ? `?${queryParams}` : ""
+      }`;
       const response = await api.get(url);
       console.log("✅ Member prayer statistics loaded:", response.data);
       return response.data;

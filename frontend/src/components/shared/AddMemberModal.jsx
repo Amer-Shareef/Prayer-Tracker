@@ -3,7 +3,13 @@ import { memberAPI } from "../../services/api";
 import { areaService } from "../../services/areaService";
 import { useAuth } from "../../context/AuthContext";
 
-const AddMemberModal = ({ isOpen, onClose, onMemberAdded }) => {
+const AddMemberModal = ({
+  isOpen,
+  onClose,
+  onMemberAdded,
+  isEdit = false,
+  memberToEdit = null,
+}) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -47,6 +53,75 @@ const AddMemberModal = ({ isOpen, onClose, onMemberAdded }) => {
       fetchAreas();
     }
   }, [isOpen]);
+
+  // Initialize form data for edit mode
+  useEffect(() => {
+    if (isOpen && isEdit && memberToEdit) {
+      // Format phone number for display (remove +94 prefix)
+      const phoneNumber = memberToEdit.phone
+        ? memberToEdit.phone.replace("+94", "")
+        : "";
+
+      setFormData({
+        fullName: memberToEdit.fullName || "",
+        username: memberToEdit.username || "",
+        email: memberToEdit.email || "",
+        phone: phoneNumber,
+        password: "", // Don't pre-fill password for security
+        confirmPassword: "",
+        role: memberToEdit.role || "Member",
+        dateOfBirth: memberToEdit.dateOfBirth || "",
+        address: memberToEdit.address || "",
+        area_id: memberToEdit.area_id || "",
+        subarea_id: memberToEdit.subarea_id || "",
+        onRent: memberToEdit.onRent || false,
+        zakathEligible: memberToEdit.zakathEligible || false,
+        differentlyAbled: memberToEdit.differentlyAbled || false,
+        mobility: memberToEdit.mobility || "",
+        otherSpecify: memberToEdit.otherSpecify || "",
+        MuallafathilQuloob: memberToEdit.MuallafathilQuloob || false,
+        placeOfBirth: memberToEdit.placeOfBirth || "",
+        nicNo: memberToEdit.nicNo || "",
+        occupation: memberToEdit.occupation || "",
+        workplaceAddress: memberToEdit.workplaceAddress || "",
+        familyStatus: memberToEdit.familyStatus || "",
+        widowAssistance: memberToEdit.widowAssistance || false,
+      });
+
+      // Fetch sub-areas if area is selected
+      if (memberToEdit.area_id) {
+        fetchSubAreas(memberToEdit.area_id);
+      }
+    } else if (isOpen && !isEdit) {
+      // Reset form for add mode
+      setFormData({
+        fullName: "",
+        username: "",
+        email: "",
+        phone: "",
+        password: "",
+        confirmPassword: "",
+        role: "Member",
+        dateOfBirth: "",
+        address: "",
+        area_id: "",
+        subarea_id: "",
+        onRent: false,
+        zakathEligible: false,
+        differentlyAbled: false,
+        mobility: "",
+        otherSpecify: "",
+        MuallafathilQuloob: false,
+        placeOfBirth: "",
+        nicNo: "",
+        occupation: "",
+        workplaceAddress: "",
+        familyStatus: "",
+        widowAssistance: false,
+      });
+      setSubAreas([]);
+    }
+  }, [isOpen, isEdit, memberToEdit]);
 
   const fetchAreas = async () => {
     try {
@@ -139,11 +214,9 @@ const AddMemberModal = ({ isOpen, onClose, onMemberAdded }) => {
       value = value.substring(0, 9);
     }
 
-    const formattedPhone = value ? `+94${value}` : "";
-
     setFormData({
       ...formData,
-      phone: formattedPhone,
+      phone: value,
     });
 
     if (error) setError("");
@@ -154,21 +227,27 @@ const AddMemberModal = ({ isOpen, onClose, onMemberAdded }) => {
       !formData.fullName ||
       !formData.username ||
       !formData.email ||
-      !formData.password ||
-      !formData.phone
+      !formData.phone ||
+      !formData.area_id
     ) {
       setError(
-        "Full name, username, email, phone number, and password are required"
+        "Full name, username, email, phone number, and area are required"
       );
       return false;
     }
 
-    if (formData.password !== formData.confirmPassword) {
+    // Password is only required for new members, not for editing
+    if (!isEdit && !formData.password) {
+      setError("Password is required for new members");
+      return false;
+    }
+
+    if (formData.password && formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
       return false;
     }
 
-    if (formData.password.length < 6) {
+    if (formData.password && formData.password.length < 6) {
       setError("Password must be at least 6 characters long");
       return false;
     }
@@ -179,11 +258,9 @@ const AddMemberModal = ({ isOpen, onClose, onMemberAdded }) => {
       return false;
     }
 
-    const phoneRegex = /^\+94\d{9}$/;
+    const phoneRegex = /^\d{9}$/;
     if (!phoneRegex.test(formData.phone)) {
-      setError(
-        "Phone number is required and must be exactly 9 digits after +94"
-      );
+      setError("Phone number is required and must be exactly 9 digits");
       return false;
     }
 
@@ -199,7 +276,18 @@ const AddMemberModal = ({ isOpen, onClose, onMemberAdded }) => {
     setError("");
 
     try {
-      const response = await memberAPI.addMember(formData);
+      let response;
+      if (isEdit && memberToEdit) {
+        // Prepare update data (exclude password if empty)
+        const updateData = { ...formData };
+        if (!updateData.password) {
+          delete updateData.password;
+          delete updateData.confirmPassword;
+        }
+        response = await memberAPI.updateMember(memberToEdit.id, updateData);
+      } else {
+        response = await memberAPI.addMember(formData);
+      }
 
       if (response.success) {
         // Reset form
@@ -232,7 +320,9 @@ const AddMemberModal = ({ isOpen, onClose, onMemberAdded }) => {
         onMemberAdded();
         onClose();
       } else {
-        setError(response.message || "Failed to add member");
+        setError(
+          response.message || `Failed to ${isEdit ? "update" : "add"} member`
+        );
       }
     } catch (err) {
       if (err.message) {
@@ -240,7 +330,9 @@ const AddMemberModal = ({ isOpen, onClose, onMemberAdded }) => {
       } else if (err.response?.data?.message) {
         setError(err.response.data.message);
       } else {
-        setError("Failed to add member. Please try again.");
+        setError(
+          `Failed to ${isEdit ? "update" : "add"} member. Please try again.`
+        );
       }
     } finally {
       setLoading(false);
@@ -299,14 +391,20 @@ const AddMemberModal = ({ isOpen, onClose, onMemberAdded }) => {
         return;
       }
 
-      const phoneRegex = /^\+94\d{9}$/;
+      const phoneRegex = /^\d{9}$/;
       if (!phoneRegex.test(formData.phone)) {
-        setError("Phone number must be exactly 9 digits after +94");
+        setError("Phone number must be exactly 9 digits");
         return;
       }
     }
 
-    // No validation needed for step 2 (location info is optional)
+    // Validate step 2 fields (area is required)
+    if (currentStep === 2) {
+      if (!formData.area_id) {
+        setError("Please select an area in Step 2");
+        return;
+      }
+    }
 
     setError("");
     setCurrentStep(currentStep + 1);
@@ -352,7 +450,7 @@ const AddMemberModal = ({ isOpen, onClose, onMemberAdded }) => {
                   className="text-lg font-semibold text-white"
                   id="modal-title"
                 >
-                  Add Member
+                  {isEdit ? "Edit Member" : "Add Member"}
                 </h3>
                 <p className="text-sm text-green-100 mt-1">
                   Step {currentStep} of 3
@@ -479,21 +577,16 @@ const AddMemberModal = ({ isOpen, onClose, onMemberAdded }) => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Phone Number <span className="text-red-500">*</span>
                       </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                          <span className="text-gray-700 text-sm">+94</span>
-                        </div>
-                        <input
-                          type="tel"
-                          name="phone"
-                          value={formData.phone.replace("+94", "")}
-                          onChange={handlePhoneChange}
-                          className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                          placeholder="7XXXXXXXX"
-                          maxLength="9"
-                          required
-                        />
-                      </div>
+                      <input
+                        type="tel"
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handlePhoneChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        placeholder="076536738"
+                        maxLength="9"
+                        required
+                      />
                     </div>
 
                     {/* Date of Birth */}
@@ -619,7 +712,7 @@ const AddMemberModal = ({ isOpen, onClose, onMemberAdded }) => {
                       {/* Area */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Area
+                          Area <span className="text-red-500">*</span>
                         </label>
                         <select
                           name="area_id"
@@ -739,98 +832,103 @@ const AddMemberModal = ({ isOpen, onClose, onMemberAdded }) => {
                   </h4>
 
                   <div className="space-y-4">
-                    {/* Password Section */}
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <h5 className="text-sm font-semibold text-gray-800 mb-3">
-                        Account Security
-                      </h5>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Password */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Password <span className="text-red-500">*</span>
-                          </label>
-                          <div className="relative">
-                            <input
-                              type={showPassword ? "text" : "password"}
-                              name="password"
-                              value={formData.password}
-                              onChange={handleInputChange}
-                              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                              placeholder="Min 6 characters"
-                              required
-                            />
-                            <button
-                              type="button"
-                              className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                              onClick={() => setShowPassword(!showPassword)}
-                            >
-                              <svg
-                                className="h-5 w-5 text-gray-400"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
+                    {/* Password Section - Only show for new members */}
+                    {!isEdit && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h5 className="text-sm font-semibold text-gray-800 mb-3">
+                          Account Security
+                        </h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Password */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Password{" "}
+                              {!isEdit && (
+                                <span className="text-red-500">*</span>
+                              )}
+                            </label>
+                            <div className="relative">
+                              <input
+                                type={showPassword ? "text" : "password"}
+                                name="password"
+                                value={formData.password}
+                                onChange={handleInputChange}
+                                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                placeholder="Min 6 characters"
+                                required
+                              />
+                              <button
+                                type="button"
+                                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                                onClick={() => setShowPassword(!showPassword)}
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d={
-                                    showPassword
-                                      ? "M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
-                                      : "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                                  }
-                                />
-                              </svg>
-                            </button>
+                                <svg
+                                  className="h-5 w-5 text-gray-400"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d={
+                                      showPassword
+                                        ? "M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
+                                        : "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                    }
+                                  />
+                                </svg>
+                              </button>
+                            </div>
                           </div>
-                        </div>
 
-                        {/* Confirm Password */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Confirm Password{" "}
-                            <span className="text-red-500">*</span>
-                          </label>
-                          <div className="relative">
-                            <input
-                              type={showConfirmPassword ? "text" : "password"}
-                              name="confirmPassword"
-                              value={formData.confirmPassword}
-                              onChange={handleInputChange}
-                              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                              placeholder="Confirm password"
-                              required
-                            />
-                            <button
-                              type="button"
-                              className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                              onClick={() =>
-                                setShowConfirmPassword(!showConfirmPassword)
-                              }
-                            >
-                              <svg
-                                className="h-5 w-5 text-gray-400"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
+                          {/* Confirm Password */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Confirm Password{" "}
+                              <span className="text-red-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <input
+                                type={showConfirmPassword ? "text" : "password"}
+                                name="confirmPassword"
+                                value={formData.confirmPassword}
+                                onChange={handleInputChange}
+                                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                placeholder="Confirm password"
+                                required
+                              />
+                              <button
+                                type="button"
+                                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                                onClick={() =>
+                                  setShowConfirmPassword(!showConfirmPassword)
+                                }
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d={
-                                    showConfirmPassword
-                                      ? "M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
-                                      : "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                                  }
-                                />
-                              </svg>
-                            </button>
+                                <svg
+                                  className="h-5 w-5 text-gray-400"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d={
+                                      showConfirmPassword
+                                        ? "M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
+                                        : "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                    }
+                                  />
+                                </svg>
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Additional Info Checkboxes */}
                     <div>
@@ -1016,7 +1114,7 @@ const AddMemberModal = ({ isOpen, onClose, onMemberAdded }) => {
                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                           ></path>
                         </svg>
-                        Adding...
+                        {isEdit ? "Updating..." : "Adding..."}
                       </>
                     ) : (
                       <>
@@ -1033,7 +1131,7 @@ const AddMemberModal = ({ isOpen, onClose, onMemberAdded }) => {
                             d="M5 13l4 4L19 7"
                           />
                         </svg>
-                        Add Member
+                        {isEdit ? "Update Member" : "Add Member"}
                       </>
                     )}
                   </button>
