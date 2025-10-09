@@ -214,7 +214,7 @@ const ViewAttendance = () => {
   const fetchOverview = useCallback(async () => {
     try {
       const response = await api.get("/attendance/overview", {
-        params: { role, period: timePeriod },
+        params: { role },
       });
 
       if (response.data?.success && response.data?.data) {
@@ -231,7 +231,7 @@ const ViewAttendance = () => {
       setError(errorMsg);
       throw err;
     }
-  }, [role, timePeriod]);
+  }, [role]);
 
   const fetchPrayerBreakdown = useCallback(async () => {
     try {
@@ -339,7 +339,7 @@ const ViewAttendance = () => {
     };
 
     loadOverviewData();
-  }, [role, timePeriod, fetchOverview, fetchPrayerBreakdown, fetchAreas]);
+  }, [role, fetchOverview, fetchPrayerBreakdown, fetchAreas]);
 
   // Fetch members data when in detailed view
   useEffect(() => {
@@ -521,13 +521,11 @@ const ViewAttendance = () => {
               {/* Quick Metrics */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {overviewData?.yesterday && (
-                  <Tooltip
-                    text={`Total prayers logged in the last ${getPeriodLabel} across ALL areas`}
-                  >
+                  <Tooltip text="Total prayers logged yesterday across ALL areas">
                     <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-help">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-medium text-gray-700">
-                          {getPeriodLabel}
+                          Yesterday
                         </h3>
                         <svg
                           className="w-8 h-8 text-green-600"
@@ -555,13 +553,11 @@ const ViewAttendance = () => {
                 )}
 
                 {overviewData?.topArea && (
-                  <Tooltip
-                    text={`Area with highest weighted score (${getPeriodLabel})`}
-                  >
+                  <Tooltip text="Area with highest weighted score (last 7 days)">
                     <div className="bg-white rounded-lg p-6 border border-green-200 shadow-sm hover:shadow-md transition-shadow cursor-help">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-medium text-green-900">
-                          Top Area ({timePeriod}d)
+                          Top Area (7d)
                         </h3>
                         <svg
                           className="w-8 h-8 text-green-600"
@@ -625,13 +621,11 @@ const ViewAttendance = () => {
                 )}
 
                 {overviewData?.avgRate7d && (
-                  <Tooltip
-                    text={`Average attendance rate across all areas (${getPeriodLabel})`}
-                  >
+                  <Tooltip text="Average attendance rate across all areas (last 7 days)">
                     <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-6 border-2 border-green-400 shadow-md hover:shadow-lg transition-shadow cursor-help">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-medium text-green-900">
-                          Avg Rate ({timePeriod}d)
+                          Avg Rate (7d)
                         </h3>
                         <svg
                           className="w-8 h-8 text-green-700"
@@ -664,8 +658,7 @@ const ViewAttendance = () => {
                       Global Prayer Breakdown
                     </h2>
                     <span className="text-xs text-gray-500">
-                      Current period: {getPeriodLabel} | Yesterday | 7d = last 7
-                      days | 30d = last 30 days
+                      Yesterday | 7d = last 7 days | 30d = last 30 days
                     </span>
                   </div>
                   <div className="grid grid-cols-5 gap-4">
@@ -907,13 +900,11 @@ const ViewAttendance = () => {
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {overviewData?.yesterday && (
-                  <Tooltip
-                    text={`Total prayers logged in the last ${getPeriodLabel} in YOUR area`}
-                  >
+                  <Tooltip text="Total prayers logged yesterday in YOUR area">
                     <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-help">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-medium text-gray-700">
-                          {getPeriodLabel}
+                          Yesterday
                         </h3>
                         <svg
                           className="w-8 h-8 text-green-600"
@@ -941,13 +932,11 @@ const ViewAttendance = () => {
                 )}
 
                 {overviewData?.areaRank && (
-                  <Tooltip
-                    text={`Your area's weighted ranking (${getPeriodLabel})`}
-                  >
+                  <Tooltip text="Your area's weighted ranking (last 7 days)">
                     <div className="bg-white rounded-lg p-6 border border-green-200 shadow-sm hover:shadow-md transition-shadow cursor-help">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-medium text-green-900">
-                          Area Rank ({timePeriod}d)
+                          Area Rank (7d)
                         </h3>
                         <svg
                           className="w-8 h-8 text-green-600"
@@ -1017,14 +1006,11 @@ const ViewAttendance = () => {
                 )}
 
                 {overviewData?.weeklyAvg && (
-                  <Tooltip
-                    text={`Average attendance rate for your area (${getPeriodLabel})`}
-                  >
+                  <Tooltip text="Average attendance rate for your area (last 7 days)">
                     <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-6 border-2 border-green-400 shadow-md hover:shadow-lg transition-shadow cursor-help">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-medium text-green-900">
-                          {timePeriod === "7" ? "Week Avg" : "Period Avg"} (
-                          {timePeriod}d)
+                          Week Avg (7d)
                         </h3>
                         <svg
                           className="w-8 h-8 text-green-700"
@@ -1044,7 +1030,7 @@ const ViewAttendance = () => {
                         {safePercentage(overviewData?.weeklyAvg?.percentage)}
                       </div>
                       <p className="text-xs text-green-800">
-                        {getPeriodLabel} average
+                        Last 7 days average
                       </p>
                     </div>
                   </Tooltip>
@@ -1059,8 +1045,7 @@ const ViewAttendance = () => {
                       Prayer Performance
                     </h2>
                     <span className="text-xs text-gray-500">
-                      Current period: {getPeriodLabel} | Yesterday | 7d = last 7
-                      days | 30d = last 30 days
+                      Yesterday | 7d = last 7 days | 30d = last 30 days
                     </span>
                   </div>
                   <div className="grid grid-cols-5 gap-4">

@@ -113,7 +113,7 @@ const LoginPage = () => {
             // WCM users get Member UI in web app
             navigate("/member/dashboard");
           } else if (role === "Founder" || role === "SuperAdmin") {
-            navigate("/founder/view-attendance");
+            navigate("/founder/dashboard");
           } else {
             navigate("/member/dashboard");
           }
@@ -277,7 +277,7 @@ const LoginPage = () => {
                   Enter the 4-digit code sent to your email
                 </p>
 
-                {/* {testOtp && (
+                {testOtp && (
                   <div className="mt-3 p-3 bg-yellow-50 border border-yellow-300 rounded">
                     <p className="text-sm text-yellow-700 font-medium">
                       🧪 Development Mode:
@@ -293,7 +293,7 @@ const LoginPage = () => {
                       Auto-fill OTP
                     </button>
                   </div>
-                )} */}
+                )}
               </div>
             )}
 
