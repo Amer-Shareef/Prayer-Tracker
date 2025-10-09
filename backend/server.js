@@ -17,12 +17,7 @@ const getAllowedOrigins = () => {
     ? process.env.CORS_ORIGINS.split(",")
         .map((o) => o.trim())
         .filter(Boolean)
-    : [
-        "http://13.60.193.171:3000",
-        "http://13.60.193.171:5000",
-        "http://localhost:3000", // Add localhost for development
-        "http://localhost:5000",
-      ];
+    : ["http://13.60.193.171:3000", "http://13.60.193.171:5000"];
 
   console.log("🌐 Allowed CORS origins:", origins);
   return origins;
@@ -32,14 +27,6 @@ const corsOptions = {
   origin: getAllowedOrigins(),
   credentials: true,
   optionsSuccessStatus: 200,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Ensure all methods are allowed
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "x-uploadthing-package",
-    "traceparent", // Required by UploadThing for distributed tracing
-    "tracestate", // Optional but related to traceparent
-  ],
 };
 
 app.use(cors(corsOptions));
@@ -60,16 +47,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// UploadThing route handler - MUST be before other routes
-const uploadthingHandler = createRouteHandler({
-  router: uploadRouter,
-  config: {
-    uploadthingSecret: process.env.UPLOADTHING_SECRET,
-    uploadthingId: process.env.UPLOADTHING_APP_ID,
-  },
-});
-
-app.use("/api/uploadthing", uploadthingHandler);
+app.use(
+  "/api/uploadthing",
+  createRouteHandler({
+    router: uploadRouter,
+    config: { env: { UPLOADTHING_TOKEN: process.env.UPLOADTHING_TOKEN } },
+  })
+);
 
 // Import database config
 const { testConnection } = require("./config/database");
