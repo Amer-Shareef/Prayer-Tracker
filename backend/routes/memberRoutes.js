@@ -76,7 +76,9 @@ router.get(
         const totalMembers = countResult[0].total;
         const totalPages = Math.ceil(totalMembers / limit);
 
-        console.log(`✅ Fetched ${members.length} of ${totalMembers} members (page ${page}/${totalPages})`);
+        console.log(
+          `✅ Fetched ${members.length} of ${totalMembers} members (page ${page}/${totalPages})`
+        );
 
         res.json({
           success: true,
@@ -110,6 +112,75 @@ router.get(
   }
 );
 
+// Get single member by ID - MUST come before /members route
+router.get(
+  "/members/:id",
+  authenticateToken,
+  authorizeRole(["Founder", "WCM", "SuperAdmin", "Member"]),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { user } = req;
+
+      console.log(`📋 Fetching member details for ID: ${id}`);
+
+      // Build query to get member with area info
+      let query = `
+        SELECT u.id, u.full_name as fullName, u.username, u.email, u.phone, u.role, u.status, 
+               u.joined_date, u.last_login, u.created_at, u.date_of_birth as dateOfBirth, 
+               u.address, u.area_id, u.sub_areas_id, u.mobility, u.living_on_rent as onRent, 
+               u.zakath_eligible as zakathEligible, u.differently_abled as differentlyAbled, 
+               u.muallafathil_quloob as MuallafathilQuloob, 
+               u.place_of_birth as placeOfBirth, u.nic_no as nicNo, u.occupation, 
+               u.workplace_address as workplaceAddress, u.family_status as familyStatus, 
+               u.widow_assistance as widowAssistance,
+               a.area_name as area, a.address as area_address,
+               sa.address as subarea,
+               CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId
+        FROM users u
+        LEFT JOIN areas a ON u.area_id = a.area_id
+        LEFT JOIN sub_areas sa ON u.sub_areas_id = sa.id
+        WHERE u.id = ?
+      `;
+      let queryParams = [id];
+
+      // Members can only view their own profile
+      if (user.role === "Member") {
+        query += " AND u.id = ?";
+        queryParams.push(user.id);
+      }
+      // Founders and WCMs can only view members from their area
+      else if (user.role === "Founder" || user.role === "WCM") {
+        query += " AND u.area_id = (SELECT area_id FROM users WHERE id = ?)";
+        queryParams.push(user.id);
+      }
+      // SuperAdmin can view any member (no additional WHERE clause)
+
+      const [members] = await pool.execute(query, queryParams);
+
+      if (members.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Member not found or access denied",
+        });
+      }
+
+      console.log("✅ Member details fetched successfully");
+      res.json({
+        success: true,
+        data: members[0],
+      });
+    } catch (error) {
+      console.error("❌ Error fetching member details:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch member details",
+        error: error.message,
+      });
+    }
+  }
+);
+
 // Get area-specific members
 router.get(
   "/members",
@@ -118,7 +189,9 @@ router.get(
   async (req, res) => {
     try {
       const { user } = req;
-      console.log(`📋 Fetching area-specific members for user role: ${user.role}`);
+      console.log(
+        `📋 Fetching area-specific members for user role: ${user.role}`
+      );
 
       // Check if pagination is requested
       const pageParam = req.query.page;
@@ -166,7 +239,11 @@ router.get(
       let countQuery = `SELECT COUNT(DISTINCT u.id) as total FROM users u`;
 
       // Add area restriction based on user role
-      if (user.role === "Founder" || user.role === "WCM" || user.role === "SuperAdmin") {
+      if (
+        user.role === "Founder" ||
+        user.role === "WCM" ||
+        user.role === "SuperAdmin"
+      ) {
         baseQuery += ` WHERE u.area_id = (SELECT area_id FROM users WHERE id = ${user.id})`;
         countQuery += ` WHERE u.area_id = (SELECT area_id FROM users WHERE id = ${user.id})`;
       } else if (user.role === "Member") {
@@ -190,7 +267,9 @@ router.get(
         const totalMembers = countResult[0].total;
         const totalPages = Math.ceil(totalMembers / limit);
 
-        console.log(`✅ Fetched ${members.length} of ${totalMembers} area members (page ${page}/${totalPages})`);
+        console.log(
+          `✅ Fetched ${members.length} of ${totalMembers} area members (page ${page}/${totalPages})`
+        );
 
         res.json({
           success: true,
@@ -206,7 +285,9 @@ router.get(
         // Return ALL area members without any limit
         const [members] = await pool.execute(baseQuery);
 
-        console.log(`✅ Fetched ALL ${members.length} area members (no pagination)`);
+        console.log(
+          `✅ Fetched ALL ${members.length} area members (no pagination)`
+        );
 
         res.json({
           success: true,
@@ -341,27 +422,27 @@ router.post(
 
       // Get area ID for new member - area_id is now mandatory
       let areaId = null;
-      
+
       // Validate that area_id is provided
       if (!req.body.area_id) {
         return res.status(400).json({
           success: false,
-          message: "Area selection is required. Please select an area."
+          message: "Area selection is required. Please select an area.",
         });
       }
-      
+
       areaId = req.body.area_id;
-      
+
       // Verify the area exists
       const [areaExists] = await pool.execute(
         "SELECT area_id FROM areas WHERE area_id = ?",
         [areaId]
       );
-      
+
       if (areaExists.length === 0) {
         return res.status(400).json({
           success: false,
-          message: "Invalid area selected. Please select a valid area."
+          message: "Invalid area selected. Please select a valid area.",
         });
       }
 
@@ -371,11 +452,11 @@ router.post(
           "SELECT area_id FROM users WHERE id = ?",
           [user.id]
         );
-        
+
         if (userData[0]?.area_id && userData[0].area_id !== areaId) {
           return res.status(403).json({
             success: false,
-            message: "You can only add members to your assigned area."
+            message: "You can only add members to your assigned area.",
           });
         }
       }
@@ -462,18 +543,18 @@ router.put(
   async (req, res) => {
     try {
       const { id } = req.params;
-      const { 
-        username, 
-        email, 
-        phone, 
-        role, 
+      const {
+        username,
+        email,
+        phone,
+        role,
         status,
         placeOfBirth,
         nicNo,
         occupation,
         workplaceAddress,
         familyStatus,
-        widowAssistance
+        widowAssistance,
       } = req.body;
       const { user } = req;
 
@@ -483,8 +564,7 @@ router.put(
 
       if (user.role === "Founder" || user.role === "WCM") {
         // Founders and WCMs can only edit members from their area
-        checkQuery +=
-          " AND area_id = (SELECT area_id FROM users WHERE id = ?)";
+        checkQuery += " AND area_id = (SELECT area_id FROM users WHERE id = ?)";
         checkParams.push(user.id);
       }
       // SuperAdmin can edit any member (no additional WHERE clause)
@@ -504,27 +584,27 @@ router.put(
 
       // Map of frontend field names to database column names
       const fieldMapping = {
-        username: 'username',
-        email: 'email', 
-        phone: 'phone',
-        role: 'role',
-        status: 'status',
-        placeOfBirth: 'place_of_birth',
-        nicNo: 'nic_no',
-        occupation: 'occupation',
-        workplaceAddress: 'workplace_address',
-        familyStatus: 'family_status',
-        widowAssistance: 'widow_assistance'
+        username: "username",
+        email: "email",
+        phone: "phone",
+        role: "role",
+        status: "status",
+        placeOfBirth: "place_of_birth",
+        nicNo: "nic_no",
+        occupation: "occupation",
+        workplaceAddress: "workplace_address",
+        familyStatus: "family_status",
+        widowAssistance: "widow_assistance",
       };
 
       // Only add fields that are provided in the request
-      Object.keys(fieldMapping).forEach(frontendField => {
+      Object.keys(fieldMapping).forEach((frontendField) => {
         if (req.body[frontendField] !== undefined) {
           const dbField = fieldMapping[frontendField];
           updateFields.push(`${dbField} = ?`);
-          
+
           // Handle special cases for data conversion
-          if (frontendField === 'widowAssistance') {
+          if (frontendField === "widowAssistance") {
             updateValues.push(req.body[frontendField] ? 1 : 0);
           } else {
             updateValues.push(req.body[frontendField]);
@@ -533,19 +613,22 @@ router.put(
       });
 
       // Always update the timestamp
-      updateFields.push('updated_at = CURRENT_TIMESTAMP');
+      updateFields.push("updated_at = CURRENT_TIMESTAMP");
 
-      if (updateFields.length === 1) { // Only timestamp was added
+      if (updateFields.length === 1) {
+        // Only timestamp was added
         return res.status(400).json({
           success: false,
-          message: "No valid fields provided for update"
+          message: "No valid fields provided for update",
         });
       }
 
       // Execute the dynamic UPDATE query
-      const updateQuery = `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`;
+      const updateQuery = `UPDATE users SET ${updateFields.join(
+        ", "
+      )} WHERE id = ?`;
       updateValues.push(id);
-      
+
       const [result] = await pool.execute(updateQuery, updateValues);
 
       if (result.affectedRows === 0) {
@@ -603,8 +686,7 @@ router.delete(
 
       if (user.role === "Founder" || user.role === "WCM") {
         // Founders and WCMs can only delete members from their area
-        checkQuery +=
-          " AND area_id = (SELECT area_id FROM users WHERE id = ?)";
+        checkQuery += " AND area_id = (SELECT area_id FROM users WHERE id = ?)";
         checkParams.push(user.id);
       }
       // SuperAdmin can delete any member (no additional WHERE clause)
@@ -702,7 +784,9 @@ router.get(
       const { startDate, endDate } = req.query;
       const { user } = req;
 
-      console.log(`📊 Fetching prayer statistics for member ${id} from ${startDate} to ${endDate}`);
+      console.log(
+        `📊 Fetching prayer statistics for member ${id} from ${startDate} to ${endDate}`
+      );
 
       // Check if member exists and access permissions
       let checkQuery = "SELECT * FROM users WHERE id = ?";
@@ -757,7 +841,9 @@ router.get(
 
       const [prayerData] = await pool.execute(prayerQuery, prayerParams);
 
-      console.log(`✅ Found ${prayerData.length} prayer records for member ${id}`);
+      console.log(
+        `✅ Found ${prayerData.length} prayer records for member ${id}`
+      );
 
       res.json({
         success: true,
@@ -765,12 +851,12 @@ router.get(
         member: {
           id: existingMember[0].id,
           fullName: existingMember[0].full_name,
-          username: existingMember[0].username
+          username: existingMember[0].username,
         },
         dateRange: {
-          startDate: startDate || 'All time',
-          endDate: endDate || 'All time'
-        }
+          startDate: startDate || "All time",
+          endDate: endDate || "All time",
+        },
       });
     } catch (error) {
       console.error("❌ Error fetching member prayer statistics:", error);

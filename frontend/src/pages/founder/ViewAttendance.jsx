@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import FounderLayout from "../../components/layouts/FounderLayout";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api"; // Use centralized API instance
+import generateMemberReport from "./GeneratePdf";
 
 // Safe data access helper
 const safeGet = (obj, path, defaultValue = 0) => {
@@ -353,21 +354,30 @@ const ViewAttendance = () => {
     setCurrentPage(page);
   }, []);
 
-  const handleDownloadReport = useCallback(
-    (member) => {
-      console.log("Downloading report for:", {
+  const handleDownloadReport = useCallback(async (member) => {
+    try {
+      console.log("Fetching full member details for report:", {
         memberId: member.id,
         memberName: member.name,
-        attendance: member.periodPercentage,
-        period: getPeriodLabel,
-        yesterdayPrayers: member.yesterdayPrayers,
-        fajrCount: member.fajrCount,
-        totalDays: member.totalDays,
-        phone: member.phone,
       });
-    },
-    [getPeriodLabel]
-  );
+
+      // Fetch full member details from the API
+      const response = await api.get(`/members/${member.id}`);
+
+      if (response.data?.success && response.data?.data) {
+        const fullMemberData = response.data.data;
+        console.log("Full member data fetched:", fullMemberData);
+        await generateMemberReport(fullMemberData);
+      } else {
+        throw new Error("Failed to fetch member details");
+      }
+    } catch (error) {
+      console.error("Error downloading report:", error);
+      alert(
+        `Failed to download report: ${error.message || "Please try again."}`
+      );
+    }
+  }, []);
 
   // Helper functions
   const getColorClass = useCallback((percentage) => {
@@ -490,7 +500,7 @@ const ViewAttendance = () => {
                     : "text-gray-600 hover:text-gray-900"
                 }`}
               >
-               Member Overview
+                Member Overview
               </button>
             </div>
           </div>

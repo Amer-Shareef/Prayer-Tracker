@@ -1200,7 +1200,7 @@ function ManageMembers() {
                                     </button>
 
                                     {/* Edit Member */}
-                                    <button
+                                    {/* <button
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleEditMember(member);
@@ -1223,7 +1223,7 @@ function ManageMembers() {
                                         />
                                       </svg>
                                       Edit Member
-                                    </button>
+                                    </button> */}
 
                                     {/* Divider */}
                                     <div className="border-t border-gray-100"></div>
