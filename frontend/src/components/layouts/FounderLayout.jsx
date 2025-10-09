@@ -412,33 +412,44 @@ const FounderLayout = ({ children }) => {
           {/* Logout Button Container */}
           <div className="mt-auto">
             <button
-              onClick={logout}
+              onClick={() => {
+                const confirmLogout = window.confirm(
+                  "Are you sure you want to logout? You will need to login again to access your account."
+                );
+                if (confirmLogout) {
+                  logout();
+                }
+              }}
               className={`
               flex items-center ${
                 sidebarOpen
                   ? "w-full px-3 py-3 rounded-2xl"
                   : "w-12 h-12 rounded-full justify-center mx-auto"
-              } transition-all duration-200 
+              } transition-all duration-200
               bg-rose-200 hover:bg-rose-300 text-rose-700 border-t border-green-500 ${
-                sidebarOpen ? "mt-4 pt-3" : "mt-3 pt-3"
+                sidebarOpen ? "mt-4" : "mt-3"
               } group shadow-sm hover:shadow-md transform hover:scale-102
             `}
               title={!sidebarOpen ? "Logout" : ""}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+              <span
+                className={`inline-block flex-shrink-0 transition-transform duration-200 group-hover:scale-110`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                />
-              </svg>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-6 w-6 flex-shrink-0 transition-transform duration-200 group-hover:scale-110"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                  />
+                </svg>
+              </span>
               {sidebarOpen && (
                 <span className="ml-3 text-sm font-medium transition-opacity duration-300 opacity-100 whitespace-nowrap">
                   Logout
