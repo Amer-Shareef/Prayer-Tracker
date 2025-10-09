@@ -189,6 +189,7 @@ const ViewAttendance = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [view, setView] = useState("overview");
+  const [loadingMembers, setLoadingMembers] = useState(false);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
@@ -279,6 +280,7 @@ const ViewAttendance = () => {
   }, [role]);
 
   const fetchMembers = useCallback(async () => {
+    setLoadingMembers(true);
     try {
       const response = await api.get("/attendance/members", {
         params: {
@@ -309,6 +311,8 @@ const ViewAttendance = () => {
       // Don't throw error here to allow partial data display
       setMembersData([]);
       setPagination(null);
+    } finally {
+      setLoadingMembers(false);
     }
   }, [role, selectedArea, timePeriod, searchTerm, currentPage]);
 
@@ -1195,7 +1199,12 @@ const ViewAttendance = () => {
                 />
               </div>
 
-              {membersData.length === 0 ? (
+              {loadingMembers ? (
+                <div className="p-12 text-center">
+                  <div className="inline-block animate-spin rounded-full border-4 border-gray-200 border-t-green-600 h-12 w-12"></div>
+                  <p className="mt-4 text-gray-600">Loading members...</p>
+                </div>
+              ) : membersData.length === 0 ? (
                 <div className="p-12 text-center">
                   <svg
                     className="mx-auto h-12 w-12 text-gray-400"
@@ -1216,7 +1225,12 @@ const ViewAttendance = () => {
                 </div>
               ) : (
                 <>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto relative">
+                    {loadingMembers && (
+                      <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+                        <div className="inline-block animate-spin rounded-full border-4 border-gray-200 border-t-green-600 h-8 w-8"></div>
+                      </div>
+                    )}
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
