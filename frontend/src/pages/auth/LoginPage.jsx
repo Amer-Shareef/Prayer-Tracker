@@ -113,7 +113,7 @@ const LoginPage = () => {
             // WCM users get Member UI in web app
             navigate("/member/dashboard");
           } else if (role === "Founder" || role === "SuperAdmin") {
-            navigate("/founder/dashboard");
+              navigate("/founder/view-attendance");
           } else {
             navigate("/member/dashboard");
           }
