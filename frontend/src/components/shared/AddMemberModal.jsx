@@ -210,8 +210,8 @@ const AddMemberModal = ({
   const handlePhoneChange = (e) => {
     let value = e.target.value.replace(/\D/g, "");
 
-    if (value.length > 9) {
-      value = value.substring(0, 9);
+    if (value.length > 10) {
+      value = value.substring(0, 10);
     }
 
     setFormData({
@@ -258,9 +258,9 @@ const AddMemberModal = ({
       return false;
     }
 
-    const phoneRegex = /^\d{9}$/;
+    const phoneRegex = /^\d{10}$/;
     if (!phoneRegex.test(formData.phone)) {
-      setError("Phone number is required and must be exactly 9 digits");
+      setError("Phone number must be exactly 10 digits");
       return false;
     }
 
@@ -325,15 +325,25 @@ const AddMemberModal = ({
         );
       }
     } catch (err) {
-      if (err.message) {
-        setError(err.message);
-      } else if (err.response?.data?.message) {
-        setError(err.response.data.message);
-      } else {
-        setError(
-          `Failed to ${isEdit ? "update" : "add"} member. Please try again.`
-        );
+      console.error("❌ Error adding/updating member:", err);
+
+      // Enhanced error handling to catch all possible error formats
+      let errorMessage = `Failed to ${
+        isEdit ? "update" : "add"
+      } member. Please try again.`;
+
+      if (err.response?.data?.message) {
+        // Backend validation error (e.g., "Username already exists")
+        errorMessage = err.response.data.message;
+      } else if (err.response?.data?.error) {
+        // Alternative error format
+        errorMessage = err.response.data.error;
+      } else if (err.message) {
+        // Generic error message
+        errorMessage = err.message;
       }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -391,9 +401,9 @@ const AddMemberModal = ({
         return;
       }
 
-      const phoneRegex = /^\d{9}$/;
+      const phoneRegex = /^\d{10}$/;
       if (!phoneRegex.test(formData.phone)) {
-        setError("Phone number must be exactly 9 digits");
+        setError("Phone number must be exactly 10 digits");
         return;
       }
     }
@@ -583,8 +593,8 @@ const AddMemberModal = ({
                         value={formData.phone}
                         onChange={handlePhoneChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        placeholder="076536738"
-                        maxLength="9"
+                        placeholder="0712345678"
+                        maxLength="10"
                         required
                       />
                     </div>
@@ -678,89 +688,7 @@ const AddMemberModal = ({
                       />
                     </div>
 
-                    {/* Address */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Address
-                      </label>
-                      <textarea
-                        name="address"
-                        value={formData.address}
-                        onChange={handleInputChange}
-                        rows="2"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        placeholder="Enter residential address"
-                      />
-                    </div>
-
-                    {/* Workplace Address */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Workplace Address
-                      </label>
-                      <textarea
-                        name="workplaceAddress"
-                        value={formData.workplaceAddress}
-                        onChange={handleInputChange}
-                        rows="2"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        placeholder="Enter workplace or business address"
-                      />
-                    </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Area */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Area <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          name="area_id"
-                          value={formData.area_id}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        >
-                          <option value="">Select area</option>
-                          {loadingAreas ? (
-                            <option value="">Loading...</option>
-                          ) : (
-                            areas.map((area) => (
-                              <option key={area.area_id} value={area.area_id}>
-                                {area.area_name || `Area ${area.area_id}`}
-                              </option>
-                            ))
-                          )}
-                        </select>
-                      </div>
-
-                      {/* Sub-area */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Sub-area
-                        </label>
-                        <select
-                          name="subarea_id"
-                          value={formData.subarea_id}
-                          onChange={handleInputChange}
-                          disabled={!formData.area_id || loadingSubAreas}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100"
-                        >
-                          <option value="">
-                            {!formData.area_id
-                              ? "Select area first"
-                              : loadingSubAreas
-                              ? "Loading..."
-                              : "Select sub-area"}
-                          </option>
-                          {!loadingSubAreas &&
-                            subAreas.map((subArea) => (
-                              <option key={subArea.id} value={subArea.id}>
-                                {subArea.address}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-
                       {/* Mobility */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -820,6 +748,90 @@ const AddMemberModal = ({
                         />
                       </div>
                     )}
+
+                    {/* Area */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Area <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="area_id"
+                        value={formData.area_id}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      >
+                        <option value="">Select area</option>
+                        {loadingAreas ? (
+                          <option value="">Loading...</option>
+                        ) : (
+                          areas.map((area) => (
+                            <option key={area.area_id} value={area.area_id}>
+                              {area.area_name || `Area ${area.area_id}`}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    {/* Sub-area */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Sub-area
+                      </label>
+                      <select
+                        name="subarea_id"
+                        value={formData.subarea_id}
+                        onChange={handleInputChange}
+                        disabled={!formData.area_id || loadingSubAreas}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100"
+                      >
+                        <option value="">
+                          {!formData.area_id
+                            ? "Select area first"
+                            : loadingSubAreas
+                            ? "Loading..."
+                            : "Select sub-area"}
+                        </option>
+                        {!loadingSubAreas &&
+                          subAreas.map((subArea) => (
+                            <option key={subArea.id} value={subArea.id}>
+                              {subArea.address}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Address */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Address
+                        </label>
+                        <textarea
+                          name="address"
+                          value={formData.address}
+                          onChange={handleInputChange}
+                          rows="2"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          placeholder="Enter residential address"
+                        />
+                      </div>
+
+                      {/* Workplace Address */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Workplace Address
+                        </label>
+                        <textarea
+                          name="workplaceAddress"
+                          value={formData.workplaceAddress}
+                          onChange={handleInputChange}
+                          rows="2"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          placeholder="Enter workplace or business address"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1089,7 +1101,8 @@ const AddMemberModal = ({
                   </button>
                 ) : (
                   <button
-                    type="submit"
+                    type="button"
+                    onClick={handleSubmit}
                     disabled={loading}
                     className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                   >

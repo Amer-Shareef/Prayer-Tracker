@@ -382,13 +382,12 @@ router.post(
         });
       }
 
-      // Phone number validation - must be in format +94XXXXXXXXX (exactly 9 digits after +94)
-      const phoneRegex = /^\+94\d{9}$/;
+      // Phone number validation - must be exactly 10 digits
+      const phoneRegex = /^\d{10}$/;
       if (!phoneRegex.test(phone)) {
         return res.status(400).json({
           success: false,
-          message:
-            "Phone number must be in format +94XXXXXXXXX (exactly 9 digits after +94)",
+          message: "Phone number must be exactly 10 digits",
         });
       }
 
