@@ -111,7 +111,7 @@ const PostFeeds = () => {
   // Helper function to validate YouTube URL
   const isValidYouTubeUrl = (url) => {
     if (!url || !url.trim()) return true; // Empty URL is valid (optional field)
-    
+
     const youtubeRegex =
       /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})(\S*)?$/;
     return youtubeRegex.test(url);
@@ -156,7 +156,9 @@ const PostFeeds = () => {
       const maxSize = 5 * 1024 * 1024; // 5MB in bytes
       if (file.size > maxSize) {
         const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
-        setImageUploadError(`Image file is too large (${fileSizeMB}MB). Maximum allowed size is 5MB.`);
+        setImageUploadError(
+          `Image file is too large (${fileSizeMB}MB). Maximum allowed size is 5MB.`
+        );
         e.target.value = ""; // Clear the file input
         return;
       }
@@ -218,8 +220,7 @@ const PostFeeds = () => {
     // Test UploadThing endpoint
     const testEndpoint = async () => {
       try {
-        const backendUrl =
-          process.env.REACT_APP_BACKEND_URL;
+        const backendUrl = process.env.REACT_APP_BACKEND_URL;
         const response = await fetch(`${backendUrl}/api/uploadthing`);
         console.log(
           "🧪 UploadThing endpoint test:",
@@ -298,7 +299,7 @@ const PostFeeds = () => {
           setVideoThumbnail("");
         } else {
           setVideoUrlError("");
-          
+
           // Show alert if image is selected
           if (uploadedImageUrl || selectedImageFile) {
             const confirmed = window.confirm(
@@ -311,13 +312,15 @@ const PostFeeds = () => {
 
           // Clear image data when video URL is entered
           clearImageData();
-          
+
           // Generate YouTube thumbnail
           const thumbnail = getYouTubeThumbnail(value);
           if (thumbnail) {
             setVideoThumbnail(thumbnail);
           } else {
-            setVideoUrlError("Could not generate video thumbnail. Please check the YouTube URL.");
+            setVideoUrlError(
+              "Could not generate video thumbnail. Please check the YouTube URL."
+            );
           }
         }
       } else {
@@ -1133,7 +1136,9 @@ const PostFeeds = () => {
                             </svg>
                           </div>
                           <div className="ml-3">
-                            <p className="text-sm font-medium">{imageUploadError}</p>
+                            <p className="text-sm font-medium">
+                              {imageUploadError}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -1205,7 +1210,9 @@ const PostFeeds = () => {
                             </svg>
                           </div>
                           <div className="ml-3">
-                            <p className="text-sm font-medium">{videoUrlError}</p>
+                            <p className="text-sm font-medium">
+                              {videoUrlError}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -1278,7 +1285,7 @@ const PostFeeds = () => {
 
         {/* Image Preview Modal */}
         {showImagePreview && (
-          <div 
+          <div
             className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
             onClick={() => setShowImagePreview(false)}
           >
