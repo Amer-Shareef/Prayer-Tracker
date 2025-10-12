@@ -5,38 +5,50 @@ import { useAuth } from "../../context/AuthContext";
 
 const TransportPage = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState("members");
-  const [selectedRequest, setSelectedRequest] = useState(null);
-  const [showModal, setShowModal] = useState(false);
-  const [actionType, setActionType] = useState(""); // 'approve' or 'reject'
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [selectedDriver, setSelectedDriver] = useState("");
+
+  // Add this with your other state declarations
+  const [driverSearchTerm, setDriverSearchTerm] = useState("");
 
   // Loading and error states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  // Modal states
+  const [showModal, setShowModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [actionType, setActionType] = useState(""); // 'approve' or 'reject'
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [selectedDriver, setSelectedDriver] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Real data from API
-  const [members, setMembers] = useState([]);
+  // Data states
   const [pickupRequests, setPickupRequests] = useState([]);
-  const [availableDrivers, setAvailableDrivers] = useState([]); // Changed from mock drivers
+  const [availableDrivers, setAvailableDrivers] = useState([]);
 
-  // Transport statistics
-  const [transportStats, setTransportStats] = useState({
-    totalMembers: 0,
-    needsAssistance: 0,
-    pendingRequests: 0,
-    approvedRequests: 0,
-    rejectedRequests: 0,
-  });
+  // Search and pagination states
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
-  // Add date and area state
+  // Date and area states
   const [currentDate, setCurrentDate] = useState({
     gregorian: "Loading...",
     hijri: "Loading...",
   });
   const [areaName, setAreaName] = useState("Loading...");
+
+  // Add this computed value after your state declarations
+  const filteredDrivers = availableDrivers.filter((driver) => {
+    const driverName = driver.fullName || driver.full_name || driver.name || "";
+    const mobility = driver.mobility || "";
+
+    return (
+      driverName.toLowerCase().includes(driverSearchTerm.toLowerCase()) ||
+      mobility.toLowerCase().includes(driverSearchTerm.toLowerCase())
+    );
+  });
 
   // Fetch current date
   useEffect(() => {
@@ -89,6 +101,21 @@ const TransportPage = () => {
     }
   }, [user]);
 
+  // Auto-dismiss messages
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(""), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => setSuccessMessage(""), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -98,327 +125,335 @@ const TransportPage = () => {
       setLoading(true);
       setError("");
 
-      console.log("🔄 Fetching transport data...");
-
-      // Fetch members and pickup requests in parallel
-      const [membersResponse, pickupResponse] = await Promise.all([
-        memberAPI.getMembers().catch((err) => {
-          console.error("❌ Failed to fetch members:", err);
-          return { success: false, data: [] };
-        }),
-        pickupService.getAllPickupRequests({ limit: 100 }).catch((err) => {
-          console.error("❌ Failed to fetch pickup requests:", err);
-          return { data: { success: false, data: [] } };
-        }),
-      ]);
-
-      console.log("📊 API Responses:");
-      console.log("- Members:", membersResponse);
-      console.log("- Pickup requests:", pickupResponse);
-
-      // Process members data
-      if (membersResponse.success && membersResponse.data) {
-        const processedMembers = membersResponse.data.map((member) => ({
-          id: member.id,
-          name: member.fullName || member.full_name || member.username,
-          phone: member.phone || "N/A",
-          address: member.address || "Address not provided",
-          transportMode: getTransportMode(member),
-          disabilityLevel: getDisabilityLevel(member),
-          needsAssistance: member.differentlyAbled || false,
-          regularPrayers: ["Fajr", "Maghrib"], // Default - can be enhanced
-          emergencyContact: member.phone || "N/A",
-        }));
-
-        setMembers(processedMembers);
-
-        // Filter members who have vehicles and can be drivers
-        const driversWithVehicles = processedMembers
-          .filter((member) => {
-            const hasVehicle =
-              member.transportMode === "Car" ||
-              member.transportMode === "Motorbike" ||
-              member.transportMode === "Bicycle";
-
-            console.log(
-              `🔍 Member ${member.name} - Transport: ${member.transportMode}, Has Vehicle: ${hasVehicle}`
-            );
-            return hasVehicle;
-          })
-          .map((member) => ({
-            id: member.id,
-            name: member.name,
-            vehicleType: member.transportMode,
-            displayName: `${member.name} (${
-              member.transportMode === "Personal Vehicle"
-                ? "Car"
-                : member.transportMode
-            })`,
-            isAvailable: true,
-          }));
-
-        setAvailableDrivers(driversWithVehicles);
-        console.log(
-          `✅ Processed ${processedMembers.length} members, ${driversWithVehicles.length} potential drivers:`,
-          driversWithVehicles
-        );
+      // Fetch pickup requests
+      const requestsResponse = await pickupService.getAllPickupRequests();
+      if (requestsResponse.data.success) {
+        setPickupRequests(requestsResponse.data.data);
       }
 
-      // FIXED: Process pickup requests data - use proper response structure
-      console.log("🔍 Checking pickup response structure:", pickupResponse);
-
-      if (
-        pickupResponse.data &&
-        pickupResponse.data.success &&
-        pickupResponse.data.data
-      ) {
-        const requestsData = pickupResponse.data.data;
-
-        console.log(
-          `📋 Found ${requestsData.length} pickup requests to process`
-        );
-
-        const processedRequests = requestsData.map((request) => ({
-          id: request.id,
-          memberId: request.user_id,
-          memberName:
-            request.member_name || request.member_username || "Unknown Member",
-          phone: request.contact_number || request.member_phone || "N/A",
-          address: request.pickup_location || "No address provided",
-          prayer: request.prayer_type || "Fajr",
-          date: new Date(request.created_at).toISOString().split("T")[0],
-          time: "4:30 AM", // Default Fajr time
-          disabilityLevel: "None", // Default
-          needsAssistance: false,
-          specialRequirements: request.special_instructions,
-          status: request.status || "pending",
-          requestedAt: request.created_at,
-          emergencyContact:
-            request.contact_phone || request.contact_number || "N/A",
-          days: request.days
-            ? typeof request.days === "string"
-              ? JSON.parse(request.days)
-              : request.days
-            : ["Daily"],
-          prayers: request.prayers
-            ? typeof request.prayers === "string"
-              ? JSON.parse(request.prayers)
-              : request.prayers
-            : ["Fajr"],
-          // Additional fields for approval workflow
-          assignedDriver: request.assigned_driver_name || null,
-          approvedBy: request.approved_by || null,
-          approvedAt: request.approved_at || null,
-          // Additional fields for rejection workflow - FIXED: use rejected_reason not rejection_reason
-          rejectionReason: request.rejected_reason || null,
-          rejectedAt: request.rejected_at || null,
-        }));
-
-        setPickupRequests(processedRequests);
-        console.log(`✅ Processed ${processedRequests.length} pickup requests`);
-      } else {
-        console.warn(
-          "❌ No pickup requests found in response:",
-          pickupResponse
-        );
-        setPickupRequests([]);
-      }
-    } catch (err) {
-      console.error("❌ Error fetching transport data:", err);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching transport data:", error);
       setError("Failed to load transport data. Please try again.");
-    } finally {
       setLoading(false);
     }
   };
 
-  // Helper functions to process member data
-  const getTransportMode = (member) => {
-    console.log("🚗 Checking transport mode for member:", member.name, {
-      transport_mode: member.transport_mode,
-      transportMode: member.transportMode,
-      mobility: member.mobility,
-      hasVehicle: member.hasVehicle,
-      vehicle: member.vehicle,
-      needsTransport: member.needsTransport,
-    });
+  // Fetch available drivers for a specific area
+  const fetchAvailableDriversForArea = async (areaId) => {
+    try {
+      const response = await memberAPI.getAllMembers();
+      if (response.success) {
+        const drivers = response.data.filter(
+          (member) =>
+            member.area_id === areaId &&
+            member.mobility &&
+            member.mobility.toLowerCase() !== "walking" &&
+            member.mobility.toLowerCase() !== "other" &&
+            member.status === "active"
+        );
+        setAvailableDrivers(drivers);
 
-    // Check for actual transport/mobility data from the member object
-    if (member.transport_mode) return member.transport_mode;
-    if (member.transportMode) return member.transportMode;
-    if (member.mobility) {
-      if (member.mobility === "car") return "Personal Vehicle";
-      if (member.mobility === "bike") return "Motorbike";
-      if (member.mobility === "bicycle") return "Bicycle";
-      if (member.mobility === "walk") return "Walking";
-      if (member.mobility === "public") return "Public Transport";
-      return member.mobility;
+        if (drivers.length === 0) {
+          setError(
+            "No available drivers found in this area with suitable mobility"
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching available drivers:", error);
+      setError("Failed to load available drivers for this area");
     }
-    // Check for vehicle ownership indicators
-    if (member.hasVehicle || member.vehicle) return "Personal Vehicle";
-    if (member.needsTransport) return "Needs Transport";
-
-    // TEMPORARY: For testing, assign random transport modes to some members
-    // This is just to test the dropdown functionality
-    const randomModes = [
-      "Personal Vehicle",
-      "Motorbike",
-      "Walking",
-      "Public Transport",
-    ];
-    const randomIndex = member.id % randomModes.length;
-    const assignedMode = randomModes[randomIndex];
-
-    console.log(`🎲 Temporarily assigning ${assignedMode} to ${member.name}`);
-    return assignedMode;
   };
 
-  const getDisabilityLevel = (member) => {
-    if (member.differentlyAbled) {
-      return "Mobility Issues";
-    }
-    return "None";
-  };
-
-  // Update stats when data changes
-  useEffect(() => {
-    setTransportStats({
-      totalMembers: members.length,
-      needsAssistance: members.filter((m) => m.needsAssistance).length,
-      pendingRequests: pickupRequests.filter((r) => r.status === "pending")
-        .length,
-      approvedRequests: pickupRequests.filter((r) => r.status === "approved")
-        .length,
-      rejectedRequests: pickupRequests.filter((r) => r.status === "rejected")
-        .length,
-    });
-  }, [members, pickupRequests]);
-
-  const handleRequestAction = (request, action) => {
+  const handleRequestAction = async (request, action) => {
     setSelectedRequest(request);
     setActionType(action);
+    setRejectionReason("");
+    setSelectedDriver("");
+    setDriverSearchTerm(""); // Add this line
+
+    // If approving, fetch drivers from the same area
+    if (action === "approve" && request.area_id) {
+      await fetchAvailableDriversForArea(request.area_id);
+    }
+
     setShowModal(true);
   };
 
+  const handleViewDetails = (request) => {
+    setSelectedRequest(request);
+    setShowDetailsModal(true);
+  };
+
   const submitAction = async () => {
-    if (actionType === "approve" && !selectedDriver) {
-      alert("Please select a member to assign");
-      return;
-    }
-    if (actionType === "reject" && !rejectionReason.trim()) {
-      alert("Please provide a reason for rejection");
-      return;
-    }
+    if (!selectedRequest) return;
 
     try {
       setActionLoading(true);
 
       if (actionType === "approve") {
-        const selectedDriverInfo = availableDrivers.find(
-          (d) => d.id === parseInt(selectedDriver)
-        );
+        if (!selectedDriver) {
+          setError("Please select a driver");
+          setActionLoading(false);
+          return;
+        }
 
-        console.log(
-          `✅ Approving request ${selectedRequest.id} with driver:`,
-          selectedDriverInfo
+        const driver = availableDrivers.find(
+          (d) => d.id.toString() === selectedDriver
         );
+        if (!driver) {
+          setError("Selected driver not found");
+          setActionLoading(false);
+          return;
+        }
 
-        // Call the API to approve and assign driver
         await pickupService.approvePickupRequest(
           selectedRequest.id,
-          selectedDriverInfo.id,
-          selectedDriverInfo.displayName
+          driver.id,
+          driver.fullName || driver.full_name || driver.name || driver.username
         );
 
-        // Update local state to reflect the change immediately
-        setPickupRequests((prev) =>
-          prev.map((request) => {
-            if (request.id === selectedRequest.id) {
-              return {
-                ...request,
-                status: "approved",
-                assignedDriver: selectedDriverInfo.displayName,
-                approvedAt: new Date().toISOString(),
-              };
-            }
-            return request;
-          })
+        setSuccessMessage(
+          `Pickup request approved and assigned to ${
+            driver.fullName ||
+            driver.full_name ||
+            driver.name ||
+            driver.username
+          }`
         );
+      } else if (actionType === "reject") {
+        if (!rejectionReason.trim()) {
+          setError("Please provide a reason for rejection");
+          setActionLoading(false);
+          return;
+        }
 
-        alert("Pickup request approved and driver assigned successfully!");
-      } else {
-        console.log(
-          `❌ Rejecting request ${selectedRequest.id}: ${rejectionReason}`
-        );
-
-        // Call the API to reject
         await pickupService.rejectPickupRequest(
           selectedRequest.id,
-          rejectionReason
+          rejectionReason.trim()
         );
 
-        // Update local state to reflect the change immediately
-        setPickupRequests((prev) =>
-          prev.map((request) => {
-            if (request.id === selectedRequest.id) {
-              return {
-                ...request,
-                status: "rejected",
-                rejectionReason: rejectionReason,
-                rejectedAt: new Date().toISOString(),
-              };
-            }
-            return request;
-          })
-        );
-
-        alert("Pickup request rejected successfully!");
+        setSuccessMessage("Pickup request rejected successfully");
       }
+
+      // Refresh data
+      await fetchData();
 
       // Reset modal
       setShowModal(false);
       setSelectedRequest(null);
+      setActionType("");
       setRejectionReason("");
       setSelectedDriver("");
-
-      // Refresh data from server to ensure consistency
-      await fetchData();
     } catch (error) {
-      console.error("❌ Error processing request:", error);
-
-      // Show more specific error messages
-      let errorMessage = "Failed to process request. Please try again.";
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-
-      alert(errorMessage);
+      console.error("Error processing request:", error);
+      setError(
+        error.response?.data?.message ||
+          "Failed to process request. Please try again."
+      );
     } finally {
       setActionLoading(false);
     }
   };
 
   const getStatusBadge = (status) => {
-    const colors = {
-      pending: "bg-yellow-100 text-yellow-800",
-      approved: "bg-green-100 text-green-800",
-      rejected: "bg-red-100 text-red-800",
+    const statusConfig = {
+      pending: {
+        bg: "bg-yellow-50",
+        border: "border-yellow-200",
+        text: "text-yellow-700",
+        dot: "bg-yellow-400",
+        label: "Pending Review",
+        icon: (
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        ),
+      },
+      approved: {
+        bg: "bg-green-50",
+        border: "border-green-200",
+        text: "text-green-700",
+        dot: "bg-green-400",
+        label: "Approved",
+        icon: (
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        ),
+      },
+      rejected: {
+        bg: "bg-red-50",
+        border: "border-red-200",
+        text: "text-red-700",
+        dot: "bg-red-400",
+        label: "Rejected",
+        icon: (
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        ),
+      },
+      completed: {
+        bg: "bg-blue-50",
+        border: "border-blue-200",
+        text: "text-blue-700",
+        dot: "bg-blue-400",
+        label: "Completed",
+        icon: (
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 13l4 4L19 7"
+            />
+          </svg>
+        ),
+      },
     };
-    return `px-2 py-1 text-xs font-medium rounded-full ${colors[status]}`;
+
+    const config = statusConfig[status] || statusConfig.pending;
+
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border ${config.bg} ${config.border} ${config.text}`}
+      >
+        {config.icon}
+        <span>{config.label}</span>
+      </span>
+    );
   };
 
-  const getDisabilityBadge = (level) => {
-    const colors = {
-      None: "bg-gray-100 text-gray-800",
-      "Mild Mobility Issues": "bg-yellow-100 text-yellow-800",
-      "Visual Impairment": "bg-blue-100 text-blue-800",
-      "Wheelchair User": "bg-orange-100 text-orange-800",
-      "Severe Disability": "bg-red-100 text-red-800",
-    };
-    return `px-2 py-1 text-xs font-medium rounded-full ${
-      colors[level] || "bg-gray-100 text-gray-800"
-    }`;
+  // Sort requests: pending first, then approved, then rejected/completed
+  const sortedAndFilteredRequests = pickupRequests
+    .filter((request) => {
+      const matchesSearch =
+        !searchTerm ||
+        request.member_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        request.area_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        request.pickup_location
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        request.driver_name?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      return matchesSearch;
+    })
+    .sort((a, b) => {
+      // Priority order: pending > approved > rejected/completed
+      const statusPriority = {
+        pending: 1,
+        approved: 2,
+        rejected: 3,
+        completed: 4,
+      };
+
+      const priorityDiff = statusPriority[a.status] - statusPriority[b.status];
+      if (priorityDiff !== 0) return priorityDiff;
+
+      // Within same status, sort by date (newest first)
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+
+  // Calculate status statistics
+  const statusStats = {
+    total: pickupRequests.length,
+    pending: pickupRequests.filter((r) => r.status === "pending").length,
+    approved: pickupRequests.filter((r) => r.status === "approved").length,
+    rejected: pickupRequests.filter((r) => r.status === "rejected").length,
+    completed: pickupRequests.filter((r) => r.status === "completed").length,
+  };
+
+  // Pagination logic
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = sortedAndFilteredRequests.slice(
+    indexOfFirstItem,
+    indexOfLastItem
+  );
+  const totalPages = Math.ceil(sortedAndFilteredRequests.length / itemsPerPage);
+
+  // Reset to first page when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    // Scroll to top of table
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 5;
+
+    if (totalPages <= maxPagesToShow) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) {
+          pages.push(i);
+        }
+        pages.push("...");
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1);
+        pages.push("...");
+        for (let i = totalPages - 3; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        pages.push(1);
+        pages.push("...");
+        pages.push(currentPage - 1);
+        pages.push(currentPage);
+        pages.push(currentPage + 1);
+        pages.push("...");
+        pages.push(totalPages);
+      }
+    }
+
+    return pages;
   };
 
   if (loading) {
@@ -427,7 +462,9 @@ const TransportPage = () => {
         <div className="max-w-7xl mx-auto p-6">
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            <div className="ml-4 text-lg">Loading transport data...</div>
+            <div className="ml-4 text-lg text-gray-600">
+              Loading transport data...
+            </div>
           </div>
         </div>
       </FounderLayout>
@@ -437,20 +474,63 @@ const TransportPage = () => {
   return (
     <FounderLayout>
       <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
-            Transport & Mobility Management
+        {/* Header */}
+        <div className="mb-6 mt-8">
+          <h2 className="text-2xl font-bold text-gray-800">
+            Transport Management
           </h2>
-          <p className="text-gray-600">
-            Manage member transportation needs and pickup requests
+          <p className="text-sm text-gray-600 mt-1">
+            Manage pickup requests and assign drivers
           </p>
         </div>
 
-        {error && (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6">
-            <div className="flex">
+        {/* Success Message */}
+        {successMessage && (
+          <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-6 rounded-r-lg shadow-sm animate-fade-in">
+            <div className="flex items-start">
               <svg
-                className="w-5 h-5 mr-2"
+                className="w-5 h-5 mr-3 flex-shrink-0 mt-0.5 text-green-400"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <span className="flex-1 text-sm font-medium text-green-800">
+                {successMessage}
+              </span>
+              <button
+                onClick={() => setSuccessMessage("")}
+                className="ml-4 text-green-600 hover:text-green-800 transition-colors"
+                title="Dismiss"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6 rounded-r-lg shadow-sm">
+            <div className="flex items-start">
+              <svg
+                className="w-5 h-5 mr-3 flex-shrink-0 mt-0.5 text-red-400"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -460,688 +540,1699 @@ const TransportPage = () => {
                   clipRule="evenodd"
                 />
               </svg>
-              {error}
+              <span className="flex-1 text-sm font-medium text-red-800">
+                {error}
+              </span>
+              <button
+                onClick={() => setError("")}
+                className="ml-4 text-red-600 hover:text-red-800 transition-colors"
+                title="Dismiss"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
             </div>
-            <button
-              onClick={fetchData}
-              className="mt-2 text-red-800 underline hover:text-red-900"
-            >
-              Try again
-            </button>
           </div>
         )}
 
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-2xl font-bold text-blue-600">
-              {transportStats.totalMembers}
+        {/* Search Bar with Compact Stats */}
+        <div className="bg-white rounded-lg shadow-sm mb-6 p-4 border border-gray-200">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            {/* Search */}
+            <div className="relative flex-1 max-w-md">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg
+                  className="h-5 w-5 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </div>
+              <input
+                type="text"
+                placeholder="Search by member, area, location, or driver..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-700 placeholder-gray-400"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  <svg
+                    className="h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
             </div>
-            <div className="text-sm text-gray-500">Total Members</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-2xl font-bold text-orange-600">
-              {transportStats.needsAssistance}
+
+            {/* Compact Stats */}
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-2 px-3 py-2 bg-yellow-50 rounded-lg border border-yellow-200">
+                <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                <span className="text-yellow-700 font-medium">
+                  {statusStats.pending} Pending
+                </span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
+                <div className="w-2 h-2 rounded-full bg-green-400"></div>
+                <span className="text-green-700 font-medium">
+                  {statusStats.approved} Approved
+                </span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                <span className="text-gray-700 font-medium">
+                  {statusStats.total} Total
+                </span>
+              </div>
             </div>
-            <div className="text-sm text-gray-500">Need Assistance</div>
           </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-2xl font-bold text-yellow-600">
-              {transportStats.pendingRequests}
-            </div>
-            <div className="text-sm text-gray-500">Pending</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-2xl font-bold text-green-600">
-              {transportStats.approvedRequests}
-            </div>
-            <div className="text-sm text-gray-500">Approved</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-2xl font-bold text-red-600">
-              {transportStats.rejectedRequests}
-            </div>
-            <div className="text-sm text-gray-500">Rejected</div>
-          </div>
+
+          {/* <p className="text-xs text-gray-500 mt-3">
+            Showing {indexOfFirstItem + 1}-
+            {Math.min(indexOfLastItem, sortedAndFilteredRequests.length)} of{" "}
+            {sortedAndFilteredRequests.length} requests • Sorted by priority
+          </p> */}
         </div>
 
-        {/* Tabs */}
-        <div className="border-b border-gray-200 mb-6">
-          <nav className="-mb-px flex space-x-8">
-            {[
-              { id: "members", label: "Member Details" },
-              { id: "requests", label: "Pickup Requests" },
-              { id: "approved", label: "Approved Requests" },
-              { id: "rejected", label: "Rejected Requests" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === tab.id
-                    ? "border-green-500 text-green-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                {tab.label}
-                {/* Show count badges for request tabs */}
-                {tab.id === "requests" &&
-                  transportStats.pendingRequests > 0 && (
-                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                      {transportStats.pendingRequests}
-                    </span>
-                  )}
-                {tab.id === "approved" &&
-                  transportStats.approvedRequests > 0 && (
-                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      {transportStats.approvedRequests}
-                    </span>
-                  )}
-                {tab.id === "rejected" &&
-                  transportStats.rejectedRequests > 0 && (
-                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                      {transportStats.rejectedRequests}
-                    </span>
-                  )}
-              </button>
-            ))}
-          </nav>
-        </div>
+        {/* Requests Table */}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Pickup Requests
+            </h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Review pending requests and track assigned drivers
+            </p>
+          </div>
 
-        {/* Tab Content */}
-        {activeTab === "members" && (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium">
-                Member Transport Information
-              </h3>
-              <p className="text-sm text-gray-600 mt-1">
-                Overview of all members and their transportation modes
-              </p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Member Details
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Pickup Information
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Assigned Driver
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Requested
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {currentItems.length === 0 ? (
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Member
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Transport Mode
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Assistance
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Contact
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {members.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan="4"
-                        className="px-6 py-8 text-center text-gray-500"
+                    <td colSpan="6" className="px-6 py-12 text-center">
+                      <svg
+                        className="mx-auto h-12 w-12 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                       >
-                        No members found
-                      </td>
-                    </tr>
-                  ) : (
-                    members.map((member) => (
-                      <tr key={member.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                        />
+                      </svg>
+                      <p className="mt-2 text-sm text-gray-500">
+                        No pickup requests found
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  currentItems.map((request) => (
+                    <tr
+                      key={request.id}
+                      className={`hover:bg-gray-50 transition-colors ${
+                        request.status === "pending" ? "bg-yellow-50/30" : ""
+                      }`}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            <svg
+                              className="h-6 w-6 text-blue-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                              />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
                             <div className="text-sm font-medium text-gray-900">
-                              {member.name}
+                              {request.member_name || "Unknown"}
                             </div>
-                            <div className="text-sm text-gray-500">
-                              {member.address}
+                            {request.member_phone && (
+                              <div className="text-xs text-gray-500 flex items-center mt-0.5">
+                                <svg
+                                  className="w-3 h-3 mr-1"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                                  />
+                                </svg>
+                                {request.member_phone}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900">
+                          <div className="flex items-start">
+                            <svg
+                              className="w-4 h-4 mr-1.5 mt-0.5 text-gray-400 flex-shrink-0"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                              />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                              />
+                            </svg>
+                            <div>
+                              {request.pickup_location ? (
+                                <>
+                                  <div className="font-medium">
+                                    {request.pickup_location}
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-0.5">
+                                    {request.area_name || "N/A"}
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="font-medium">
+                                  {request.area_name || "N/A"}
+                                </div>
+                              )}
                             </div>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`px-2 py-1 text-xs font-medium rounded-full ${
-                              member.transportMode === "Personal Vehicle"
-                                ? "bg-green-100 text-green-800"
-                                : member.transportMode === "Motorbike"
-                                ? "bg-blue-100 text-blue-800"
-                                : member.transportMode === "Bicycle"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : member.transportMode === "Walking"
-                                ? "bg-gray-100 text-gray-800"
-                                : member.transportMode === "Public Transport"
-                                ? "bg-purple-100 text-purple-800"
-                                : member.transportMode === "Needs Transport"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-blue-100 text-blue-800"
-                            }`}
-                          >
-                            {member.transportMode}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`px-2 py-1 text-xs font-medium rounded-full ${
-                              member.needsAssistance
-                                ? "bg-red-100 text-red-800"
-                                : "bg-green-100 text-green-800"
-                            }`}
-                          >
-                            {member.needsAssistance
-                              ? "Required"
-                              : "Not Required"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <div>{member.phone}</div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "requests" && (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-medium">Pending Pickup Requests</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Requests awaiting approval or rejection
-                </p>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Member Details
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Schedule
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Requirements
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {pickupRequests.filter(
-                    (request) => request.status === "pending"
-                  ).length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan="5"
-                        className="px-6 py-8 text-center text-gray-500"
-                      >
-                        No pending pickup requests found
+                        </div>
                       </td>
-                    </tr>
-                  ) : (
-                    pickupRequests
-                      .filter((request) => request.status === "pending")
-                      .map((request) => (
-                        <tr key={request.id}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">
-                                {request.memberName}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                {request.address}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {request.phone}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {request.days.length > 0
-                                ? request.days
-                                    .map(
-                                      (d) =>
-                                        d.charAt(0).toUpperCase() + d.slice(1)
-                                    )
-                                    .join(", ")
-                                : "Daily"}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {request.prayers.length > 0
-                                ? request.prayers
-                                    .map(
-                                      (p) =>
-                                        p.charAt(0).toUpperCase() + p.slice(1)
-                                    )
-                                    .join(", ")
-                                : "Fajr"}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              Requested:{" "}
-                              {new Date(
-                                request.requestedAt
-                              ).toLocaleDateString()}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm text-gray-900">
-                              {request.specialRequirements}
-                            </div>
-                            {request.needsAssistance && (
-                              <span className="inline-block mt-1 px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
-                                Assistance Required
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
-                              Pending
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex flex-col space-y-1">
-                              <button
-                                onClick={() =>
-                                  handleRequestAction(request, "approve")
-                                }
-                                className="text-green-600 hover:text-green-900 text-xs"
-                                disabled={actionLoading}
-                              >
-                                Approve
-                              </button>
-                              <button
-                                onClick={() =>
-                                  handleRequestAction(request, "reject")
-                                }
-                                className="text-red-600 hover:text-red-900 text-xs"
-                                disabled={actionLoading}
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "approved" && (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-medium">
-                  Approved Pickup Requests
-                </h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Requests that have been approved and assigned
-                </p>
-              </div>
-              <button
-                onClick={fetchData}
-                disabled={loading}
-                className="text-blue-600 hover:text-blue-800 text-sm"
-              >
-                🔄 Refresh
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Member Details
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Schedule
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Assigned Member
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Approved Date
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {pickupRequests.filter(
-                    (request) => request.status === "approved"
-                  ).length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan="5"
-                        className="px-6 py-8 text-center text-gray-500"
-                      >
-                        No approved pickup requests found
+                      <td className="px-6 py-4">
+                        {getStatusBadge(request.status)}
                       </td>
-                    </tr>
-                  ) : (
-                    pickupRequests
-                      .filter((request) => request.status === "approved")
-                      .map((request) => (
-                        <tr key={request.id}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div>
+                      <td className="px-6 py-4">
+                        {request.driver_name ? (
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
+                              <svg
+                                className="h-4 w-4 text-green-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                                />
+                              </svg>
+                            </div>
+                            <div className="ml-2">
                               <div className="text-sm font-medium text-gray-900">
-                                {request.memberName}
+                                {request.driver_name}
                               </div>
-                              <div className="text-sm text-gray-500">
-                                {request.address}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {request.phone}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {request.days.length > 0
-                                ? request.days
-                                    .map(
-                                      (d) =>
-                                        d.charAt(0).toUpperCase() + d.slice(1)
-                                    )
-                                    .join(", ")
-                                : "Daily"}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {request.prayers.length > 0
-                                ? request.prayers
-                                    .map(
-                                      (p) =>
-                                        p.charAt(0).toUpperCase() + p.slice(1)
-                                    )
-                                    .join(", ")
-                                : "Fajr"}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              Requested:{" "}
-                              {new Date(
-                                request.requestedAt
-                              ).toLocaleDateString()}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {request.assignedDriver ? (
-                              <div className="text-sm text-green-600">
-                                <div className="font-medium">
-                                  {request.assignedDriver}
-                                </div>
+                              {request.driver_phone && (
                                 <div className="text-xs text-gray-500">
-                                  Assigned Member
+                                  {request.driver_phone}
                                 </div>
-                              </div>
-                            ) : (
-                              <div className="text-sm text-gray-500">
-                                Not assigned
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                              Approved
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {request.approvedAt
-                              ? new Date(
-                                  request.approvedAt
-                                ).toLocaleDateString()
-                              : "Recently"}
-                          </td>
-                        </tr>
-                      ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "rejected" && (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-medium">
-                  Rejected Pickup Requests
-                </h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Requests that have been rejected with reasons
-                </p>
-              </div>
-              <button
-                onClick={fetchData}
-                disabled={loading}
-                className="text-blue-600 hover:text-blue-800 text-sm"
-              >
-                🔄 Refresh
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Member Details
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Schedule
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Rejection Reason
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Rejected Date
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {pickupRequests.filter(
-                    (request) => request.status === "rejected"
-                  ).length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan="5"
-                        className="px-6 py-8 text-center text-gray-500"
-                      >
-                        No rejected pickup requests found
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center text-gray-400 text-sm">
+                            <svg
+                              className="w-4 h-4 mr-1"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M20 12H4"
+                              />
+                            </svg>
+                            Not assigned
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div className="flex items-center">
+                          <svg
+                            className="w-4 h-4 mr-1.5 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
+                          </svg>
+                          {new Date(request.created_at).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            }
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        {request.status === "pending" ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() =>
+                                handleRequestAction(request, "approve")
+                              }
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-md transition-colors shadow-sm"
+                              title="Approve and assign driver"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                              Approve
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleRequestAction(request, "reject")
+                              }
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-md transition-colors shadow-sm"
+                              title="Reject request"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M6 18L18 6M6 6l12 12"
+                                />
+                              </svg>
+                              Reject
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleViewDetails(request)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-md transition-colors"
+                            title="View details"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                              />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                              />
+                            </svg>
+                            View
+                          </button>
+                        )}
                       </td>
                     </tr>
-                  ) : (
-                    pickupRequests
-                      .filter((request) => request.status === "rejected")
-                      .map((request) => (
-                        <tr key={request.id}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">
-                                {request.memberName}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                {request.address}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {request.phone}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {request.days.length > 0
-                                ? request.days
-                                    .map(
-                                      (d) =>
-                                        d.charAt(0).toUpperCase() + d.slice(1)
-                                    )
-                                    .join(", ")
-                                : "Daily"}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {request.prayers.length > 0
-                                ? request.prayers
-                                    .map(
-                                      (p) =>
-                                        p.charAt(0).toUpperCase() + p.slice(1)
-                                    )
-                                    .join(", ")
-                                : "Fajr"}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              Requested:{" "}
-                              {new Date(
-                                request.requestedAt
-                              ).toLocaleDateString()}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm text-red-600 max-w-xs">
-                              {request.rejectionReason || "No reason provided"}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
-                              Rejected
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {request.rejectedAt
-                              ? new Date(
-                                  request.rejectedAt
-                                ).toLocaleDateString()
-                              : "Recently"}
-                          </td>
-                        </tr>
-                      ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
 
-        {/* Action Modal */}
-        {showModal && (
-          <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-              <div
-                className="fixed inset-0 transition-opacity"
-                aria-hidden="true"
-              >
-                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-              </div>
-              <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                    {actionType === "approve"
-                      ? "Approve Pickup Request"
-                      : "Reject Pickup Request"}
-                  </h3>
-
-                  <div className="mb-4">
-                    <p className="text-sm text-gray-600">
-                      Member:{" "}
-                      <span className="font-medium">
-                        {selectedRequest?.memberName}
-                      </span>
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Location:{" "}
-                      <span className="font-medium">
-                        {selectedRequest?.address}
-                      </span>
-                    </p>
-                  </div>
-
-                  {actionType === "approve" && (
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Assign Member
-                      </label>
-                      <select
-                        value={selectedDriver}
-                        onChange={(e) => setSelectedDriver(e.target.value)}
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-green-500 focus:border-green-500"
-                      >
-                        <option value="">
-                          Select a member with vehicle...
-                        </option>
-                        {availableDrivers
-                          .filter((d) => d.isAvailable)
-                          .map((driver) => (
-                            <option key={driver.id} value={driver.id}>
-                              {driver.displayName}
-                            </option>
-                          ))}
-                      </select>
-                      {availableDrivers.length === 0 && (
-                        <p className="text-sm text-gray-500 mt-1">
-                          No members with vehicles available
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {actionType === "reject" && (
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Reason for Rejection
-                      </label>
-                      <textarea
-                        value={rejectionReason}
-                        onChange={(e) => setRejectionReason(e.target.value)}
-                        rows={3}
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-red-500 focus:border-red-500"
-                        placeholder="Please provide a reason for rejection..."
-                      />
-                    </div>
-                  )}
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="bg-white px-6 py-4 border-t border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  Page <span className="font-medium">{currentPage}</span> of{" "}
+                  <span className="font-medium">{totalPages}</span>
                 </div>
 
-                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <nav className="flex items-center gap-2">
+                  {/* Previous Button */}
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className={`inline-flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                      currentPage === 1
+                        ? "border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50"
+                        : "border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                    }`}
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 19l-7-7 7-7"
+                      />
+                    </svg>
+                    Previous
+                  </button>
+
+                  {/* Page Numbers */}
+                  <div className="hidden sm:flex items-center gap-1">
+                    {getPageNumbers().map((pageNum, index) => {
+                      if (pageNum === "...") {
+                        return (
+                          <span
+                            key={`ellipsis-${index}`}
+                            className="px-3 py-2 text-gray-500"
+                          >
+                            ...
+                          </span>
+                        );
+                      }
+
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => handlePageChange(pageNum)}
+                          className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                            currentPage === pageNum
+                              ? "bg-blue-600 text-white"
+                              : "text-gray-700 hover:bg-gray-100"
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Next Button */}
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className={`inline-flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                      currentPage === totalPages
+                        ? "border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50"
+                        : "border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                    }`}
+                  >
+                    Next
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </button>
+                </nav>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Keep the existing modals unchanged */}
+        {/* Action Modal (Approve/Reject) */}
+        {showModal && (
+          <div
+            className="fixed inset-0 z-50 overflow-y-auto"
+            aria-labelledby="modal-title"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div
+                className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+                aria-hidden="true"
+                onClick={() => !actionLoading && setShowModal(false)}
+              ></div>
+
+              <span
+                className="hidden sm:inline-block sm:align-middle sm:h-screen"
+                aria-hidden="true"
+              >
+                &#8203;
+              </span>
+
+              <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+                <div className="sm:flex sm:items-start">
+                  <div
+                    className={`mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full sm:mx-0 sm:h-10 sm:w-10 ${
+                      actionType === "approve" ? "bg-green-100" : "bg-red-100"
+                    }`}
+                  >
+                    {actionType === "approve" ? (
+                      <svg
+                        className="h-6 w-6 text-green-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        className="h-6 w-6 text-red-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left flex-1">
+                    <h3
+                      className="text-lg leading-6 font-semibold text-gray-900"
+                      id="modal-title"
+                    >
+                      {actionType === "approve"
+                        ? "Approve Pickup Request"
+                        : "Reject Pickup Request"}
+                    </h3>
+
+                    <div className="mt-4 bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="font-medium text-gray-600">
+                            Member:
+                          </span>
+                          <span className="text-gray-900">
+                            {selectedRequest?.member_name}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="font-medium text-gray-600">
+                            Location:
+                          </span>
+                          <span className="text-gray-900">
+                            {selectedRequest?.pickup_location ||
+                              selectedRequest?.area_name}
+                          </span>
+                        </div>
+                        {selectedRequest?.pickup_location && (
+                          <div className="flex justify-between">
+                            <span className="font-medium text-gray-600">
+                              Area:
+                            </span>
+                            <span className="text-gray-900">
+                              {selectedRequest?.area_name}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {actionType === "approve" && (
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Assign Driver *
+                        </label>
+                        <select
+                          value={selectedDriver}
+                          onChange={(e) => setSelectedDriver(e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                        >
+                          <option value="">Select a driver...</option>
+                          {availableDrivers.length === 0 ? (
+                            <option value="" disabled>
+                              No drivers available in this area
+                            </option>
+                          ) : (
+                            availableDrivers.map((driver) => (
+                              <option key={driver.id} value={driver.id}>
+                                {driver.fullName ||
+                                  driver.full_name ||
+                                  driver.name}{" "}
+                                • {driver.mobility || "Vehicle"}
+                              </option>
+                            ))
+                          )}
+                        </select>
+                        {availableDrivers.length === 0 && (
+                          <p className="text-xs text-gray-500 mt-2 flex items-start">
+                            <svg
+                              className="w-4 h-4 mr-1 mt-0.5 flex-shrink-0"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
+                            </svg>
+                            No members with suitable transport found in this
+                            area
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {actionType === "reject" && (
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Reason for Rejection *
+                        </label>
+                        <textarea
+                          value={rejectionReason}
+                          onChange={(e) => setRejectionReason(e.target.value)}
+                          rows={3}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm resize-none"
+                          placeholder="Please explain why this request is being rejected..."
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          This will be shared with the member
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse gap-3">
                   <button
                     type="button"
-                    className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 text-base font-medium text-white focus:outline-none sm:ml-3 sm:w-auto sm:text-sm ${
+                    className={`w-full inline-flex justify-center items-center gap-2 rounded-lg border border-transparent shadow-sm px-4 py-2.5 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:w-auto sm:text-sm transition-colors ${
                       actionType === "approve"
                         ? "bg-green-600 hover:bg-green-700 focus:ring-green-500"
                         : "bg-red-600 hover:bg-red-700 focus:ring-red-500"
-                    }`}
+                    } ${actionLoading ? "opacity-75 cursor-not-allowed" : ""}`}
                     onClick={submitAction}
                     disabled={actionLoading}
                   >
-                    {actionLoading
-                      ? "Processing..."
-                      : actionType === "approve"
-                      ? "Approve"
-                      : "Reject"}
+                    {actionLoading ? (
+                      <>
+                        <svg
+                          className="animate-spin h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        {actionType === "approve" ? (
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                        ) : (
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        )}
+                        {actionType === "approve"
+                          ? "Approve & Assign"
+                          : "Reject Request"}
+                      </>
+                    )}
                   </button>
                   <button
                     type="button"
-                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    className="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2.5 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:w-auto sm:text-sm transition-colors"
                     onClick={() => setShowModal(false)}
                     disabled={actionLoading}
                   >
                     Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Details Modal */}
+        {/* Action Modal (Approve/Reject) - IMPROVED VERSION */}
+        {/* Action Modal (Approve/Reject) - OPTIMIZED FOR 100+ DRIVERS */}
+        {showModal && (
+          <div
+            className="fixed inset-0 z-50 overflow-y-auto"
+            aria-labelledby="modal-title"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div
+                className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+                aria-hidden="true"
+                onClick={() => !actionLoading && setShowModal(false)}
+              ></div>
+
+              <span
+                className="hidden sm:inline-block sm:align-middle sm:h-screen"
+                aria-hidden="true"
+              >
+                &#8203;
+              </span>
+
+              <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full sm:p-6">
+                <div className="sm:flex sm:items-start">
+                  <div
+                    className={`mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full sm:mx-0 sm:h-10 sm:w-10 ${
+                      actionType === "approve" ? "bg-green-100" : "bg-red-100"
+                    }`}
+                  >
+                    {actionType === "approve" ? (
+                      <svg
+                        className="h-6 w-6 text-green-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        className="h-6 w-6 text-red-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left flex-1">
+                    <h3
+                      className="text-lg leading-6 font-semibold text-gray-900"
+                      id="modal-title"
+                    >
+                      {actionType === "approve"
+                        ? "Approve Pickup Request"
+                        : "Reject Pickup Request"}
+                    </h3>
+
+                    <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-start justify-between">
+                          <span className="font-medium text-gray-600 flex items-center gap-1.5">
+                            <svg
+                              className="w-4 h-4 text-blue-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                              />
+                            </svg>
+                            Member:
+                          </span>
+                          <span className="text-gray-900 font-medium">
+                            {selectedRequest?.member_name}
+                          </span>
+                        </div>
+                        <div className="flex items-start justify-between">
+                          <span className="font-medium text-gray-600 flex items-center gap-1.5">
+                            <svg
+                              className="w-4 h-4 text-blue-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                              />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                              />
+                            </svg>
+                            Location:
+                          </span>
+                          <span className="text-gray-900 font-medium text-right">
+                            {selectedRequest?.pickup_location ||
+                              selectedRequest?.area_name}
+                          </span>
+                        </div>
+                        {selectedRequest?.pickup_location && (
+                          <div className="flex items-start justify-between">
+                            <span className="font-medium text-gray-600 flex items-center gap-1.5">
+                              <svg
+                                className="w-4 h-4 text-blue-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                                />
+                              </svg>
+                              Area:
+                            </span>
+                            <span className="text-gray-900 font-medium">
+                              {selectedRequest?.area_name}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {actionType === "approve" && (
+                      <div className="mt-5">
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                          Select Driver to Assign *
+                        </label>
+
+                        {availableDrivers.length === 0 ? (
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <div className="flex items-start">
+                              <svg
+                                className="w-5 h-5 text-yellow-600 mr-3 flex-shrink-0 mt-0.5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                                />
+                              </svg>
+                              <div>
+                                <p className="text-sm font-medium text-yellow-800">
+                                  No drivers available
+                                </p>
+                                <p className="text-xs text-yellow-700 mt-1">
+                                  No members with suitable transport found in
+                                  this area.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {/* Driver Search */}
+                            <div className="relative mb-3">
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg
+                                  className="h-5 w-5 text-gray-400"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                                  />
+                                </svg>
+                              </div>
+                              <input
+                                type="text"
+                                placeholder="Search drivers by name..."
+                                value={driverSearchTerm}
+                                onChange={(e) =>
+                                  setDriverSearchTerm(e.target.value)
+                                }
+                                className="w-full pl-10 pr-10 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm transition-colors"
+                              />
+                              {driverSearchTerm && (
+                                <button
+                                  onClick={() => setDriverSearchTerm("")}
+                                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                                >
+                                  <svg
+                                    className="h-5 w-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M6 18L18 6M6 6l12 12"
+                                    />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Results count */}
+                            <div className="text-xs text-gray-500 mb-2">
+                              Showing {filteredDrivers.length} of{" "}
+                              {availableDrivers.length} drivers
+                            </div>
+
+                            {/* Scrollable Driver List - Optimized */}
+                            <div className="border-2 border-gray-200 rounded-lg max-h-96 overflow-y-auto custom-scrollbar">
+                              {filteredDrivers.length === 0 ? (
+                                <div className="p-8 text-center">
+                                  <svg
+                                    className="mx-auto h-12 w-12 text-gray-400"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                                    />
+                                  </svg>
+                                  <p className="mt-2 text-sm text-gray-500">
+                                    No drivers found matching "
+                                    {driverSearchTerm}"
+                                  </p>
+                                </div>
+                              ) : (
+                                filteredDrivers.map((driver) => {
+                                  const driverId = driver.id.toString();
+                                  const isSelected =
+                                    selectedDriver === driverId;
+                                  const driverName =
+                                    driver.fullName ||
+                                    driver.full_name ||
+                                    driver.name;
+                                  const mobility = driver.mobility || "Vehicle";
+
+                                  // Get mobility icon
+                                  const getMobilityIcon = () => {
+                                    const mobilityLower =
+                                      mobility.toLowerCase();
+                                    if (mobilityLower.includes("car")) {
+                                      return (
+                                        <svg
+                                          className="w-4 h-4"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"
+                                          />
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1-1V4a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h4a1 1 0 001-1m-6 0h6"
+                                          />
+                                        </svg>
+                                      );
+                                    } else if (
+                                      mobilityLower.includes("bike") ||
+                                      mobilityLower.includes("motorcycle")
+                                    ) {
+                                      return (
+                                        <svg
+                                          className="w-4 h-4"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M13 10V3L4 14h7v7l9-11h-7z"
+                                          />
+                                        </svg>
+                                      );
+                                    } else if (
+                                      mobilityLower.includes("van") ||
+                                      mobilityLower.includes("truck")
+                                    ) {
+                                      return (
+                                        <svg
+                                          className="w-4 h-4"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+                                          />
+                                        </svg>
+                                      );
+                                    } else {
+                                      return (
+                                        <svg
+                                          className="w-4 h-4"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                                          />
+                                        </svg>
+                                      );
+                                    }
+                                  };
+
+                                  return (
+                                    <label
+                                      key={driver.id}
+                                      htmlFor={`driver-${driver.id}`}
+                                      className={`flex items-center p-3 border-b border-gray-200 cursor-pointer transition-all hover:bg-gray-50 ${
+                                        isSelected
+                                          ? "bg-green-50 border-l-4 border-l-green-500"
+                                          : ""
+                                      }`}
+                                    >
+                                      <input
+                                        type="radio"
+                                        id={`driver-${driver.id}`}
+                                        name="driver-selection"
+                                        value={driverId}
+                                        checked={isSelected}
+                                        onChange={(e) =>
+                                          setSelectedDriver(e.target.value)
+                                        }
+                                        className="sr-only"
+                                      />
+
+                                      {/* Radio Circle */}
+                                      <div className="flex-shrink-0 mr-3">
+                                        <div
+                                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                                            isSelected
+                                              ? "border-green-500 bg-green-500"
+                                              : "border-gray-300 bg-white"
+                                          }`}
+                                        >
+                                          {isSelected && (
+                                            <div className="w-2 h-2 rounded-full bg-white"></div>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Driver Avatar */}
+                                      <div
+                                        className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center mr-3 ${
+                                          isSelected
+                                            ? "bg-green-200"
+                                            : "bg-blue-100"
+                                        }`}
+                                      >
+                                        <svg
+                                          className={`w-6 h-6 ${
+                                            isSelected
+                                              ? "text-green-700"
+                                              : "text-blue-600"
+                                          }`}
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                          />
+                                        </svg>
+                                      </div>
+
+                                      {/* Driver Info */}
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center justify-between">
+                                          <h4
+                                            className={`text-sm font-semibold truncate ${
+                                              isSelected
+                                                ? "text-green-900"
+                                                : "text-gray-900"
+                                            }`}
+                                          >
+                                            {driverName}
+                                          </h4>
+                                        </div>
+
+                                        {/* Mobility Type Badge - Inline */}
+                                        <div className="flex items-center gap-2 mt-1">
+                                          <span
+                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                                              isSelected
+                                                ? "bg-green-100 text-green-700"
+                                                : "bg-gray-100 text-gray-600"
+                                            }`}
+                                          >
+                                            {getMobilityIcon()}
+                                            {mobility}
+                                          </span>
+
+                                          {/* Phone (if available) */}
+                                          {driver.phone && (
+                                            <span
+                                              className={`text-xs ${
+                                                isSelected
+                                                  ? "text-green-600"
+                                                  : "text-gray-500"
+                                              }`}
+                                            >
+                                              • {driver.phone}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Checkmark for selected */}
+                                      {isSelected && (
+                                        <svg
+                                          className="w-5 h-5 text-green-600 ml-2 flex-shrink-0"
+                                          fill="currentColor"
+                                          viewBox="0 0 20 20"
+                                        >
+                                          <path
+                                            fillRule="evenodd"
+                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                            clipRule="evenodd"
+                                          />
+                                        </svg>
+                                      )}
+                                    </label>
+                                  );
+                                })
+                              )}
+                            </div>
+
+                            <p className="text-xs text-gray-500 mt-2 flex items-start gap-1">
+                              <svg
+                                className="w-4 h-4 flex-shrink-0 mt-0.5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
+                              </svg>
+                              Click on a driver to select them
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {actionType === "reject" && (
+                      <div className="mt-5">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Reason for Rejection *
+                        </label>
+                        <textarea
+                          value={rejectionReason}
+                          onChange={(e) => setRejectionReason(e.target.value)}
+                          rows={4}
+                          className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 text-sm resize-none transition-colors"
+                          placeholder="Please explain why this request is being rejected..."
+                        />
+                        <div className="flex items-start gap-2 mt-2">
+                          <svg
+                            className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                          <p className="text-xs text-gray-500">
+                            This reason will be shared with the member who
+                            requested the pickup
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-6 sm:mt-5 sm:flex sm:flex-row-reverse gap-3">
+                  <button
+                    type="button"
+                    className={`w-full inline-flex justify-center items-center gap-2 rounded-lg border border-transparent shadow-sm px-5 py-2.5 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:w-auto sm:text-sm transition-all ${
+                      actionType === "approve"
+                        ? "bg-green-600 hover:bg-green-700 focus:ring-green-500"
+                        : "bg-red-600 hover:bg-red-700 focus:ring-red-500"
+                    } ${
+                      actionLoading ||
+                      (actionType === "approve" && !selectedDriver)
+                        ? "opacity-60 cursor-not-allowed"
+                        : "hover:scale-105"
+                    }`}
+                    onClick={submitAction}
+                    disabled={
+                      actionLoading ||
+                      (actionType === "approve" && !selectedDriver)
+                    }
+                  >
+                    {actionLoading ? (
+                      <>
+                        <svg
+                          className="animate-spin h-5 w-5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        {actionType === "approve" ? (
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                        ) : (
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        )}
+                        {actionType === "approve"
+                          ? "Approve & Assign"
+                          : "Reject Request"}
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-3 w-full inline-flex justify-center rounded-lg border-2 border-gray-300 shadow-sm px-5 py-2.5 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:w-auto sm:text-sm transition-colors"
+                    onClick={() => setShowModal(false)}
+                    disabled={actionLoading}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Details Modal */}
+        {showDetailsModal && selectedRequest && (
+          <div
+            className="fixed inset-0 z-50 overflow-y-auto"
+            aria-labelledby="details-modal-title"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div
+                className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+                aria-hidden="true"
+                onClick={() => setShowDetailsModal(false)}
+              ></div>
+
+              <span
+                className="hidden sm:inline-block sm:align-middle sm:h-screen"
+                aria-hidden="true"
+              >
+                &#8203;
+              </span>
+
+              <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full sm:p-6">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <svg
+                      className="h-6 w-6 text-blue-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                      />
+                    </svg>
+                  </div>
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left flex-1">
+                    <h3
+                      className="text-lg leading-6 font-semibold text-gray-900"
+                      id="details-modal-title"
+                    >
+                      Pickup Request Details
+                    </h3>
+
+                    <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between">
+                            <span className="font-medium text-gray-600 flex items-center gap-1.5">
+                              <svg
+                                className="w-4 h-4 text-blue-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                />
+                              </svg>
+                              Member:
+                            </span>
+                            <span className="text-gray-900 font-medium text-right">
+                              {selectedRequest.member_name || "Unknown"}
+                            </span>
+                          </div>
+
+                          <div className="flex items-start justify-between">
+                            <span className="font-medium text-gray-600 flex items-center gap-1.5">
+                              <svg
+                                className="w-4 h-4 text-blue-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                                />
+                              </svg>
+                              Phone:
+                            </span>
+                            <span className="text-gray-900 font-medium">
+                              {selectedRequest.member_phone || "Not provided"}
+                            </span>
+                          </div>
+
+                          <div className="flex items-start justify-between">
+                            <span className="font-medium text-gray-600 flex items-center gap-1.5">
+                              <svg
+                                className="w-4 h-4 text-blue-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                                />
+                              </svg>
+                              Location:
+                            </span>
+                            <span className="text-gray-900 font-medium text-right">
+                              {selectedRequest.pickup_location ||
+                                "Not specified"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between">
+                            <span className="font-medium text-gray-600 flex items-center gap-1.5">
+                              <svg
+                                className="w-4 h-4 text-blue-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                                />
+                              </svg>
+                              Area:
+                            </span>
+                            <span className="text-gray-900 font-medium">
+                              {selectedRequest.area_name || "N/A"}
+                            </span>
+                          </div>
+
+                          <div className="flex items-start justify-between">
+                            <span className="font-medium text-gray-600 flex items-center gap-1.5">
+                              <svg
+                                className="w-4 h-4 text-blue-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                />
+                              </svg>
+                              Requested:
+                            </span>
+                            <span className="text-gray-900 font-medium">
+                              {new Date(
+                                selectedRequest.created_at
+                              ).toLocaleDateString("en-US", {
+                                weekday: "short",
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+
+                          <div className="flex items-start justify-between">
+                            <span className="font-medium text-gray-600">
+                              Status:
+                            </span>
+                            <span className="font-medium">
+                              {getStatusBadge(selectedRequest.status)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Additional Details */}
+                      <div className="mt-4 pt-4 border-t border-blue-300">
+                        <div className="space-y-2">
+                          {selectedRequest.days && (
+                            <div className="flex items-start justify-between">
+                              <span className="font-medium text-gray-600">
+                                Days:
+                              </span>
+                              <span className="text-gray-900 font-medium text-right">
+                                {Array.isArray(selectedRequest.days)
+                                  ? selectedRequest.days.join(", ")
+                                  : selectedRequest.days}
+                              </span>
+                            </div>
+                          )}
+
+                          {selectedRequest.prayers && (
+                            <div className="flex items-start justify-between">
+                              <span className="font-medium text-gray-600">
+                                Prayers:
+                              </span>
+                              <span className="text-gray-900 font-medium text-right">
+                                {Array.isArray(selectedRequest.prayers)
+                                  ? selectedRequest.prayers.join(", ")
+                                  : selectedRequest.prayers}
+                              </span>
+                            </div>
+                          )}
+
+                          {selectedRequest.special_instructions && (
+                            <div className="flex flex-col">
+                              <span className="font-medium text-gray-600 mb-1">
+                                Special Instructions:
+                              </span>
+                              <span className="text-gray-900 bg-white bg-opacity-50 rounded px-2 py-1 text-sm">
+                                {selectedRequest.special_instructions}
+                              </span>
+                            </div>
+                          )}
+
+                          {selectedRequest.contact_number && (
+                            <div className="flex items-start justify-between">
+                              <span className="font-medium text-gray-600">
+                                Contact:
+                              </span>
+                              <span className="text-gray-900 font-medium">
+                                {selectedRequest.contact_number}
+                              </span>
+                            </div>
+                          )}
+
+                          {selectedRequest.status === "approved" &&
+                            selectedRequest.driver_name && (
+                              <div className="flex items-start justify-between">
+                                <span className="font-medium text-gray-600 flex items-center gap-1.5">
+                                  <svg
+                                    className="w-4 h-4 text-green-600"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                                    />
+                                  </svg>
+                                  Assigned Driver:
+                                </span>
+                                <div className="text-right">
+                                  <div className="text-gray-900 font-medium">
+                                    {selectedRequest.driver_name}
+                                  </div>
+                                  {selectedRequest.driver_phone && (
+                                    <div className="text-xs text-gray-600">
+                                      {selectedRequest.driver_phone}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                          {selectedRequest.status === "rejected" &&
+                            selectedRequest.rejected_reason && (
+                              <div className="flex flex-col">
+                                <span className="font-medium text-gray-600 mb-1">
+                                  Rejection Reason:
+                                </span>
+                                <span className="text-red-700 bg-red-50 rounded px-2 py-1 text-sm">
+                                  {selectedRequest.rejected_reason}
+                                </span>
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+                    onClick={() => setShowDetailsModal(false)}
+                  >
+                    Close
                   </button>
                 </div>
               </div>

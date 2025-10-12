@@ -603,19 +603,19 @@ export const pickupService = {
   // Approve pickup request with driver assignment
   approvePickupRequest: async (
     requestId,
-    assignedDriverId,
-    assignedDriverName
+    assigned_driver_id,
+    assigned_driver_name
   ) => {
     try {
       console.log(
         "🟢 Approving pickup request:",
         requestId,
         "with driver:",
-        assignedDriverName
+        assigned_driver_name
       );
       const response = await api.put(`/pickup-requests/${requestId}/approve`, {
-        assignedDriverId,
-        assignedDriverName,
+        assigned_driver_id,
+        assigned_driver_name,
       });
       console.log("✅ Pickup request approved:", response.data);
       return response;

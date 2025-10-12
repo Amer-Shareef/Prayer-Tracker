@@ -21,7 +21,7 @@ router.get(
         limit,
         limitType: typeof limit,
         userId: user.id,
-        assignedDriverId: user.assigned_driver_id,
+        assigned_driver_id: user.assigned_driver_id,
       });
 
       // Build query dynamically WITHOUT using LIMIT in prepared statement
@@ -71,10 +71,29 @@ WHERE pr.user_id = ? OR pr.assigned_driver_id = ?
         `✅ Found ${allResults.length} total requests, returning ${results.length} with limit ${limitValue}`
       );
 
+      // Add role indicator for each request
+      const resultsWithRole = results.map((request) => {
+        let userRole = null;
+
+        // Only set role if status is approved
+        if (request.status === "approved") {
+          if (request.user_id === user.id) {
+            userRole = "member";
+          } else if (request.assigned_driver_id === user.id) {
+            userRole = "driver";
+          }
+        }
+
+        return {
+          ...request,
+          user_role: userRole,
+        };
+      });
+
       res.json({
         success: true,
-        data: results,
-        count: results.length,
+        data: resultsWithRole,
+        count: resultsWithRole.length,
         total: allResults.length,
       });
     } catch (error) {
@@ -186,10 +205,29 @@ u.username as member_username,
 
     console.log(`✅ Found ${requests.length} pickup requests for ${user.role}`);
 
+    // Add role indicator for each request
+    const requestsWithRole = requests.map((request) => {
+      let userRole = null;
+
+      // Only set role if status is approved
+      if (request.status === "approved") {
+        if (request.user_id === user.id) {
+          userRole = "member";
+        } else if (request.assigned_driver_id === user.id) {
+          userRole = "driver";
+        }
+      }
+
+      return {
+        ...request,
+        user_role: userRole,
+      };
+    });
+
     res.json({
       success: true,
-      data: requests,
-      total: requests.length,
+      data: requestsWithRole,
+      total: requestsWithRole.length,
     });
   } catch (error) {
     console.error("❌ Error fetching pickup requests:", error);
@@ -217,11 +255,11 @@ router.post(
         prayers,
       } = req.body;
 
-      // Simplified validation - only pickup_location and area_id are mandatory
-      if (!pickup_location || !area_id) {
+      // Simplified validation - only area_id is mandatory
+      if (!area_id) {
         return res.status(400).json({
           success: false,
-          message: "Pickup location and area_id are required",
+          message: "Area ID is required",
         });
       }
 
@@ -604,13 +642,13 @@ router.put(
   dbHealthCheck,
   async (req, res) => {
     const requestId = req.params.id;
-    const { assignedDriverId, assignedDriverName } = req.body;
+    const { assigned_driver_id, assigned_driver_name } = req.body;
 
     console.log(
       "🟢 Approving pickup request:",
       requestId,
       "with driver:",
-      assignedDriverName
+      assigned_driver_name
     );
 
     try {
@@ -627,7 +665,7 @@ router.put(
         approved_at = NOW()
       WHERE id = ?
     `,
-        [assignedDriverId, assignedDriverName, requestId]
+        [assigned_driver_id, assigned_driver_name, requestId]
       );
 
       if (result.affectedRows === 0) {
@@ -843,6 +881,100 @@ router.get(
       res.status(500).json({
         success: false,
         message: "Failed to fetch available drivers",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// GET /api/pickup-requests/check-user/:userId - Get user's pickup requests with full details (for mobile view)
+router.get(
+  "/pickup-requests/check-user/:userId",
+  authenticateToken,
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      console.log(`🔍 Getting pickup requests for user ID: ${userId}`);
+
+      const userIdNum = parseInt(userId, 10);
+
+      // Get user's pickup requests with full details (same as /all endpoint)
+      console.log(`🔎 Executing SQL query for user_id = ${userIdNum}`);
+
+      const [requests] = await pool.execute(
+        `SELECT 
+         pr.id,
+         pr.user_id,
+         pr.area_id,
+         pr.pickup_location,
+         pr.status,
+         pr.contact_number,
+         pr.special_instructions,
+         pr.days,
+         pr.prayers,
+         pr.created_at,
+         pr.updated_at,
+         pr.assigned_driver_id,
+         pr.assigned_driver_name,
+         pr.approved_at,
+         pr.rejected_at,
+         a.area_name,
+         u.username as member_username,
+         u.phone as member_phone,
+         u.full_name as member_name,
+         u.email as member_email,
+         du.username as driver_username,
+         du.phone as driver_phone,
+         du.full_name as driver_name
+         FROM pickup_requests pr
+         LEFT JOIN areas a ON pr.area_id = a.area_id
+         LEFT JOIN users u ON pr.user_id = u.id
+         LEFT JOIN users du ON pr.assigned_driver_id = du.id
+         WHERE pr.user_id = ?
+         ORDER BY pr.created_at DESC`,
+        [userIdNum]
+      );
+
+      console.log(`📊 Raw query returned ${requests.length} rows`);
+
+      // Calculate active requests count
+      const activeRequests = requests.filter(
+        (req) => req.status === "pending" || req.status === "approved"
+      );
+
+      // Add role indicator for each request
+      const requestsWithRole = requests.map((request) => {
+        let userRole = null;
+
+        // Only set role if status is approved
+        if (request.status === "approved") {
+          if (request.user_id === userIdNum) {
+            userRole = "member";
+          } else if (request.assigned_driver_id === userIdNum) {
+            userRole = "driver";
+          }
+        }
+
+        return {
+          ...request,
+          user_role: userRole,
+        };
+      });
+
+      const response = {
+        success: true,
+        userId: userIdNum,
+        pickupRequests: requestsWithRole,
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error("❌ Error checking user pickup requests:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to check user pickup requests",
         error: error.message,
       });
     }
