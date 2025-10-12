@@ -932,9 +932,9 @@ router.get(
          LEFT JOIN areas a ON pr.area_id = a.area_id
          LEFT JOIN users u ON pr.user_id = u.id
          LEFT JOIN users du ON pr.assigned_driver_id = du.id
-         WHERE pr.user_id = ?
+         WHERE pr.user_id = ? OR pr.assigned_driver_id = ?
          ORDER BY pr.created_at DESC`,
-        [userIdNum]
+        [userIdNum, userIdNum]
       );
 
       console.log(`📊 Raw query returned ${requests.length} rows`);
@@ -944,27 +944,45 @@ router.get(
         (req) => req.status === "pending" || req.status === "approved"
       );
 
+      // Determine user's role based on requests
+      let userRole = null;
+      const hasMemberRequests = requests.some(
+        (req) => req.user_id === userIdNum
+      );
+      const hasDriverRequests = requests.some(
+        (req) => req.assigned_driver_id === userIdNum
+      );
+
+      if (hasMemberRequests && hasDriverRequests) {
+        userRole = "both";
+      } else if (hasDriverRequests) {
+        userRole = "driver";
+      } else if (hasMemberRequests) {
+        userRole = "member";
+      }
+
       // Add role indicator for each request
       const requestsWithRole = requests.map((request) => {
-        let userRole = null;
+        let requestUserRole = null;
 
         // Only set role if status is approved
         if (request.status === "approved") {
           if (request.user_id === userIdNum) {
-            userRole = "member";
+            requestUserRole = "member";
           } else if (request.assigned_driver_id === userIdNum) {
-            userRole = "driver";
+            requestUserRole = "driver";
           }
         }
 
         return {
           ...request,
-          user_role: userRole,
+          user_role: requestUserRole,
         };
       });
 
       const response = {
         success: true,
+        user_role: userRole,
         userId: userIdNum,
         pickupRequests: requestsWithRole,
       };
