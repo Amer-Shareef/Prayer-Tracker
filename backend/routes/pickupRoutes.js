@@ -831,6 +831,274 @@ router.put(
   }
 );
 
+// DELETE /api/pickup-requests/:id/admin - Delete pickup request (Admin only)
+router.delete(
+  "/pickup-requests/:id/admin",
+  authenticateToken,
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
+  dbHealthCheck,
+  async (req, res) => {
+    const requestId = req.params.id;
+
+    console.log(
+      "🗑️ Admin deleting pickup request:",
+      requestId,
+      "by user:",
+      req.user.id
+    );
+
+    try {
+      const connection = await pool.getConnection();
+
+      // First, check if the pickup request exists
+      const [existingRequest] = await connection.query(
+        "SELECT id, status, user_id, pickup_location FROM pickup_requests WHERE id = ?",
+        [requestId]
+      );
+
+      if (existingRequest.length === 0) {
+        connection.release();
+        return res.status(404).json({
+          success: false,
+          message: "Pickup request not found",
+        });
+      }
+
+      const request = existingRequest[0];
+      console.log("📋 Found pickup request to delete:", {
+        id: request.id,
+        status: request.status,
+        user_id: request.user_id,
+        pickup_location: request.pickup_location,
+      });
+
+      // Delete the pickup request from database
+      const [result] = await connection.query(
+        "DELETE FROM pickup_requests WHERE id = ?",
+        [requestId]
+      );
+
+      console.log("📊 Delete result:", {
+        affectedRows: result.affectedRows,
+      });
+
+      if (result.affectedRows === 0) {
+        connection.release();
+        return res.status(404).json({
+          success: false,
+          message: "Pickup request not found",
+        });
+      }
+
+      connection.release();
+
+      console.log("✅ Pickup request deleted successfully by admin");
+      res.json({
+        success: true,
+        message: "Pickup request deleted successfully",
+      });
+    } catch (error) {
+      console.error("❌ Error deleting pickup request:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to delete pickup request",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// POST /api/pickup-requests/admin - Create pickup request as admin (assign member and driver)
+router.post(
+  "/pickup-requests/admin",
+  authenticateToken,
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
+  dbHealthCheck,
+  async (req, res) => {
+    try {
+      const {
+        user_id,
+        area_id,
+        pickup_location,
+        contact_number,
+        special_instructions,
+        days,
+        prayers,
+        assigned_driver_id,
+        assigned_driver_name,
+        auto_approve,
+      } = req.body;
+
+      console.log("🔧 Admin creating pickup request:", {
+        user_id,
+        area_id,
+        assigned_driver_id,
+        auto_approve,
+      });
+
+      // Validate required fields
+      if (!user_id) {
+        return res.status(400).json({
+          success: false,
+          message: "Member user ID is required",
+        });
+      }
+
+      if (!area_id) {
+        return res.status(400).json({
+          success: false,
+          message: "Area ID is required",
+        });
+      }
+
+      // Validate days array if provided
+      if (days && Array.isArray(days) && days.length > 0) {
+        const validDays = [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday",
+        ];
+        const invalidDays = days.filter(
+          (day) => !validDays.includes(day.toLowerCase())
+        );
+        if (invalidDays.length > 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid days: ${invalidDays.join(", ")}`,
+          });
+        }
+      }
+
+      // Validate prayers array if provided
+      if (prayers && Array.isArray(prayers) && prayers.length > 0) {
+        const validPrayers = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
+        const invalidPrayers = prayers.filter(
+          (prayer) => !validPrayers.includes(prayer.toLowerCase())
+        );
+        if (invalidPrayers.length > 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid prayers: ${invalidPrayers.join(", ")}`,
+          });
+        }
+      }
+
+      // Verify user exists and belongs to the specified area
+      const [userCheck] = await pool.execute(
+        "SELECT id, area_id, full_name, phone FROM users WHERE id = ?",
+        [user_id]
+      );
+
+      if (userCheck.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Member not found",
+        });
+      }
+
+      if (userCheck[0].area_id !== area_id) {
+        return res.status(400).json({
+          success: false,
+          message: "Member does not belong to the specified area",
+        });
+      }
+
+      // Check for duplicate active requests
+      const [existingRequests] = await pool.execute(
+        `SELECT id FROM pickup_requests 
+         WHERE user_id = ? AND status NOT IN ('cancelled', 'completed', 'rejected')`,
+        [user_id]
+      );
+
+      if (existingRequests.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "This member already has an active pickup request. Please cancel it first.",
+        });
+      }
+
+      // Determine status based on auto_approve and driver assignment
+      let status = "pending";
+      let approvedAt = null;
+
+      if (auto_approve && assigned_driver_id) {
+        status = "approved";
+        approvedAt = new Date();
+      }
+
+      // Create the pickup request
+      const [result] = await pool.execute(
+        `INSERT INTO pickup_requests 
+         (user_id, area_id, sub_areas_id, pickup_location, special_instructions, contact_number,
+          days, prayers, status, assigned_driver_id, assigned_driver_name, 
+          approved_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [
+          user_id,
+          area_id,
+          req.body.sub_areas_id || null,
+          pickup_location ? pickup_location.trim() : null,
+          special_instructions ? special_instructions.trim() : null,
+          contact_number || userCheck[0].phone || null,
+          days && days.length > 0
+            ? JSON.stringify(days.map((d) => d.toLowerCase()))
+            : JSON.stringify(["daily"]),
+          prayers && prayers.length > 0
+            ? JSON.stringify(prayers.map((p) => p.toLowerCase()))
+            : JSON.stringify(["fajr"]),
+          status,
+          assigned_driver_id || null,
+          assigned_driver_name || null,
+          approvedAt,
+        ]
+      );
+
+      // Get the created request with full details
+      const [createdRequest] = await pool.execute(
+        `SELECT pr.*, 
+                u.username as member_username, 
+                u.email as member_email, 
+                u.phone as member_phone,
+                u.full_name as member_name,
+                a.area_name,
+                du.username as driver_username,
+                du.phone as driver_phone,
+                du.full_name as driver_name
+         FROM pickup_requests pr
+         LEFT JOIN users u ON pr.user_id = u.id
+         LEFT JOIN areas a ON pr.area_id = a.area_id
+         LEFT JOIN users du ON pr.assigned_driver_id = du.id
+         WHERE pr.id = ?`,
+        [result.insertId]
+      );
+
+      console.log(
+        `✅ Admin created pickup request: ID ${result.insertId}, status: ${status}`
+      );
+
+      res.status(201).json({
+        success: true,
+        message: `Pickup request created successfully${
+          status === "approved" ? " and approved" : ""
+        }`,
+        data: createdRequest[0],
+      });
+    } catch (error) {
+      console.error("❌ Error creating admin pickup request:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to create pickup request",
+        error: error.message,
+      });
+    }
+  }
+);
+
 // GET /api/pickup-requests/available-drivers - Get members who can be assigned as drivers
 router.get(
   "/pickup-requests/available-drivers",

@@ -17,6 +17,7 @@ const TransportPage = () => {
   // Modal states
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [actionType, setActionType] = useState(""); // 'approve' or 'reject'
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
@@ -26,6 +27,21 @@ const TransportPage = () => {
   // Data states
   const [pickupRequests, setPickupRequests] = useState([]);
   const [availableDrivers, setAvailableDrivers] = useState([]);
+  const [areaMembers, setAreaMembers] = useState([]);
+  const [areas, setAreas] = useState([]);
+  const [subAreas, setSubAreas] = useState([]);
+
+  // Create request form states
+  const [createFormData, setCreateFormData] = useState({
+    user_id: "",
+    area_id: "",
+    sub_areas_id: "",
+    pickup_location: "",
+    emergency_contact: "",
+    special_instructions: "",
+    assigned_driver_id: "",
+    auto_approve: false,
+  });
 
   // Search and pagination states
   const [searchTerm, setSearchTerm] = useState("");
@@ -126,14 +142,58 @@ const TransportPage = () => {
       setError("");
 
       // Fetch pickup requests
+      console.log("🔄 Fetching pickup requests...");
       const requestsResponse = await pickupService.getAllPickupRequests();
+      console.log("📥 Pickup requests response:", requestsResponse);
+      console.log("📦 Response data:", requestsResponse.data);
+
       if (requestsResponse.data.success) {
+        console.log("✅ Setting pickup requests:", requestsResponse.data.data);
         setPickupRequests(requestsResponse.data.data);
+      } else {
+        console.warn("⚠️ Response not successful:", requestsResponse.data);
+        setPickupRequests([]);
+      }
+
+      // Fetch areas for SuperAdmin
+      if (user.role === "SuperAdmin" || user.role === "superadmin") {
+        try {
+          console.log("🔄 Fetching areas for SuperAdmin...");
+          const areasResponse = await areaService.getAllAreas();
+          console.log("📥 Areas response:", areasResponse);
+          // Response structure: { success: true, data: [...] }
+          if (areasResponse.success && areasResponse.data) {
+            console.log("✅ Setting areas:", areasResponse.data);
+            setAreas(areasResponse.data);
+          } else {
+            console.warn("⚠️ Areas response not successful:", areasResponse);
+            setAreas([]);
+          }
+        } catch (err) {
+          console.error("❌ Error fetching areas:", err);
+          setAreas([]);
+        }
+        // Don't fetch members for SuperAdmin on initial load
+      } else {
+        // Fetch area members for Founder/WCM
+        try {
+          console.log("🔄 Fetching members for Founder/WCM...");
+          const membersResponse = await memberAPI.getMembers();
+          console.log("📥 Members response:", membersResponse);
+          setAreaMembers(membersResponse.data || membersResponse.members || []);
+        } catch (err) {
+          console.error("❌ Error fetching members:", err);
+        }
       }
 
       setLoading(false);
     } catch (error) {
-      console.error("Error fetching transport data:", error);
+      console.error("❌ Error fetching transport data:", error);
+      console.error("Error details:", {
+        message: error.message,
+        response: error.response,
+        stack: error.stack,
+      });
       setError("Failed to load transport data. Please try again.");
       setLoading(false);
     }
@@ -184,6 +244,221 @@ const TransportPage = () => {
   const handleViewDetails = (request) => {
     setSelectedRequest(request);
     setShowDetailsModal(true);
+  };
+
+  const handleDeleteRequest = async (request) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to permanently delete this pickup request from ${request.member_name}? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL}/pickup-requests/${request.id}/admin`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSuccessMessage("Pickup request deleted successfully");
+        // Refresh the data
+        await fetchData();
+      } else {
+        setError(data.message || "Failed to delete pickup request");
+      }
+    } catch (error) {
+      console.error("Error deleting pickup request:", error);
+      setError("Failed to delete pickup request");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleOpenCreateModal = async () => {
+    // For Founder/WCM, set their area automatically and fetch drivers
+    if (
+      user.role !== "SuperAdmin" &&
+      user.role !== "superadmin" &&
+      user.area_id
+    ) {
+      try {
+        // Fetch drivers for Founder/WCM area
+        await fetchAvailableDriversForArea(user.area_id);
+
+        // Fetch sub-areas for this area
+        try {
+          const subAreasResponse = await areaService.getSubAreas(user.area_id);
+          // Response structure: { success: true, data: { area: {...}, subAreas: [...] } }
+          if (subAreasResponse.success && subAreasResponse.data?.subAreas) {
+            setSubAreas(subAreasResponse.data.subAreas);
+          } else {
+            setSubAreas([]);
+          }
+        } catch (err) {
+          console.error("Error fetching sub-areas:", err);
+          setSubAreas([]);
+        }
+      } catch (error) {
+        console.error("Error fetching drivers:", error);
+      }
+    } else {
+      // For SuperAdmin, clear members until area is selected
+      setAreaMembers([]);
+      setSubAreas([]);
+      setAvailableDrivers([]);
+    }
+
+    // Reset form
+    setCreateFormData({
+      user_id: "",
+      area_id:
+        user.role === "SuperAdmin" || user.role === "superadmin"
+          ? ""
+          : user.area_id || "",
+      sub_areas_id: "",
+      emergency_contact: "",
+      special_instructions: "",
+      assigned_driver_id: "",
+      auto_approve: false,
+    });
+    setShowCreateModal(true);
+  };
+
+  // Handle area selection for SuperAdmin
+  const handleAreaChange = async (areaId) => {
+    setCreateFormData((prev) => ({
+      ...prev,
+      area_id: areaId,
+      sub_areas_id: "", // Reset sub-area
+      user_id: "", // Reset member selection
+      assigned_driver_id: "", // Reset driver
+    }));
+
+    if (areaId) {
+      try {
+        // Fetch members for the selected area
+        const membersResponse = await memberAPI.getAllMembers();
+        if (membersResponse.success && membersResponse.data) {
+          // Filter members by selected area
+          const areaFilteredMembers = membersResponse.data.filter(
+            (member) => member.area_id === parseInt(areaId)
+          );
+          setAreaMembers(areaFilteredMembers);
+        } else {
+          setAreaMembers([]);
+        }
+
+        // Fetch sub-areas for selected area
+        const subAreasResponse = await areaService.getSubAreas(areaId);
+        // Response structure: { success: true, data: { area: {...}, subAreas: [...] } }
+        if (subAreasResponse.success && subAreasResponse.data?.subAreas) {
+          setSubAreas(subAreasResponse.data.subAreas);
+        } else {
+          setSubAreas([]);
+        }
+
+        // Fetch drivers for selected area
+        await fetchAvailableDriversForArea(parseInt(areaId));
+      } catch (error) {
+        console.error("Error fetching area data:", error);
+        setAreaMembers([]);
+        setSubAreas([]);
+      }
+    } else {
+      setAreaMembers([]);
+      setSubAreas([]);
+      setAvailableDrivers([]);
+    }
+  };
+
+  const handleCreateFormChange = (field, value) => {
+    setCreateFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleSubmitCreateRequest = async () => {
+    // Validation
+    if (!createFormData.user_id) {
+      setError("Please select a member");
+      return;
+    }
+    if (!createFormData.area_id) {
+      setError("Please select an area");
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      // Get driver name if driver is selected
+      let assigned_driver_name = null;
+      if (createFormData.assigned_driver_id) {
+        const selectedDriver = availableDrivers.find(
+          (d) => d.id === parseInt(createFormData.assigned_driver_id)
+        );
+        assigned_driver_name =
+          selectedDriver?.full_name || selectedDriver?.fullName;
+      }
+
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL}/api/pickup-requests/admin`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            user_id: parseInt(createFormData.user_id),
+            area_id: parseInt(createFormData.area_id),
+            sub_areas_id: createFormData.sub_areas_id
+              ? parseInt(createFormData.sub_areas_id)
+              : null,
+            contact_number: createFormData.emergency_contact || null,
+            special_instructions: createFormData.special_instructions,
+            assigned_driver_id: createFormData.assigned_driver_id
+              ? parseInt(createFormData.assigned_driver_id)
+              : null,
+            assigned_driver_name: assigned_driver_name,
+            auto_approve:
+              createFormData.auto_approve && createFormData.assigned_driver_id
+                ? true
+                : false,
+            days: ["daily"],
+            prayers: ["fajr"],
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSuccessMessage(
+          data.message || "Pickup request created successfully"
+        );
+        setShowCreateModal(false);
+        await fetchData();
+      } else {
+        setError(data.message || "Failed to create pickup request");
+      }
+    } catch (error) {
+      console.error("Error creating pickup request:", error);
+      setError("Failed to create pickup request");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const submitAction = async () => {
@@ -475,13 +750,34 @@ const TransportPage = () => {
     <FounderLayout>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-6 mt-8">
-          <h2 className="text-2xl font-bold text-gray-800">
-            Transport Management
-          </h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Manage pickup requests and assign drivers
-          </p>
+        <div className="mb-6 mt-8 flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">
+              Transport Management
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Manage pickup requests and assign drivers
+            </p>
+          </div>
+          {/* <button
+            onClick={handleOpenCreateModal}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-sm"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+            Add Pickup Request
+          </button> */}
         </div>
 
         {/* Success Message */}
@@ -870,14 +1166,61 @@ const TransportPage = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
-                        {request.status === "pending" ? (
-                          <div className="flex items-center justify-center gap-2">
+                        <div className="flex items-center justify-center gap-2">
+                          {request.status === "pending" ? (
+                            <>
+                              <button
+                                onClick={() =>
+                                  handleRequestAction(request, "approve")
+                                }
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-md transition-colors shadow-sm"
+                                title="Approve and assign driver"
+                                disabled={actionLoading}
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M5 13l4 4L19 7"
+                                  />
+                                </svg>
+                                Approve
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleRequestAction(request, "reject")
+                                }
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-md transition-colors shadow-sm"
+                                title="Reject request"
+                                disabled={actionLoading}
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M6 18L18 6M6 6l12 12"
+                                  />
+                                </svg>
+                                Reject
+                              </button>
+                            </>
+                          ) : (
                             <button
-                              onClick={() =>
-                                handleRequestAction(request, "approve")
-                              }
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-md transition-colors shadow-sm"
-                              title="Approve and assign driver"
+                              onClick={() => handleViewDetails(request)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-md transition-colors"
+                              title="View details"
                             >
                               <svg
                                 className="w-4 h-4"
@@ -889,39 +1232,23 @@ const TransportPage = () => {
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
                                   strokeWidth={2}
-                                  d="M5 13l4 4L19 7"
+                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                                 />
-                              </svg>
-                              Approve
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleRequestAction(request, "reject")
-                              }
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-md transition-colors shadow-sm"
-                              title="Reject request"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
                                 <path
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
                                   strokeWidth={2}
-                                  d="M6 18L18 6M6 6l12 12"
+                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                                 />
                               </svg>
-                              Reject
+                              View
                             </button>
-                          </div>
-                        ) : (
+                          )}
                           <button
-                            onClick={() => handleViewDetails(request)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-md transition-colors"
-                            title="View details"
+                            onClick={() => handleDeleteRequest(request)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-md transition-colors shadow-sm"
+                            title="Delete request permanently"
+                            disabled={actionLoading}
                           >
                             <svg
                               className="w-4 h-4"
@@ -933,18 +1260,12 @@ const TransportPage = () => {
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                                 strokeWidth={2}
-                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                              />
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                               />
                             </svg>
-                            View
+                            Delete
                           </button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -2233,6 +2554,279 @@ const TransportPage = () => {
                     onClick={() => setShowDetailsModal(false)}
                   >
                     Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Create Pickup Request Modal */}
+        {showCreateModal && (
+          <div className="fixed z-50 inset-0 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div
+                className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+                onClick={() => !actionLoading && setShowCreateModal(false)}
+              ></div>
+
+              <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="flex items-start mb-4">
+                    <div className="flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:h-10 sm:w-10">
+                      <svg
+                        className="h-6 w-6 text-blue-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900">
+                        Create Pickup Request
+                      </h3>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Assign a pickup request to a member and optionally
+                        assign a driver
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 space-y-4">
+                    {/* Area Selection (SuperAdmin only) */}
+                    {(user.role === "SuperAdmin" ||
+                      user.role === "superadmin") && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Select Area <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={createFormData.area_id}
+                          onChange={(e) => handleAreaChange(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          disabled={actionLoading}
+                        >
+                          <option value="">Choose an area...</option>
+                          {areas.map((area) => (
+                            <option key={area.area_id} value={area.area_id}>
+                              {area.area_name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Sub-Area Selection (if area is selected) */}
+                    {createFormData.area_id && subAreas.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Sub-Area (Optional)
+                        </label>
+                        <select
+                          value={createFormData.sub_areas_id}
+                          onChange={(e) =>
+                            handleCreateFormChange(
+                              "sub_areas_id",
+                              e.target.value
+                            )
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          disabled={actionLoading}
+                        >
+                          <option value="">Select a sub-area...</option>
+                          {subAreas.map((subArea) => (
+                            <option key={subArea.id} value={subArea.id}>
+                              {subArea.address}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Member Selection */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select Member <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={createFormData.user_id}
+                        onChange={(e) =>
+                          handleCreateFormChange("user_id", e.target.value)
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        disabled={
+                          actionLoading ||
+                          (user.role === "SuperAdmin" &&
+                            !createFormData.area_id)
+                        }
+                      >
+                        <option value="">
+                          {(user.role === "SuperAdmin" ||
+                            user.role === "superadmin") &&
+                          !createFormData.area_id
+                            ? "Please select an area first..."
+                            : "Choose a member..."}
+                        </option>
+                        {areaMembers.map((member) => (
+                          <option key={member.id} value={member.id}>
+                            {member.full_name || member.fullName} -{" "}
+                            {member.phone}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Emergency Contact */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Emergency Contact
+                      </label>
+                      <input
+                        type="tel"
+                        value={createFormData.emergency_contact}
+                        onChange={(e) =>
+                          handleCreateFormChange(
+                            "emergency_contact",
+                            e.target.value
+                          )
+                        }
+                        placeholder="Optional emergency contact number"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        disabled={actionLoading}
+                      />
+                    </div>
+
+                    {/* Assign Driver */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Assign Driver (Optional)
+                      </label>
+                      <select
+                        value={createFormData.assigned_driver_id}
+                        onChange={(e) =>
+                          handleCreateFormChange(
+                            "assigned_driver_id",
+                            e.target.value
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        disabled={actionLoading}
+                      >
+                        <option value="">No driver assigned</option>
+                        {availableDrivers.map((driver) => (
+                          <option key={driver.id} value={driver.id}>
+                            {driver.full_name || driver.fullName} -{" "}
+                            {driver.mobility}
+                          </option>
+                        ))}
+                      </select>
+                      {createFormData.assigned_driver_id && (
+                        <p className="mt-2 text-xs text-gray-500">
+                          💡 Check "Auto-approve" below to automatically approve
+                          this request
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Special Instructions */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Special Instructions
+                      </label>
+                      <textarea
+                        value={createFormData.special_instructions}
+                        onChange={(e) =>
+                          handleCreateFormChange(
+                            "special_instructions",
+                            e.target.value
+                          )
+                        }
+                        placeholder="Any special notes or instructions..."
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                        disabled={actionLoading}
+                      />
+                    </div>
+
+                    {/* Auto-approve checkbox */}
+                    {createFormData.assigned_driver_id && (
+                      <div className="flex items-start">
+                        <div className="flex items-center h-5">
+                          <input
+                            type="checkbox"
+                            checked={createFormData.auto_approve}
+                            onChange={(e) =>
+                              handleCreateFormChange(
+                                "auto_approve",
+                                e.target.checked
+                              )
+                            }
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            disabled={actionLoading}
+                          />
+                        </div>
+                        <div className="ml-3">
+                          <label className="text-sm font-medium text-gray-700">
+                            Auto-approve this request
+                          </label>
+                          <p className="text-xs text-gray-500">
+                            Request will be automatically approved with the
+                            assigned driver
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-2">
+                  <button
+                    type="button"
+                    className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={handleSubmitCreateRequest}
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? (
+                      <>
+                        <svg
+                          className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Request"
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:w-auto sm:text-sm"
+                    onClick={() => setShowCreateModal(false)}
+                    disabled={actionLoading}
+                  >
+                    Cancel
                   </button>
                 </div>
               </div>
