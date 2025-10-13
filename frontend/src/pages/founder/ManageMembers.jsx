@@ -16,7 +16,6 @@ function ManageMembers() {
   const [successMessage, setSuccessMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
   const [filterMemberId, setFilterMemberId] = useState("");
   const [filterFullName, setFilterFullName] = useState("");
   const [filterMinAge, setFilterMinAge] = useState("");
@@ -70,7 +69,6 @@ function ManageMembers() {
     return (
       searchTerm ||
       filterRole !== "all" ||
-      filterStatus !== "all" ||
       filterMemberId ||
       filterFullName ||
       filterMinAge ||
@@ -470,8 +468,6 @@ function ManageMembers() {
       (member.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (member.fullName || "").toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = filterRole === "all" || member.role === filterRole;
-    const matchesStatus =
-      filterStatus === "all" || member.status === filterStatus;
     const matchesMemberId =
       !filterMemberId ||
       (member.memberId || "")
@@ -510,7 +506,6 @@ function ManageMembers() {
     return (
       matchesSearch &&
       matchesRole &&
-      matchesStatus &&
       matchesMemberId &&
       matchesFullName &&
       matchesUsername &&
@@ -544,9 +539,13 @@ function ManageMembers() {
         aValue = a.role || "";
         bValue = b.role || "";
         break;
-      case "status":
-        aValue = a.status || "";
-        bValue = b.status || "";
+      case "area":
+        aValue = a.area || "";
+        bValue = b.area || "";
+        break;
+      case "contact":
+        aValue = a.phone || "";
+        bValue = b.phone || "";
         break;
       case "joined":
         aValue = new Date(a.joined_date || 0).getTime();
@@ -760,20 +759,6 @@ function ManageMembers() {
                 </select>
               </div>
 
-              {/* Status Filter */}
-              <div>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-700"
-                >
-                  <option value="all">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="pending">Pending</option>
-                </select>
-              </div>
-
               {/* Area Filter */}
               <div>
                 <select
@@ -861,7 +846,6 @@ function ManageMembers() {
                     setFilterArea("all");
                     setFilterAdditionalInfo("all");
                     setFilterRole("all");
-                    setFilterStatus("all");
                   }}
                   className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center transition-colors duration-200"
                 >
@@ -895,7 +879,7 @@ function ManageMembers() {
                 <tr>
                   <th
                     onClick={() => handleSort("memberId")}
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150 w-26"
                   >
                     <div className="flex items-center space-x-1">
                       <span>Member ID</span>
@@ -904,7 +888,7 @@ function ManageMembers() {
                   </th>
                   <th
                     onClick={() => handleSort("fullName")}
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150 w-58"
                   >
                     <div className="flex items-center space-x-1">
                       <span>Full Name</span>
@@ -922,20 +906,31 @@ function ManageMembers() {
                   </th> */}
                   <th
                     onClick={() => handleSort("role")}
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150 w-24"
                   >
                     <div className="flex items-center space-x-1">
                       <span>Role</span>
                       <SortIcon column="role" />
                     </div>
                   </th>
+                  {user?.role === "SuperAdmin" && (
+                    <th
+                      onClick={() => handleSort("area")}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>Area</span>
+                        <SortIcon column="area" />
+                      </div>
+                    </th>
+                  )}
                   <th
-                    onClick={() => handleSort("status")}
+                    onClick={() => handleSort("contact")}
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150"
                   >
                     <div className="flex items-center space-x-1">
-                      <span>Status</span>
-                      <SortIcon column="status" />
+                      <span>Contact Number</span>
+                      <SortIcon column="contact" />
                     </div>
                   </th>
                   <th
@@ -955,7 +950,10 @@ function ManageMembers() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading && !members.length ? (
                   <tr>
-                    <td colSpan="7" className="px-4 py-8 text-center">
+                    <td
+                      colSpan={user?.role === "SuperAdmin" ? "8" : "7"}
+                      className="px-4 py-8 text-center"
+                    >
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
                       <p className="mt-3 text-gray-600">Loading members...</p>
                     </td>
@@ -1024,31 +1022,25 @@ function ManageMembers() {
                               {member.role === "Member"
                                 ? "Member"
                                 : member.role === "WCM"
-                                ? "Working Committee Member"
+                                ? "WC"
                                 : member.role === "Founder"
-                                ? "Working Committee Admin"
+                                ? "WC Admin"
                                 : member.role === "SuperAdmin"
                                 ? "Super Admin"
                                 : member.role || "-"}
                             </span>
                           </td>
 
-                          {/* Status */}
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <span
-                              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                member.status === "active"
-                                  ? "bg-green-100 text-green-800"
-                                  : member.status === "inactive"
-                                  ? "bg-red-100 text-red-800"
-                                  : "bg-yellow-100 text-yellow-800"
-                              }`}
-                            >
-                              {member.status
-                                ? member.status.charAt(0).toUpperCase() +
-                                  member.status.slice(1)
-                                : "-"}
-                            </span>
+                          {/* Area - Only for SuperAdmin */}
+                          {user?.role === "SuperAdmin" && (
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {member.area || "-"}
+                            </td>
+                          )}
+
+                          {/* Contact Number */}
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {member.phone || "-"}
                           </td>
 
                           {/* Joined */}
