@@ -4,6 +4,24 @@ const { uploadRouter } = require("./middleware/uploadthing");
 const dotenv = require("dotenv");
 dotenv.config();
 
+// Disable console logs in production
+if (process.env.NODE_ENV === "production") {
+  const noop = function () {};
+  const methods = ["log", "debug", "info", "warn"];
+
+  // Save original console.error for critical errors
+  const originalError = console.error;
+
+  methods.forEach((method) => {
+    console[method] = noop;
+  });
+
+  // Keep console.error functional for critical errors
+  console.error = originalError;
+
+  // Optional: Log that console is disabled (using error which is still active)
+  console.error("ℹ️  Console logs disabled in production mode");
+}
 const express = require("express");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
