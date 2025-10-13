@@ -539,7 +539,7 @@ const TransportPage = () => {
         border: "border-yellow-200",
         text: "text-yellow-700",
         dot: "bg-yellow-400",
-        label: "Pending Review",
+        label: "Pending",
         icon: (
           <svg
             className="w-4 h-4"

@@ -1000,6 +1000,65 @@ export const feedsService = {
   },
 };
 
+// Attendance Statistics service - NEW
+export const attendanceService = {
+  // Get overview statistics
+  getOverview: async (role) => {
+    try {
+      console.log("📊 Getting attendance overview for role:", role);
+      const response = await api.get("/attendance/overview", {
+        params: { role },
+      });
+      console.log("✅ Overview fetched:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Failed to fetch overview:", error);
+      throw error;
+    }
+  },
+
+  // Get prayer breakdown statistics
+  getPrayerBreakdown: async (role) => {
+    try {
+      console.log("📊 Getting prayer breakdown for role:", role);
+      const response = await api.get("/attendance/prayer-breakdown", {
+        params: { role },
+      });
+      console.log("✅ Prayer breakdown fetched:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Failed to fetch prayer breakdown:", error);
+      throw error;
+    }
+  },
+
+  // Get areas performance (SuperAdmin only)
+  getAreasPerformance: async () => {
+    try {
+      console.log("📊 Getting areas performance");
+      const response = await api.get("/attendance/areas");
+      console.log("✅ Areas performance fetched:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Failed to fetch areas performance:", error);
+      throw error;
+    }
+  },
+
+  // Get members attendance list
+  getMembersAttendance: async (params = {}) => {
+    try {
+      console.log("📊 Getting members attendance with params:", params);
+      const response = await api.get("/attendance/members", { params });
+      console.log("✅ Members attendance fetched:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Failed to fetch members attendance:", error);
+      throw error;
+    }
+  },
+};
+
 // Area service
 export const areaService = {
   getAreas: async () => {
