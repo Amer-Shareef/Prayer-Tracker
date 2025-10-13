@@ -63,7 +63,9 @@ const PrayerDots = React.memo(({ prayers }) => {
         >
           <div
             className={`w-2.5 h-2.5 rounded-full transition-all ${
-              prayers[prayer] ? "bg-green-500 ring-2 ring-green-200" : "bg-gray-300"
+              prayers[prayer]
+                ? "bg-green-500 ring-2 ring-green-200"
+                : "bg-gray-300"
             }`}
           />
         </Tooltip>
@@ -366,7 +368,8 @@ const ViewAttendance = () => {
   const getColorClass = useCallback((percentage) => {
     const pct = Number(percentage) || 0;
     if (pct >= 80) return "text-green-700 bg-green-100 border border-green-300";
-    if (pct >= 60) return "text-yellow-700 bg-yellow-100 border border-yellow-300";
+    if (pct >= 60)
+      return "text-yellow-700 bg-yellow-100 border border-yellow-300";
     return "text-red-700 bg-red-100 border border-red-300";
   }, []);
 
@@ -383,7 +386,9 @@ const ViewAttendance = () => {
         <div className="flex items-center justify-center h-screen">
           <div className="text-center">
             <div className="inline-block animate-spin rounded-full border-4 border-gray-200 border-t-green-600 h-16 w-16"></div>
-            <p className="mt-6 text-lg font-medium text-gray-700">Loading attendance data...</p>
+            <p className="mt-6 text-lg font-medium text-gray-700">
+              Loading attendance data...
+            </p>
           </div>
         </div>
       </FounderLayout>
@@ -410,7 +415,9 @@ const ViewAttendance = () => {
                 />
               </svg>
             </div>
-            <p className="text-xl font-semibold text-gray-900 mb-3">Error Loading Data</p>
+            <p className="text-xl font-semibold text-gray-900 mb-3">
+              Error Loading Data
+            </p>
             <p className="text-base text-gray-600 mb-6">{error}</p>
             <button
               onClick={() => window.location.reload()}
@@ -523,7 +530,9 @@ const ViewAttendance = () => {
                         </svg>
                       </div>
                       <div className="text-4xl font-bold text-gray-900 mb-2">
-                        {formatPercentage(safeGet(overviewData, "yesterday.percentage", 0))}
+                        {formatPercentage(
+                          safeGet(overviewData, "yesterday.percentage", 0)
+                        )}
                       </div>
                       <p className="text-sm font-medium text-gray-600">
                         {safeGet(overviewData, "yesterday.count", 0)} of{" "}
@@ -558,7 +567,10 @@ const ViewAttendance = () => {
                         {safeGet(overviewData, "topArea.name", "N/A")}
                       </div>
                       <p className="text-sm font-medium text-green-800">
-                        {formatPercentage(safeGet(overviewData, "topArea.percentage", 0))} score
+                        {formatPercentage(
+                          safeGet(overviewData, "topArea.percentage", 0)
+                        )}{" "}
+                        score
                       </p>
                     </div>
                   </Tooltip>
@@ -589,7 +601,8 @@ const ViewAttendance = () => {
                         {safeGet(overviewData, "newMembers.count", 0)}
                       </div>
                       <p className="text-sm font-medium text-gray-600">
-                        of {safeGet(overviewData, "newMembers.total", 0)} total members
+                        of {safeGet(overviewData, "newMembers.total", 0)} total
+                        members
                       </p>
                     </div>
                   </Tooltip>
@@ -617,9 +630,13 @@ const ViewAttendance = () => {
                         </svg>
                       </div>
                       <div className="text-4xl font-bold text-blue-900 mb-2">
-                        {formatPercentage(safeGet(overviewData, "avgRate7d.percentage", 0))}
+                        {formatPercentage(
+                          safeGet(overviewData, "avgRate7d.percentage", 0)
+                        )}
                       </div>
-                      <p className="text-sm font-medium text-blue-800">Last 7 days</p>
+                      <p className="text-sm font-medium text-blue-800">
+                        Last 7 days
+                      </p>
                     </div>
                   </Tooltip>
                 )}
@@ -660,7 +677,9 @@ const ViewAttendance = () => {
 
                             <div className="mb-4">
                               <div className="text-3xl font-bold text-gray-900">
-                                {formatPercentage(safeGet(data, "yesterdayPercent", 0))}
+                                {formatPercentage(
+                                  safeGet(data, "yesterdayPercent", 0)
+                                )}
                               </div>
                               <div className="text-sm font-medium text-gray-600 mt-1">
                                 Yesterday
@@ -674,7 +693,11 @@ const ViewAttendance = () => {
                               <div>
                                 <div className="flex justify-between text-sm font-medium text-gray-700 mb-1.5">
                                   <span>7 Days</span>
-                                  <span>{formatPercentage(safeGet(data, "weekPercent", 0))}</span>
+                                  <span>
+                                    {formatPercentage(
+                                      safeGet(data, "weekPercent", 0)
+                                    )}
+                                  </span>
                                 </div>
                                 <div className="w-full bg-gray-200 rounded-full h-2.5">
                                   <div
@@ -682,7 +705,10 @@ const ViewAttendance = () => {
                                       safeGet(data, "weekPercent", 0)
                                     )}`}
                                     style={{
-                                      width: `${Math.min(safeGet(data, "weekPercent", 0), 100)}%`,
+                                      width: `${Math.min(
+                                        safeGet(data, "weekPercent", 0),
+                                        100
+                                      )}%`,
                                     }}
                                   />
                                 </div>
@@ -691,7 +717,11 @@ const ViewAttendance = () => {
                               <div>
                                 <div className="flex justify-between text-sm font-medium text-gray-700 mb-1.5">
                                   <span>30 Days</span>
-                                  <span>{formatPercentage(safeGet(data, "monthPercent", 0))}</span>
+                                  <span>
+                                    {formatPercentage(
+                                      safeGet(data, "monthPercent", 0)
+                                    )}
+                                  </span>
                                 </div>
                                 <div className="w-full bg-gray-200 rounded-full h-2.5">
                                   <div
@@ -699,7 +729,10 @@ const ViewAttendance = () => {
                                       safeGet(data, "monthPercent", 0)
                                     )}`}
                                     style={{
-                                      width: `${Math.min(safeGet(data, "monthPercent", 0), 100)}%`,
+                                      width: `${Math.min(
+                                        safeGet(data, "monthPercent", 0),
+                                        100
+                                      )}%`,
                                     }}
                                   />
                                 </div>
@@ -753,7 +786,10 @@ const ViewAttendance = () => {
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {areasData.map((area, index) => (
-                          <tr key={area.area_id} className="hover:bg-gray-50 transition-colors">
+                          <tr
+                            key={area.area_id}
+                            className="hover:bg-gray-50 transition-colors"
+                          >
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div
                                 className={`w-10 h-10 rounded-lg flex items-center justify-center text-base font-bold ${
@@ -781,7 +817,9 @@ const ViewAttendance = () => {
                                   safeGet(area, "fajrPercent", 0)
                                 )}`}
                               >
-                                {formatPercentage(safeGet(area, "fajrPercent", 0))}
+                                {formatPercentage(
+                                  safeGet(area, "fajrPercent", 0)
+                                )}
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -790,7 +828,9 @@ const ViewAttendance = () => {
                                   safeGet(area, "yesterdayPercent", 0)
                                 )}`}
                               >
-                                {formatPercentage(safeGet(area, "yesterdayPercent", 0))}
+                                {formatPercentage(
+                                  safeGet(area, "yesterdayPercent", 0)
+                                )}
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -799,7 +839,9 @@ const ViewAttendance = () => {
                                   safeGet(area, "weekPercent", 0)
                                 )}`}
                               >
-                                {formatPercentage(safeGet(area, "weekPercent", 0))}
+                                {formatPercentage(
+                                  safeGet(area, "weekPercent", 0)
+                                )}
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -808,7 +850,9 @@ const ViewAttendance = () => {
                                   safeGet(area, "monthPercent", 0)
                                 )}`}
                               >
-                                {formatPercentage(safeGet(area, "monthPercent", 0))}
+                                {formatPercentage(
+                                  safeGet(area, "monthPercent", 0)
+                                )}
                               </span>
                             </td>
                           </tr>
@@ -845,7 +889,9 @@ const ViewAttendance = () => {
                         </svg>
                       </div>
                       <div className="text-4xl font-bold text-gray-900 mb-2">
-                        {formatPercentage(safeGet(overviewData, "yesterday.percentage", 0))}
+                        {formatPercentage(
+                          safeGet(overviewData, "yesterday.percentage", 0)
+                        )}
                       </div>
                       <p className="text-sm font-medium text-gray-600">
                         {safeGet(overviewData, "yesterday.count", 0)} of{" "}
@@ -881,11 +927,15 @@ const ViewAttendance = () => {
                           #{safeGet(overviewData, "areaRank.position", "N/A")}
                         </span>
                         <span className="text-2xl font-medium text-gray-600">
-                          / {safeGet(overviewData, "areaRank.totalAreas", "N/A")}
+                          /{" "}
+                          {safeGet(overviewData, "areaRank.totalAreas", "N/A")}
                         </span>
                       </div>
                       <p className="text-sm font-medium text-green-800">
-                        {formatPercentage(safeGet(overviewData, "areaRank.percentage", 0))} score
+                        {formatPercentage(
+                          safeGet(overviewData, "areaRank.percentage", 0)
+                        )}{" "}
+                        score
                       </p>
                     </div>
                   </Tooltip>
@@ -916,7 +966,8 @@ const ViewAttendance = () => {
                         {safeGet(overviewData, "newMembers.count", 0)}
                       </div>
                       <p className="text-sm font-medium text-gray-600">
-                        of {safeGet(overviewData, "newMembers.total", 0)} total members
+                        of {safeGet(overviewData, "newMembers.total", 0)} total
+                        members
                       </p>
                     </div>
                   </Tooltip>
@@ -944,9 +995,13 @@ const ViewAttendance = () => {
                         </svg>
                       </div>
                       <div className="text-4xl font-bold text-blue-900 mb-2">
-                        {formatPercentage(safeGet(overviewData, "weeklyAvg.percentage", 0))}
+                        {formatPercentage(
+                          safeGet(overviewData, "weeklyAvg.percentage", 0)
+                        )}
                       </div>
-                      <p className="text-sm font-medium text-blue-800">Last 7 days</p>
+                      <p className="text-sm font-medium text-blue-800">
+                        Last 7 days
+                      </p>
                     </div>
                   </Tooltip>
                 )}
@@ -987,7 +1042,9 @@ const ViewAttendance = () => {
 
                             <div className="mb-4">
                               <div className="text-3xl font-bold text-gray-900">
-                                {formatPercentage(safeGet(data, "yesterdayPercent", 0))}
+                                {formatPercentage(
+                                  safeGet(data, "yesterdayPercent", 0)
+                                )}
                               </div>
                               <div className="text-sm font-medium text-gray-600 mt-1">
                                 Yesterday
@@ -1001,7 +1058,11 @@ const ViewAttendance = () => {
                               <div>
                                 <div className="flex justify-between text-sm font-medium text-gray-700 mb-1.5">
                                   <span>7 Days</span>
-                                  <span>{formatPercentage(safeGet(data, "weekPercent", 0))}</span>
+                                  <span>
+                                    {formatPercentage(
+                                      safeGet(data, "weekPercent", 0)
+                                    )}
+                                  </span>
                                 </div>
                                 <div className="w-full bg-gray-200 rounded-full h-2.5">
                                   <div
@@ -1009,7 +1070,10 @@ const ViewAttendance = () => {
                                       safeGet(data, "weekPercent", 0)
                                     )}`}
                                     style={{
-                                      width: `${Math.min(safeGet(data, "weekPercent", 0), 100)}%`,
+                                      width: `${Math.min(
+                                        safeGet(data, "weekPercent", 0),
+                                        100
+                                      )}%`,
                                     }}
                                   />
                                 </div>
@@ -1018,7 +1082,11 @@ const ViewAttendance = () => {
                               <div>
                                 <div className="flex justify-between text-sm font-medium text-gray-700 mb-1.5">
                                   <span>30 Days</span>
-                                  <span>{formatPercentage(safeGet(data, "monthPercent", 0))}</span>
+                                  <span>
+                                    {formatPercentage(
+                                      safeGet(data, "monthPercent", 0)
+                                    )}
+                                  </span>
                                 </div>
                                 <div className="w-full bg-gray-200 rounded-full h-2.5">
                                   <div
@@ -1026,7 +1094,10 @@ const ViewAttendance = () => {
                                       safeGet(data, "monthPercent", 0)
                                     )}`}
                                     style={{
-                                      width: `${Math.min(safeGet(data, "monthPercent", 0), 100)}%`,
+                                      width: `${Math.min(
+                                        safeGet(data, "monthPercent", 0),
+                                        100
+                                      )}%`,
                                     }}
                                   />
                                 </div>
@@ -1102,7 +1173,9 @@ const ViewAttendance = () => {
               {loadingMembers ? (
                 <div className="p-16 text-center">
                   <div className="inline-block animate-spin rounded-full border-4 border-gray-200 border-t-green-600 h-16 w-16"></div>
-                  <p className="mt-6 text-lg font-medium text-gray-700">Loading members...</p>
+                  <p className="mt-6 text-lg font-medium text-gray-700">
+                    Loading members...
+                  </p>
                 </div>
               ) : membersData.length === 0 ? (
                 <div className="p-16 text-center">
@@ -1125,96 +1198,157 @@ const ViewAttendance = () => {
                 </div>
               ) : (
                 <>
+                  {/* Replace the table section in the Member List View */}
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y-2 divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
                             Member
                           </th>
-                          <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                            Area
+                          </th>
+                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
                             Attendance ({getPeriodLabel})
                           </th>
-                          <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
                             Yesterday
                           </th>
-                          <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                            🌅 Fajr Count
+                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                            🌅 Fajr Streak
                           </th>
-                          <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
                             Action
                           </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {membersData.map((member) => (
-                          <tr
-                            key={member.id}
-                            className="hover:bg-gray-50 transition-colors"
-                          >
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center">
-                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-100 to-emerald-100 flex items-center justify-center text-green-800 font-bold text-base border-2 border-green-300">
-                                  {safeGet(member, "name", "N/A")
-                                    .split(" ")
-                                    .map((n) => n[0])
-                                    .join("")}
-                                </div>
-                                <div className="ml-4">
-                                  <div className="text-base font-semibold text-gray-900">
-                                    {safeGet(member, "name", "N/A")}
+                        {membersData.map((member) => {
+                          const areaName =
+                            areasData.find((a) => a.area_id === member.area_id)
+                              ?.name || `Area ${member.area_id}`;
+                          const fajrPercentage =
+                            member.totalDays > 0
+                              ? Math.round(
+                                  (member.fajrCount / member.totalDays) * 100
+                                )
+                              : 0;
+
+                          return (
+                            <tr
+                              key={member.id}
+                              className="hover:bg-gray-50 transition-colors"
+                            >
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-100 to-emerald-100 flex items-center justify-center text-green-800 font-bold text-base border-2 border-green-300">
+                                    {safeGet(member, "name", "N/A")
+                                      .split(" ")
+                                      .map((n) => n[0])
+                                      .join("")}
                                   </div>
-                                  <div className="text-sm font-medium text-gray-500">
-                                    {safeGet(member, "phone", "N/A")}
+                                  <div className="ml-4">
+                                    <div className="text-base font-semibold text-gray-900">
+                                      {safeGet(member, "name", "N/A")}
+                                    </div>
+                                    <div className="text-sm font-medium text-gray-500">
+                                      {safeGet(member, "phone", "N/A")}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span
-                                className={`inline-flex px-4 py-2 rounded-lg text-base font-bold ${getColorClass(
-                                  safeGet(member, "periodPercentage", 0)
-                                )}`}
-                              >
-                                {formatPercentage(safeGet(member, "periodPercentage", 0))}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <PrayerDots
-                                prayers={safeGet(
-                                  member,
-                                  "yesterdayPrayers",
-                                  {}
-                                )}
-                              />
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-base font-semibold text-gray-900">
-                              {safeGet(member, "fajrCount", 0)}/
-                              {safeGet(member, "totalDays", 0)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <button
-                                onClick={() => handleDownloadReport(member)}
-                                className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-all hover:shadow-lg"
-                              >
-                                <svg
-                                  className="w-5 h-5 mr-2"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold bg-blue-100 text-blue-900 border border-blue-300">
+                                  {areaName}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <span
+                                  className={`inline-flex px-4 py-2 rounded-lg text-base font-bold ${getColorClass(
+                                    safeGet(member, "periodPercentage", 0)
+                                  )}`}
                                 >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                  {formatPercentage(
+                                    safeGet(member, "periodPercentage", 0)
+                                  )}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex justify-center">
+                                  <PrayerDots
+                                    prayers={safeGet(
+                                      member,
+                                      "yesterdayPrayers",
+                                      {}
+                                    )}
                                   />
-                                </svg>
-                                Download Report
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex flex-col items-center space-y-1.5">
+                                  <div className="flex items-baseline space-x-1">
+                                    <span className="text-2xl font-bold text-gray-900">
+                                      {safeGet(member, "fajrCount", 0)}
+                                    </span>
+                                    <span className="text-base font-medium text-gray-500">
+                                      / {safeGet(member, "totalDays", 0)}
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-gray-200 rounded-full h-2 max-w-[100px]">
+                                    <div
+                                      className={`h-2 rounded-full transition-all ${
+                                        fajrPercentage >= 80
+                                          ? "bg-green-500"
+                                          : fajrPercentage >= 60
+                                          ? "bg-yellow-500"
+                                          : "bg-red-500"
+                                      }`}
+                                      style={{
+                                        width: `${Math.min(
+                                          fajrPercentage,
+                                          100
+                                        )}%`,
+                                      }}
+                                    />
+                                  </div>
+                                  <span
+                                    className={`text-xs font-semibold ${
+                                      fajrPercentage >= 80
+                                        ? "text-green-700"
+                                        : fajrPercentage >= 60
+                                        ? "text-yellow-700"
+                                        : "text-red-700"
+                                    }`}
+                                  >
+                                    {fajrPercentage}%
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap text-center">
+                                <button
+                                  onClick={() => handleDownloadReport(member)}
+                                  className="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-all hover:shadow-lg"
+                                >
+                                  <svg
+                                    className="w-4 h-4 mr-1"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                    />
+                                  </svg>
+                                  Report
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
