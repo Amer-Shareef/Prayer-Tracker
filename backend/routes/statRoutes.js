@@ -6,12 +6,17 @@ const { dbHealthCheck } = require("../middleware/dbHealthCheck");
 
 const router = express.Router();
 
+// Helper function to get formatted dates
+const getFormattedDate = (daysAgo = 0) => {
+  const date = new Date();
+  date.setDate(date.getDate() - daysAgo);
+  return date.toISOString().split('T')[0];
+};
+
 // Helper function to remove SQL comments that might interfere with placeholders
 const cleanSQL = (sql) => {
-  // Remove single-line comments (-- and #)
   let cleaned = sql.replace(/--[^\n]*\n/g, '\n');
   cleaned = cleaned.replace(/#[^\n]*/g, '');
-  // Remove multi-line comments (/* */)
   cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
   return cleaned;
 };
@@ -58,7 +63,6 @@ router.get(
 
       let overviewData = {};
 
-      // Get area info
       if (areaFilter) {
         const [areaInfo] = await pool.execute(
           'SELECT area_id, area_name FROM areas WHERE area_id = ?',
@@ -72,7 +76,6 @@ router.get(
         }
       }
 
-      // Yesterday's attendance
       const yesterdayQuery = cleanSQL(`
         SELECT 
           COUNT(DISTINCT p.user_id) as active_members,
@@ -102,7 +105,6 @@ router.get(
         total: totalPossible,
       };
 
-      // New members in last 30 days
       const newMembersQuery = cleanSQL(`
         SELECT 
           COUNT(*) as new_count,
@@ -371,6 +373,11 @@ router.get(
         });
       }
 
+      const today = getFormattedDate(0);
+      const yesterday = getFormattedDate(1);
+      const last7DaysStart = getFormattedDate(7);
+      const last30DaysStart = getFormattedDate(30);
+
       const areasQuery = cleanSQL(`
         SELECT 
           a.area_id,
@@ -378,61 +385,81 @@ router.get(
           (SELECT COUNT(*) FROM users WHERE status = 'active' AND area_id = a.area_id) as members,
           (SELECT SUM(fajr + dhuhr + asr + maghrib + isha) 
            FROM prayers 
-           WHERE area_id = a.area_id AND prayer_date = DATE_SUB(CURDATE(), INTERVAL 1 DAY)) as yesterday_prayers,
+           WHERE area_id = a.area_id AND prayer_date = ?) as yesterday_prayers,
           (SELECT SUM(fajr + dhuhr + asr + maghrib + isha) 
            FROM prayers 
-           WHERE area_id = a.area_id AND prayer_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)) as week_prayers,
+           WHERE area_id = a.area_id AND prayer_date >= ? AND prayer_date < ?) as week_prayers,
           (SELECT SUM(fajr + dhuhr + asr + maghrib + isha) 
            FROM prayers 
-           WHERE area_id = a.area_id AND prayer_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) as month_prayers,
+           WHERE area_id = a.area_id AND prayer_date >= ? AND prayer_date < ?) as month_prayers,
           (SELECT SUM(fajr) 
            FROM prayers 
-           WHERE area_id = a.area_id AND prayer_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)) as fajr_week
+           WHERE area_id = a.area_id AND prayer_date >= ? AND prayer_date < ?) as fajr_week,
+          (SELECT AVG(prayer_days) 
+           FROM (
+             SELECT COUNT(DISTINCT prayer_date) as prayer_days
+             FROM prayers p
+             INNER JOIN users u ON p.user_id = u.id
+             WHERE u.area_id = a.area_id 
+             AND u.status = 'active'
+             AND p.prayer_date >= ? AND p.prayer_date < ?
+             GROUP BY p.user_id
+           ) as member_attendance) as avg_days_attended
         FROM areas a
         ORDER BY a.area_name
       `);
 
-      const [areasData] = await pool.execute(areasQuery);
+      const [areasData] = await pool.execute(areasQuery, [
+        yesterday,
+        last7DaysStart, today,
+        last30DaysStart, today,
+        last7DaysStart, today,
+        last7DaysStart, today
+      ]);
 
       const areasWithStats = areasData.map((area) => {
         const members = area.members || 0;
 
-        const yesterdayPercent =
-          members > 0
-            ? Math.round(((area.yesterday_prayers || 0) / (members * 5)) * 100)
-            : 0;
-        const weekPercent =
-          members > 0
-            ? Math.round(((area.week_prayers || 0) / (members * 7 * 5)) * 100)
-            : 0;
-        const monthPercent =
-          members > 0
-            ? Math.round(((area.month_prayers || 0) / (members * 30 * 5)) * 100)
-            : 0;
-        const fajrPercent =
-          members > 0
-            ? Math.round(((area.fajr_week || 0) / (members * 7)) * 100)
-            : 0;
+        const yesterdayPossible = members * 5;
+        const yesterdayPercent = yesterdayPossible > 0
+          ? Math.round(((area.yesterday_prayers || 0) / yesterdayPossible) * 100)
+          : 0;
 
-        const weightedScore = calculateWeightedScore(
-          weekPercent,
-          yesterdayPercent,
-          fajrPercent
+        const weekPossible = members * 7 * 5;
+        const weekPercent = weekPossible > 0
+          ? Math.round(((area.week_prayers || 0) / weekPossible) * 100)
+          : 0;
+
+        const monthPossible = members * 30 * 5;
+        const monthPercent = monthPossible > 0
+          ? Math.round(((area.month_prayers || 0) / monthPossible) * 100)
+          : 0;
+
+        const fajrPossible = members * 7;
+        const fajrPercent = fajrPossible > 0
+          ? Math.round(((area.fajr_week || 0) / fajrPossible) * 100)
+          : 0;
+
+        const avgDaysAttended = area.avg_days_attended || 0;
+
+        const averageScore = Math.round(
+          (yesterdayPercent + weekPercent + monthPercent + fajrPercent) / 4
         );
 
         return {
           area_id: area.area_id,
           name: area.area_name,
           members: members,
-          yesterdayPercent,
-          weekPercent,
-          monthPercent,
-          fajrPercent,
-          weightedScore,
+          yesterdayPercent: Math.min(yesterdayPercent, 100),
+          weekPercent: Math.min(weekPercent, 100),
+          monthPercent: Math.min(monthPercent, 100),
+          fajrPercent: Math.min(fajrPercent, 100),
+          avgDaysAttended: Math.round(avgDaysAttended * 10) / 10,
+          averageScore: Math.min(averageScore, 100),
         };
       });
 
-      areasWithStats.sort((a, b) => b.weightedScore - a.weightedScore);
+      areasWithStats.sort((a, b) => b.averageScore - a.averageScore);
 
       res.json({
         success: true,
@@ -450,7 +477,8 @@ router.get(
   }
 );
 
-// 4. GET /api/attendance/members - OPTIMIZED VERSION
+
+// 4. GET /api/attendance/members - Member attendance list
 router.get(
   "/attendance/members",
   authenticateToken,
@@ -488,13 +516,9 @@ router.get(
       const limitNum = parseInt(limit);
       const offset = (pageNum - 1) * limitNum;
 
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - periodDays);
-      const formattedStartDate = startDate.toISOString().split('T')[0];
-      
-      const yesterdayDate = new Date();
-      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-      const formattedYesterday = yesterdayDate.toISOString().split('T')[0];
+      // Use helper function for cleaner date handling
+      const formattedStartDate = getFormattedDate(periodDays);
+      const formattedYesterday = getFormattedDate(1);
 
       let whereConditions = ["u.status = ?"];
       let params = ["active"];

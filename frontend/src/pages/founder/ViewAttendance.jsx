@@ -747,6 +747,7 @@ const ViewAttendance = () => {
               )}
 
               {/* Area Performance Table */}
+              {/* Area Performance Table */}
               {areasData.length > 0 && (
                 <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200">
                   <div className="p-8 border-b-2 border-gray-200">
@@ -754,32 +755,40 @@ const ViewAttendance = () => {
                       Area Performance
                     </h2>
                     <p className="text-sm font-medium text-gray-600">
-                      Ranked by weighted score (attendance + Fajr consistency)
+                      Ranked by overall performance across all metrics
                     </p>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y-2 divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
                             Rank
                           </th>
-                          <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
                             Area
                           </th>
-                          <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
                             Members
                           </th>
-                          <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                            🌅 Fajr (7d)
+                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                            🌅 Fajr
+                            <br />
+                            <span className="text-xs font-normal text-gray-500">
+                              (Last 7d)
+                            </span>
                           </th>
-                          <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
                             Yesterday
                           </th>
-                          <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                            7 Days
+                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                            Attendance
+                            <br />
+                            <span className="text-xs font-normal text-gray-500">
+                              (Last 7d)
+                            </span>
                           </th>
-                          <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
                             30 Days
                           </th>
                         </tr>
@@ -790,9 +799,9 @@ const ViewAttendance = () => {
                             key={area.area_id}
                             className="hover:bg-gray-50 transition-colors"
                           >
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
                               <div
-                                className={`w-10 h-10 rounded-lg flex items-center justify-center text-base font-bold ${
+                                className={`w-10 h-10 rounded-lg flex items-center justify-center text-base font-bold mx-auto ${
                                   index === 0
                                     ? "bg-yellow-100 text-yellow-800 border-2 border-yellow-400"
                                     : index === 1
@@ -805,13 +814,13 @@ const ViewAttendance = () => {
                                 {index + 1}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-base font-semibold text-gray-900">
+                            <td className="px-6 py-4 whitespace-nowrap text-center text-base font-semibold text-gray-900">
                               {safeGet(area, "name", "N/A")}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-700">
+                            <td className="px-6 py-4 whitespace-nowrap text-center text-base font-medium text-gray-700">
                               {safeGet(area, "members", 0)}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
                               <span
                                 className={`inline-flex px-3 py-1.5 rounded-lg text-base font-bold ${getColorClass(
                                   safeGet(area, "fajrPercent", 0)
@@ -822,7 +831,7 @@ const ViewAttendance = () => {
                                 )}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
                               <span
                                 className={`inline-flex px-3 py-1.5 rounded-lg text-base font-bold ${getColorClass(
                                   safeGet(area, "yesterdayPercent", 0)
@@ -833,7 +842,7 @@ const ViewAttendance = () => {
                                 )}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
                               <span
                                 className={`inline-flex px-3 py-1.5 rounded-lg text-base font-bold ${getColorClass(
                                   safeGet(area, "weekPercent", 0)
@@ -844,7 +853,7 @@ const ViewAttendance = () => {
                                 )}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
                               <span
                                 className={`inline-flex px-3 py-1.5 rounded-lg text-base font-bold ${getColorClass(
                                   safeGet(area, "monthPercent", 0)
