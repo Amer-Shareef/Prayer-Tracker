@@ -27,15 +27,15 @@ const LoginPage = () => {
       if (role === "Member" || role === "WCM") {
         navigate("/member/dashboard", { replace: true });
       } else if (role === "Founder" || role === "SuperAdmin") {
-        navigate("/founder/dashboard", { replace: true });
+        navigate("/founder/view-attendance", { replace: true });
       } else {
         navigate("/member/dashboard", { replace: true });
       }
     }
   }, [user, authLoading, navigate]);
 
-  // Show loading state while checking authentication
-  if (authLoading) {
+  // Show loading state while checking authentication or redirecting authenticated user
+  if (authLoading || user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>

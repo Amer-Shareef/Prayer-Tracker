@@ -23,7 +23,6 @@ import DailyActivities from "./pages/member/DailyActivities";
 import ChangePassword from "./pages/member/ChangePassword";
 
 // Founder Pages
-import FounderDashboard from "./components/dashboard/FounderDashboard";
 import AddMember from "./pages/founder/AddMember";
 import ApprovePickup from "./pages/founder/ApprovePickup";
 import AreaPage from "./pages/founder/AreaPage";
@@ -128,15 +127,15 @@ function App() {
             path="/founder"
             element={
               <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
-                <Navigate to="/founder/dashboard" replace />
+                <Navigate to="/founder/view-attendance" replace />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/founder/dashboard"
+            path="/founder/view-attendance"
             element={
               <ProtectedRoute roles={["Founder", "WCM", "SuperAdmin"]}>
-                <FounderDashboard />
+                <ViewAttendance />
               </ProtectedRoute>
             }
           />
@@ -248,7 +247,7 @@ function App() {
           {/* Legacy SuperAdmin routes - redirect to founder routes */}
           <Route
             path="/superadmin/*"
-            element={<Navigate to="/founder/dashboard" replace />}
+            element={<Navigate to="/founder/view-attendance" replace />}
           />
 
           {/* 404 Fallback */}

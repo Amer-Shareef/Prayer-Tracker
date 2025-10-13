@@ -31,7 +31,7 @@ const ProtectedRoute = ({ children, role, roles }) => {
       if (userRoleForUI === "Member") {
         return <Navigate to="/member/dashboard" replace />;
       } else if (userRoleForUI === "Founder" || userRoleForUI === "SuperAdmin" || userRoleForUI === "WCM") {
-        return <Navigate to="/founder/dashboard" replace />;
+        return <Navigate to="/founder/view-attendance" replace />;
       } else {
         return <Navigate to="/login" replace />;
       }

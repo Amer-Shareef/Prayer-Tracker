@@ -433,16 +433,16 @@ const ViewAttendance = () => {
 
   return (
     <FounderLayout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-3">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 Attendance Dashboard
               </h1>
-              <div className="flex items-center space-x-3">
-                <span className="inline-flex items-center px-4 py-2 rounded-lg text-base font-semibold bg-blue-100 text-blue-900 border-2 border-blue-300">
+              <div className="flex items-center space-x-2">
+                <span className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-semibold bg-blue-100 text-blue-900 border border-blue-300">
                   {role === "SuperAdmin"
                     ? "SuperAdmin"
                     : role === "WCM"
@@ -450,9 +450,9 @@ const ViewAttendance = () => {
                     : "WC Admin"}
                 </span>
                 {overviewData?.areaInfo && (
-                  <span className="inline-flex items-center px-4 py-2 rounded-lg text-base font-semibold bg-green-100 text-green-900 border-2 border-green-300">
+                  <span className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-semibold bg-green-100 text-green-900 border border-green-300">
                     <svg
-                      className="w-5 h-5 mr-2"
+                      className="w-4 h-4 mr-1"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -477,12 +477,12 @@ const ViewAttendance = () => {
             </div>
 
             {/* View Switcher */}
-            <div className="bg-white rounded-xl shadow-md p-1.5 inline-flex border-2 border-gray-200">
+            <div className="bg-white rounded-lg shadow-sm p-1 inline-flex border border-gray-200">
               <button
                 onClick={() => setView("overview")}
-                className={`px-8 py-3 rounded-lg text-base font-semibold transition-all ${
+                className={`px-6 py-2 rounded-md text-sm font-semibold transition-all ${
                   view === "overview"
-                    ? "bg-green-600 text-white shadow-lg"
+                    ? "bg-green-600 text-white shadow-sm"
                     : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                 }`}
               >
@@ -490,9 +490,9 @@ const ViewAttendance = () => {
               </button>
               <button
                 onClick={() => setView("detailed")}
-                className={`px-8 py-3 rounded-lg text-base font-semibold transition-all ${
+                className={`px-6 py-2 rounded-md text-sm font-semibold transition-all ${
                   view === "detailed"
-                    ? "bg-green-600 text-white shadow-lg"
+                    ? "bg-green-600 text-white shadow-sm"
                     : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                 }`}
               >
@@ -507,16 +507,16 @@ const ViewAttendance = () => {
             /* ==================== SUPERADMIN OVERVIEW ==================== */
             <div className="space-y-8">
               {/* Quick Metrics */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {overviewData?.yesterday && (
                   <Tooltip text="Total prayers completed yesterday across all areas">
-                    <div className="bg-white rounded-xl p-6 border-2 border-gray-200 shadow-md hover:shadow-xl transition-all cursor-help">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-base font-bold text-gray-700 uppercase tracking-wide">
+                    <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-help">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
                           Yesterday
                         </h3>
                         <svg
-                          className="w-10 h-10 text-green-600"
+                          className="w-8 h-8 text-green-600"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -529,12 +529,12 @@ const ViewAttendance = () => {
                           />
                         </svg>
                       </div>
-                      <div className="text-4xl font-bold text-gray-900 mb-2">
+                      <div className="text-3xl font-bold text-gray-900 mb-1">
                         {formatPercentage(
                           safeGet(overviewData, "yesterday.percentage", 0)
                         )}
                       </div>
-                      <p className="text-sm font-medium text-gray-600">
+                      <p className="text-xs font-medium text-gray-600">
                         {safeGet(overviewData, "yesterday.count", 0)} of{" "}
                         {safeGet(overviewData, "yesterday.total", 0)} prayers
                       </p>
@@ -544,13 +544,13 @@ const ViewAttendance = () => {
 
                 {overviewData?.topArea && (
                   <Tooltip text="Best performing area in the last 7 days">
-                    <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl p-6 border-2 border-green-400 shadow-md hover:shadow-xl transition-all cursor-help">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-base font-bold text-green-900 uppercase tracking-wide">
+                    <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-lg p-4 border border-green-400 shadow-sm hover:shadow-md transition-all cursor-help">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-bold text-green-900 uppercase tracking-wide">
                           Top Area
                         </h3>
                         <svg
-                          className="w-10 h-10 text-green-700"
+                          className="w-8 h-8 text-green-700"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -563,10 +563,10 @@ const ViewAttendance = () => {
                           />
                         </svg>
                       </div>
-                      <div className="text-2xl font-bold text-gray-900 mb-2 truncate">
+                      <div className="text-2xl font-bold text-gray-900 mb-1 truncate">
                         {safeGet(overviewData, "topArea.name", "N/A")}
                       </div>
-                      <p className="text-sm font-medium text-green-800">
+                      <p className="text-xs font-medium text-green-800">
                         {formatPercentage(
                           safeGet(overviewData, "topArea.percentage", 0)
                         )}{" "}
@@ -578,13 +578,13 @@ const ViewAttendance = () => {
 
                 {overviewData?.newMembers && (
                   <Tooltip text="New members who joined in the last 30 days">
-                    <div className="bg-white rounded-xl p-6 border-2 border-gray-200 shadow-md hover:shadow-xl transition-all cursor-help">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-base font-bold text-gray-700 uppercase tracking-wide">
+                    <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-help">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
                           New Members
                         </h3>
                         <svg
-                          className="w-10 h-10 text-green-600"
+                          className="w-8 h-8 text-green-600"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -597,10 +597,10 @@ const ViewAttendance = () => {
                           />
                         </svg>
                       </div>
-                      <div className="text-4xl font-bold text-gray-900 mb-2">
+                      <div className="text-3xl font-bold text-gray-900 mb-1">
                         {safeGet(overviewData, "newMembers.count", 0)}
                       </div>
-                      <p className="text-sm font-medium text-gray-600">
+                      <p className="text-xs font-medium text-gray-600">
                         of {safeGet(overviewData, "newMembers.total", 0)} total
                         members
                       </p>
@@ -610,13 +610,13 @@ const ViewAttendance = () => {
 
                 {overviewData?.avgRate7d && (
                   <Tooltip text="Average attendance rate across all areas (last 7 days)">
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl p-6 border-2 border-blue-400 shadow-md hover:shadow-xl transition-all cursor-help">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-base font-bold text-blue-900 uppercase tracking-wide">
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg p-4 border border-blue-400 shadow-sm hover:shadow-md transition-all cursor-help">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-bold text-blue-900 uppercase tracking-wide">
                           Weekly Avg
                         </h3>
                         <svg
-                          className="w-10 h-10 text-blue-700"
+                          className="w-8 h-8 text-blue-700"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -629,12 +629,12 @@ const ViewAttendance = () => {
                           />
                         </svg>
                       </div>
-                      <div className="text-4xl font-bold text-blue-900 mb-2">
+                      <div className="text-3xl font-bold text-blue-900 mb-1">
                         {formatPercentage(
                           safeGet(overviewData, "avgRate7d.percentage", 0)
                         )}
                       </div>
-                      <p className="text-sm font-medium text-blue-800">
+                      <p className="text-xs font-medium text-blue-800">
                         Last 7 days
                       </p>
                     </div>
@@ -644,30 +644,30 @@ const ViewAttendance = () => {
 
               {/* Prayer Breakdown */}
               {prayerBreakdown && (
-                <div className="bg-white rounded-xl shadow-lg p-8 border-2 border-gray-200">
-                  <div className="flex items-center justify-between mb-8">
-                    <h2 className="text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-bold text-gray-900">
                       Prayer Breakdown
                     </h2>
-                    <span className="text-sm font-medium text-gray-500 bg-gray-100 px-4 py-2 rounded-lg">
+                    <span className="text-xs font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-lg">
                       All Areas Combined
                     </span>
                   </div>
-                  <div className="grid grid-cols-5 gap-6">
+                  <div className="grid grid-cols-5 gap-4">
                     {Object.entries(prayerBreakdown).map(([prayer, data]) => {
                       const isFajr = prayer === "fajr";
                       return (
                         <div
                           key={prayer}
-                          className={`rounded-xl p-6 transition-all hover:scale-105 ${
+                          className={`rounded-lg p-4 transition-all hover:scale-105 ${
                             isFajr
-                              ? "bg-gradient-to-br from-green-50 to-emerald-100 border-2 border-green-400 shadow-md"
-                              : "bg-gray-50 border-2 border-gray-200"
+                              ? "bg-gradient-to-br from-green-50 to-emerald-100 border border-green-400 shadow-sm"
+                              : "bg-gray-50 border border-gray-200"
                           }`}
                         >
                           <div className="text-center">
                             <div
-                              className={`text-base font-bold mb-3 uppercase tracking-wide ${
+                              className={`text-sm font-bold mb-2 uppercase tracking-wide ${
                                 isFajr ? "text-green-900" : "text-gray-700"
                               }`}
                             >
@@ -675,13 +675,13 @@ const ViewAttendance = () => {
                               {prayer.charAt(0).toUpperCase() + prayer.slice(1)}
                             </div>
 
-                            <div className="mb-4">
-                              <div className="text-3xl font-bold text-gray-900">
+                            <div className="mb-3">
+                              <div className="text-2xl font-bold text-gray-900">
                                 {formatPercentage(
                                   safeGet(data, "yesterdayPercent", 0)
                                 )}
                               </div>
-                              <div className="text-sm font-medium text-gray-600 mt-1">
+                              <div className="text-xs font-medium text-gray-600 mt-1">
                                 Yesterday
                               </div>
                               <div className="text-xs text-gray-500 mt-0.5">
@@ -689,9 +689,9 @@ const ViewAttendance = () => {
                               </div>
                             </div>
 
-                            <div className="space-y-3">
+                            <div className="space-y-2">
                               <div>
-                                <div className="flex justify-between text-sm font-medium text-gray-700 mb-1.5">
+                                <div className="flex justify-between text-xs font-medium text-gray-700 mb-1">
                                   <span>7 Days</span>
                                   <span>
                                     {formatPercentage(
@@ -699,9 +699,9 @@ const ViewAttendance = () => {
                                     )}
                                   </span>
                                 </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                <div className="w-full bg-gray-200 rounded-full h-2">
                                   <div
-                                    className={`h-2.5 rounded-full transition-all ${getProgressColor(
+                                    className={`h-2 rounded-full transition-all ${getProgressColor(
                                       safeGet(data, "weekPercent", 0)
                                     )}`}
                                     style={{
@@ -715,7 +715,7 @@ const ViewAttendance = () => {
                               </div>
 
                               <div>
-                                <div className="flex justify-between text-sm font-medium text-gray-700 mb-1.5">
+                                <div className="flex justify-between text-xs font-medium text-gray-700 mb-1">
                                   <span>30 Days</span>
                                   <span>
                                     {formatPercentage(
@@ -723,9 +723,9 @@ const ViewAttendance = () => {
                                     )}
                                   </span>
                                 </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                <div className="w-full bg-gray-200 rounded-full h-2">
                                   <div
-                                    className={`h-2.5 rounded-full transition-all ${getProgressColor(
+                                    className={`h-2 rounded-full transition-all ${getProgressColor(
                                       safeGet(data, "monthPercent", 0)
                                     )}`}
                                     style={{
@@ -749,46 +749,46 @@ const ViewAttendance = () => {
               {/* Area Performance Table */}
               {/* Area Performance Table */}
               {areasData.length > 0 && (
-                <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200">
-                  <div className="p-8 border-b-2 border-gray-200">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                  <div className="p-6 border-b border-gray-200">
+                    <h2 className="text-xl font-bold text-gray-900 mb-1">
                       Area Performance
                     </h2>
-                    <p className="text-sm font-medium text-gray-600">
+                    <p className="text-xs font-medium text-gray-600">
                       Ranked by overall performance across all metrics
                     </p>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y-2 divide-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                             Rank
                           </th>
-                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                             Area
                           </th>
-                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                             Members
                           </th>
-                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                             🌅 Fajr
                             <br />
                             <span className="text-xs font-normal text-gray-500">
                               (Last 7d)
                             </span>
                           </th>
-                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                             Yesterday
                           </th>
-                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                             Attendance
                             <br />
                             <span className="text-xs font-normal text-gray-500">
                               (Last 7d)
                             </span>
                           </th>
-                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                             30 Days
                           </th>
                         </tr>
@@ -799,30 +799,30 @@ const ViewAttendance = () => {
                             key={area.area_id}
                             className="hover:bg-gray-50 transition-colors"
                           >
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <td className="px-4 py-3 whitespace-nowrap text-center">
                               <div
-                                className={`w-10 h-10 rounded-lg flex items-center justify-center text-base font-bold mx-auto ${
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold mx-auto ${
                                   index === 0
-                                    ? "bg-yellow-100 text-yellow-800 border-2 border-yellow-400"
+                                    ? "bg-yellow-100 text-yellow-800 border border-yellow-400"
                                     : index === 1
-                                    ? "bg-gray-200 text-gray-700 border-2 border-gray-400"
+                                    ? "bg-gray-200 text-gray-700 border border-gray-400"
                                     : index === 2
-                                    ? "bg-orange-100 text-orange-700 border-2 border-orange-400"
+                                    ? "bg-orange-100 text-orange-700 border border-orange-400"
                                     : "bg-gray-50 text-gray-500 border border-gray-300"
                                 }`}
                               >
                                 {index + 1}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center text-base font-semibold text-gray-900">
+                            <td className="px-4 py-3 whitespace-nowrap text-center text-sm font-semibold text-gray-900">
                               {safeGet(area, "name", "N/A")}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center text-base font-medium text-gray-700">
+                            <td className="px-4 py-3 whitespace-nowrap text-center text-sm font-medium text-gray-700">
                               {safeGet(area, "members", 0)}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <td className="px-4 py-3 whitespace-nowrap text-center">
                               <span
-                                className={`inline-flex px-3 py-1.5 rounded-lg text-base font-bold ${getColorClass(
+                                className={`inline-flex px-2 py-1 rounded text-sm font-bold ${getColorClass(
                                   safeGet(area, "fajrPercent", 0)
                                 )}`}
                               >
@@ -831,9 +831,9 @@ const ViewAttendance = () => {
                                 )}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <td className="px-4 py-3 whitespace-nowrap text-center">
                               <span
-                                className={`inline-flex px-3 py-1.5 rounded-lg text-base font-bold ${getColorClass(
+                                className={`inline-flex px-2 py-1 rounded text-sm font-bold ${getColorClass(
                                   safeGet(area, "yesterdayPercent", 0)
                                 )}`}
                               >
@@ -842,9 +842,9 @@ const ViewAttendance = () => {
                                 )}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <td className="px-4 py-3 whitespace-nowrap text-center">
                               <span
-                                className={`inline-flex px-3 py-1.5 rounded-lg text-base font-bold ${getColorClass(
+                                className={`inline-flex px-2 py-1 rounded text-sm font-bold ${getColorClass(
                                   safeGet(area, "weekPercent", 0)
                                 )}`}
                               >
@@ -853,9 +853,9 @@ const ViewAttendance = () => {
                                 )}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <td className="px-4 py-3 whitespace-nowrap text-center">
                               <span
-                                className={`inline-flex px-3 py-1.5 rounded-lg text-base font-bold ${getColorClass(
+                                className={`inline-flex px-2 py-1 rounded text-sm font-bold ${getColorClass(
                                   safeGet(area, "monthPercent", 0)
                                 )}`}
                               >
@@ -874,17 +874,17 @@ const ViewAttendance = () => {
             </div>
           ) : (
             /* ==================== FOUNDER OVERVIEW ==================== */
-            <div className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {overviewData?.yesterday && (
                   <Tooltip text="Total prayers completed yesterday in your area">
-                    <div className="bg-white rounded-xl p-6 border-2 border-gray-200 shadow-md hover:shadow-xl transition-all cursor-help">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-base font-bold text-gray-700 uppercase tracking-wide">
+                    <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-help">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
                           Yesterday
                         </h3>
                         <svg
-                          className="w-10 h-10 text-green-600"
+                          className="w-8 h-8 text-green-600"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -897,12 +897,12 @@ const ViewAttendance = () => {
                           />
                         </svg>
                       </div>
-                      <div className="text-4xl font-bold text-gray-900 mb-2">
+                      <div className="text-3xl font-bold text-gray-900 mb-1">
                         {formatPercentage(
                           safeGet(overviewData, "yesterday.percentage", 0)
                         )}
                       </div>
-                      <p className="text-sm font-medium text-gray-600">
+                      <p className="text-xs font-medium text-gray-600">
                         {safeGet(overviewData, "yesterday.count", 0)} of{" "}
                         {safeGet(overviewData, "yesterday.total", 0)} prayers
                       </p>
@@ -912,13 +912,13 @@ const ViewAttendance = () => {
 
                 {overviewData?.areaRank && (
                   <Tooltip text="Your area's ranking compared to other areas (last 7 days)">
-                    <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl p-6 border-2 border-green-400 shadow-md hover:shadow-xl transition-all cursor-help">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-base font-bold text-green-900 uppercase tracking-wide">
+                    <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-lg p-4 border border-green-400 shadow-sm hover:shadow-md transition-all cursor-help">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-bold text-green-900 uppercase tracking-wide">
                           Area Rank
                         </h3>
                         <svg
-                          className="w-10 h-10 text-green-700"
+                          className="w-8 h-8 text-green-700"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -931,16 +931,16 @@ const ViewAttendance = () => {
                           />
                         </svg>
                       </div>
-                      <div className="flex items-baseline space-x-2 mb-2">
-                        <span className="text-4xl font-bold text-gray-900">
+                      <div className="flex items-baseline space-x-2 mb-1">
+                        <span className="text-3xl font-bold text-gray-900">
                           #{safeGet(overviewData, "areaRank.position", "N/A")}
                         </span>
-                        <span className="text-2xl font-medium text-gray-600">
+                        <span className="text-xl font-medium text-gray-600">
                           /{" "}
                           {safeGet(overviewData, "areaRank.totalAreas", "N/A")}
                         </span>
                       </div>
-                      <p className="text-sm font-medium text-green-800">
+                      <p className="text-xs font-medium text-green-800">
                         {formatPercentage(
                           safeGet(overviewData, "areaRank.percentage", 0)
                         )}{" "}
@@ -952,13 +952,13 @@ const ViewAttendance = () => {
 
                 {overviewData?.newMembers && (
                   <Tooltip text="New members who joined your area in the last 30 days">
-                    <div className="bg-white rounded-xl p-6 border-2 border-gray-200 shadow-md hover:shadow-xl transition-all cursor-help">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-base font-bold text-gray-700 uppercase tracking-wide">
+                    <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-help">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
                           New Members
                         </h3>
                         <svg
-                          className="w-10 h-10 text-green-600"
+                          className="w-8 h-8 text-green-600"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -971,10 +971,10 @@ const ViewAttendance = () => {
                           />
                         </svg>
                       </div>
-                      <div className="text-4xl font-bold text-gray-900 mb-2">
+                      <div className="text-3xl font-bold text-gray-900 mb-1">
                         {safeGet(overviewData, "newMembers.count", 0)}
                       </div>
-                      <p className="text-sm font-medium text-gray-600">
+                      <p className="text-xs font-medium text-gray-600">
                         of {safeGet(overviewData, "newMembers.total", 0)} total
                         members
                       </p>
@@ -984,13 +984,13 @@ const ViewAttendance = () => {
 
                 {overviewData?.weeklyAvg && (
                   <Tooltip text="Average attendance rate for your area (last 7 days)">
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl p-6 border-2 border-blue-400 shadow-md hover:shadow-xl transition-all cursor-help">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-base font-bold text-blue-900 uppercase tracking-wide">
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg p-4 border border-blue-400 shadow-sm hover:shadow-md transition-all cursor-help">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-bold text-blue-900 uppercase tracking-wide">
                           Weekly Avg
                         </h3>
                         <svg
-                          className="w-10 h-10 text-blue-700"
+                          className="w-8 h-8 text-blue-700"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -1003,12 +1003,12 @@ const ViewAttendance = () => {
                           />
                         </svg>
                       </div>
-                      <div className="text-4xl font-bold text-blue-900 mb-2">
+                      <div className="text-3xl font-bold text-blue-900 mb-1">
                         {formatPercentage(
                           safeGet(overviewData, "weeklyAvg.percentage", 0)
                         )}
                       </div>
-                      <p className="text-sm font-medium text-blue-800">
+                      <p className="text-xs font-medium text-blue-800">
                         Last 7 days
                       </p>
                     </div>
@@ -1018,30 +1018,30 @@ const ViewAttendance = () => {
 
               {/* Prayer Breakdown */}
               {prayerBreakdown && (
-                <div className="bg-white rounded-xl shadow-lg p-8 border-2 border-gray-200">
-                  <div className="flex items-center justify-between mb-8">
-                    <h2 className="text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-bold text-gray-900">
                       Prayer Breakdown
                     </h2>
-                    <span className="text-sm font-medium text-gray-500 bg-gray-100 px-4 py-2 rounded-lg">
+                    <span className="text-xs font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-lg">
                       Your Area
                     </span>
                   </div>
-                  <div className="grid grid-cols-5 gap-6">
+                  <div className="grid grid-cols-5 gap-4">
                     {Object.entries(prayerBreakdown).map(([prayer, data]) => {
                       const isFajr = prayer === "fajr";
                       return (
                         <div
                           key={prayer}
-                          className={`rounded-xl p-6 transition-all hover:scale-105 ${
+                          className={`rounded-lg p-4 transition-all hover:scale-105 ${
                             isFajr
-                              ? "bg-gradient-to-br from-green-50 to-emerald-100 border-2 border-green-400 shadow-md"
-                              : "bg-gray-50 border-2 border-gray-200"
+                              ? "bg-gradient-to-br from-green-50 to-emerald-100 border border-green-400 shadow-sm"
+                              : "bg-gray-50 border border-gray-200"
                           }`}
                         >
                           <div className="text-center">
                             <div
-                              className={`text-base font-bold mb-3 uppercase tracking-wide ${
+                              className={`text-sm font-bold mb-2 uppercase tracking-wide ${
                                 isFajr ? "text-green-900" : "text-gray-700"
                               }`}
                             >
@@ -1049,13 +1049,13 @@ const ViewAttendance = () => {
                               {prayer.charAt(0).toUpperCase() + prayer.slice(1)}
                             </div>
 
-                            <div className="mb-4">
-                              <div className="text-3xl font-bold text-gray-900">
+                            <div className="mb-3">
+                              <div className="text-2xl font-bold text-gray-900">
                                 {formatPercentage(
                                   safeGet(data, "yesterdayPercent", 0)
                                 )}
                               </div>
-                              <div className="text-sm font-medium text-gray-600 mt-1">
+                              <div className="text-xs font-medium text-gray-600 mt-1">
                                 Yesterday
                               </div>
                               <div className="text-xs text-gray-500 mt-0.5">
@@ -1063,9 +1063,9 @@ const ViewAttendance = () => {
                               </div>
                             </div>
 
-                            <div className="space-y-3">
+                            <div className="space-y-2">
                               <div>
-                                <div className="flex justify-between text-sm font-medium text-gray-700 mb-1.5">
+                                <div className="flex justify-between text-xs font-medium text-gray-700 mb-1">
                                   <span>7 Days</span>
                                   <span>
                                     {formatPercentage(
@@ -1073,9 +1073,9 @@ const ViewAttendance = () => {
                                     )}
                                   </span>
                                 </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                <div className="w-full bg-gray-200 rounded-full h-2">
                                   <div
-                                    className={`h-2.5 rounded-full transition-all ${getProgressColor(
+                                    className={`h-2 rounded-full transition-all ${getProgressColor(
                                       safeGet(data, "weekPercent", 0)
                                     )}`}
                                     style={{
@@ -1089,7 +1089,7 @@ const ViewAttendance = () => {
                               </div>
 
                               <div>
-                                <div className="flex justify-between text-sm font-medium text-gray-700 mb-1.5">
+                                <div className="flex justify-between text-xs font-medium text-gray-700 mb-1">
                                   <span>30 Days</span>
                                   <span>
                                     {formatPercentage(
@@ -1097,9 +1097,9 @@ const ViewAttendance = () => {
                                     )}
                                   </span>
                                 </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                <div className="w-full bg-gray-200 rounded-full h-2">
                                   <div
-                                    className={`h-2.5 rounded-full transition-all ${getProgressColor(
+                                    className={`h-2 rounded-full transition-all ${getProgressColor(
                                       safeGet(data, "monthPercent", 0)
                                     )}`}
                                     style={{
@@ -1123,28 +1123,28 @@ const ViewAttendance = () => {
           )
         ) : (
           /* ==================== MEMBER LIST VIEW ==================== */
-          <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200">
-              <div className="p-8 border-b-2 border-gray-200">
-                <div className="flex items-start justify-between mb-6">
+          <div className="space-y-4">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                    <h2 className="text-xl font-bold text-gray-900 mb-1">
                       Member Attendance
                     </h2>
-                    <p className="text-base font-medium text-gray-600">
+                    <p className="text-sm font-medium text-gray-600">
                       {pagination?.totalItems || 0} members found
                     </p>
                   </div>
 
-                  <div className="flex flex-col items-end space-y-3">
-                    <div className="flex space-x-2">
+                  <div className="flex flex-col items-end space-y-2">
+                    <div className="flex space-x-1">
                       {timePeriodOptions.map((option) => (
                         <button
                           key={option.value}
                           onClick={() => setTimePeriod(option.value)}
-                          className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                          className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                             timePeriod === option.value
-                              ? "bg-green-600 text-white shadow-lg scale-105"
+                              ? "bg-green-600 text-white shadow-sm scale-105"
                               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                           }`}
                         >
@@ -1157,7 +1157,7 @@ const ViewAttendance = () => {
                       <select
                         value={selectedArea}
                         onChange={(e) => setSelectedArea(e.target.value)}
-                        className="px-4 py-2 border-2 border-gray-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        className="px-3 py-1.5 border border-gray-300 rounded-md text-xs font-medium focus:ring-1 focus:ring-green-500 focus:border-transparent"
                       >
                         <option value="all">All Areas</option>
                         {areasData.map((area) => (
@@ -1175,7 +1175,7 @@ const ViewAttendance = () => {
                   placeholder="Search members by name..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-5 py-3 border-2 border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-green-500 focus:border-transparent"
                 />
               </div>
 
@@ -1209,25 +1209,25 @@ const ViewAttendance = () => {
                 <>
                   {/* Replace the table section in the Member List View */}
                   <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y-2 divide-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                             Member
                           </th>
-                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                             Area
                           </th>
-                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                             Attendance ({getPeriodLabel})
                           </th>
-                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                             Yesterday
                           </th>
-                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                             🌅 Fajr Streak
                           </th>
-                          <th className="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                             Action
                           </th>
                         </tr>
@@ -1249,32 +1249,32 @@ const ViewAttendance = () => {
                               key={member.id}
                               className="hover:bg-gray-50 transition-colors"
                             >
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="px-4 py-3 whitespace-nowrap">
                                 <div className="flex items-center">
-                                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-100 to-emerald-100 flex items-center justify-center text-green-800 font-bold text-base border-2 border-green-300">
+                                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-100 to-emerald-100 flex items-center justify-center text-green-800 font-bold text-sm border border-green-300">
                                     {safeGet(member, "name", "N/A")
                                       .split(" ")
                                       .map((n) => n[0])
                                       .join("")}
                                   </div>
-                                  <div className="ml-4">
-                                    <div className="text-base font-semibold text-gray-900">
+                                  <div className="ml-3">
+                                    <div className="text-sm font-semibold text-gray-900">
                                       {safeGet(member, "name", "N/A")}
                                     </div>
-                                    <div className="text-sm font-medium text-gray-500">
+                                    <div className="text-xs font-medium text-gray-500">
                                       {safeGet(member, "phone", "N/A")}
                                     </div>
                                   </div>
                                 </div>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-center">
-                                <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold bg-blue-100 text-blue-900 border border-blue-300">
+                              <td className="px-4 py-3 whitespace-nowrap text-center">
+                                <span className="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-blue-100 text-blue-900 border border-blue-300">
                                   {areaName}
                                 </span>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                              <td className="px-4 py-3 whitespace-nowrap text-center">
                                 <span
-                                  className={`inline-flex px-4 py-2 rounded-lg text-base font-bold ${getColorClass(
+                                  className={`inline-flex px-3 py-1.5 rounded text-sm font-bold ${getColorClass(
                                     safeGet(member, "periodPercentage", 0)
                                   )}`}
                                 >
@@ -1283,7 +1283,7 @@ const ViewAttendance = () => {
                                   )}
                                 </span>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="px-4 py-3 whitespace-nowrap">
                                 <div className="flex justify-center">
                                   <PrayerDots
                                     prayers={safeGet(
@@ -1294,19 +1294,19 @@ const ViewAttendance = () => {
                                   />
                                 </div>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="flex flex-col items-center space-y-1.5">
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <div className="flex flex-col items-center space-y-1">
                                   <div className="flex items-baseline space-x-1">
-                                    <span className="text-2xl font-bold text-gray-900">
+                                    <span className="text-xl font-bold text-gray-900">
                                       {safeGet(member, "fajrCount", 0)}
                                     </span>
-                                    <span className="text-base font-medium text-gray-500">
+                                    <span className="text-sm font-medium text-gray-500">
                                       / {safeGet(member, "totalDays", 0)}
                                     </span>
                                   </div>
-                                  <div className="w-full bg-gray-200 rounded-full h-2 max-w-[100px]">
+                                  <div className="w-full bg-gray-200 rounded-full h-1.5 max-w-[80px]">
                                     <div
-                                      className={`h-2 rounded-full transition-all ${
+                                      className={`h-1.5 rounded-full transition-all ${
                                         fajrPercentage >= 80
                                           ? "bg-green-500"
                                           : fajrPercentage >= 60
@@ -1334,13 +1334,13 @@ const ViewAttendance = () => {
                                   </span>
                                 </div>
                               </td>
-                              <td className="px-4 py-4 whitespace-nowrap text-center">
+                              <td className="px-3 py-3 whitespace-nowrap text-center">
                                 <button
                                   onClick={() => handleDownloadReport(member)}
-                                  className="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-all hover:shadow-lg"
+                                  className="inline-flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded transition-all hover:shadow-sm"
                                 >
                                   <svg
-                                    className="w-4 h-4 mr-1"
+                                    className="w-3 h-3 mr-1"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
