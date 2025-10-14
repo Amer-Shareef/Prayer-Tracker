@@ -193,11 +193,16 @@ const PostFeeds = () => {
       setLoading(true);
       setApiError("");
 
-      // Use getFeeds which supports pagination (limit of 5)
-      const response = await feedsService.getFeeds({
+      // Use getAllFeeds which returns all feeds without area restrictions
+      const response = await feedsService.getAllFeeds({
         page: page,
         limit: 15, // #Change for Production
       });
+      // get only area based feeds
+      //  const response = await feedsService.getFeeds({
+      //   page: page,
+      //   limit: 15, // #Change for Production
+      // });
 
       if (response.success) {
         setFeeds(response.data);
