@@ -5,6 +5,7 @@ import FounderLayout from "../../components/layouts/FounderLayout";
 import { meetingsService, memberAPI, areaService } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import WeeklyMeetings from "../../components/WeeklyMeetings";
+import userService from "../../services/userService";
 
 const MeetingsPage = () => {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ const MeetingsPage = () => {
   const [members, setMembers] = useState([]);
   const [areas, setAreas] = useState([]);
   const [selectedAreaForMembers, setSelectedAreaForMembers] = useState("");
+  const [userAreaName, setUserAreaName] = useState("");
   const [meetings, setMeetings] = useState([]);
   const [availableMentors, setAvailableMentors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +24,7 @@ const MeetingsPage = () => {
   const [personalView, setPersonalView] = useState("upcoming");
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [weeklySearchTerm, setWeeklySearchTerm] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
@@ -71,8 +74,26 @@ const MeetingsPage = () => {
     fetchData();
     if (user?.role === "SuperAdmin") {
       fetchAreas();
+    } else {
+      // Fetch user profile to get area name for Founder/WCM
+      fetchUserAreaName();
     }
   }, [user?.role]);
+
+  // Fetch user's area name for Founder/WCM
+  const fetchUserAreaName = async () => {
+    try {
+      const response = await userService.getProfile();
+      if (response.success && response.data) {
+        // Use area_name directly from profile since it's already joined
+        if (response.data.area_name) {
+          setUserAreaName(response.data.area_name);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user area name:", error);
+    }
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -361,103 +382,45 @@ const MeetingsPage = () => {
           </div>
         )}
 
-        {/* Main Tabs */}
-        <div className="bg-white rounded-xl shadow-md p-1.5 inline-flex border-2 border-gray-200 mb-6">
-          <button
-            onClick={() => setActiveTab("weekly")}
-            className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-              activeTab === "weekly"
-                ? "bg-green-600 text-white shadow-lg"
-                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-            }`}
-          >
-            📅 Weekly Meetings
-          </button>
-          <button
-            onClick={() => setActiveTab("personal")}
-            className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-              activeTab === "personal"
-                ? "bg-green-600 text-white shadow-lg"
-                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-            }`}
-          >
-            👥 Personal Sessions
-          </button>
-        </div>
+        {/* Main Tabs with integrated header */}
+        <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 mb-6">
+          <div className="p-6">
+            <div className="flex items-center justify-between">
+              {/* Tab Switcher on the left */}
+              <div className="bg-gray-100 rounded-lg p-1 inline-flex border-2 border-gray-200">
+                <button
+                  onClick={() => setActiveTab("weekly")}
+                  className={`px-6 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    activeTab === "weekly"
+                      ? "bg-green-600 text-white shadow-lg"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  }`}
+                >
+                  📅 Weekly Meetings
+                </button>
+                <button
+                  onClick={() => setActiveTab("personal")}
+                  className={`px-6 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    activeTab === "personal"
+                      ? "bg-green-600 text-white shadow-lg"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  }`}
+                >
+                  👥 Personal Sessions
+                </button>
+              </div>
 
-        {/* Tab Content */}
-        {activeTab === "weekly" ? (
-          <WeeklyMeetings />
-        ) : (
-          <div className="space-y-6">
-            {/* Personal Sessions Header */}
-            <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200">
-              <div className="p-6 border-b-2 border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900">
-                      Personal Counseling Sessions
-                    </h2>
-                    <p className="text-xs text-gray-600 mt-1">
-                      One-on-one member guidance and support
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={handleCreateSession}
-                    className="flex items-center px-4 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-all shadow-md hover:shadow-lg"
-                  >
-                    <svg
-                      className="w-5 h-5 mr-2"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    Schedule Session
-                  </button>
-                </div>
-
-                {/* View Toggle & Search */}
-                <div className="flex items-center justify-between mt-4 space-x-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="flex space-x-2 bg-gray-100 rounded-lg p-1">
-                      <button
-                        onClick={() => setPersonalView("upcoming")}
-                        className={`px-4 py-2 rounded-md text-xs font-semibold transition-all ${
-                          personalView === "upcoming"
-                            ? "bg-white text-green-700 shadow"
-                            : "text-gray-600 hover:text-gray-900"
-                        }`}
-                      >
-                        Upcoming ({getUpcomingMeetings().length})
-                      </button>
-                      <button
-                        onClick={() => setPersonalView("history")}
-                        className={`px-4 py-2 rounded-md text-xs font-semibold transition-all ${
-                          personalView === "history"
-                            ? "bg-white text-green-700 shadow"
-                            : "text-gray-600 hover:text-gray-900"
-                        }`}
-                      >
-                        History ({getCompletedMeetings().length})
-                      </button>
-                    </div>
-
-                    {/* Area Filter for SuperAdmin */}
+              {/* Search and Create Button on the right */}
+              <div className="flex items-center space-x-3">
+                {activeTab === "weekly" ? (
+                  <>
                     {user?.role === "SuperAdmin" && areas.length > 0 && (
                       <select
                         value={selectedAreaForMembers}
                         onChange={(e) =>
                           setSelectedAreaForMembers(e.target.value)
                         }
-                        className="px-3 py-2 text-xs border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        className="px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                       >
                         <option value="">Select Area</option>
                         <option value="all">All Areas</option>
@@ -468,29 +431,133 @@ const MeetingsPage = () => {
                         ))}
                       </select>
                     )}
-                  </div>
-
-                  <div className="relative flex-1 max-w-md">
+                    <input
+                      type="text"
+                      placeholder="Search meetings..."
+                      value={weeklySearchTerm}
+                      onChange={(e) => setWeeklySearchTerm(e.target.value)}
+                      className="px-4 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={() =>
+                        window.dispatchEvent(
+                          new Event("openWeeklyMeetingModal")
+                        )
+                      }
+                      className="flex items-center px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-all"
+                    >
+                      <svg
+                        className="w-5 h-5 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
+                      Create Meeting
+                    </button>
+                  </>
+                ) : (
+                  <>
                     <input
                       type="text"
                       placeholder="Search sessions..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      className="px-4 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     />
-                    <svg
-                      className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+
+                    <button
+                      onClick={handleCreateSession}
+                      className="flex items-center px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-all"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                      />
-                    </svg>
+                      <svg
+                        className="w-5 h-5 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
+                      Create Session
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === "weekly" ? (
+          <WeeklyMeetings
+            searchTermFromParent={weeklySearchTerm}
+            selectedAreaFromParent={selectedAreaForMembers}
+          />
+        ) : (
+          <div className="space-y-6">
+            {/* Personal Sessions Content */}
+            <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200">
+              <div className="p-6 border-b-2 border-gray-200">
+                {/* Area Filter & View Toggle */}
+                <div className="flex items-center justify-between">
+                  {/* Area Filter on the left - Always visible, locked for Founder/WCM */}
+                  <div>
+                    {user?.role === "SuperAdmin" ? (
+                      <select
+                        value={selectedAreaForMembers}
+                        onChange={(e) =>
+                          setSelectedAreaForMembers(e.target.value)
+                        }
+                        className="px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      >
+                        <option value="">Select Area</option>
+                        <option value="all">All Areas</option>
+                        {areas.map((area) => (
+                          <option key={area.area_id} value={area.area_id}>
+                            {area.area_name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="px-3 py-2 text-sm bg-gray-100 border-2 border-gray-300 rounded-lg text-gray-700 font-medium">
+                        📍 {userAreaName || "Loading..."}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* View Toggle on the right */}
+                  <div className="flex space-x-2 bg-gray-100 rounded-lg p-1">
+                    <button
+                      onClick={() => setPersonalView("upcoming")}
+                      className={`px-4 py-2 rounded-md text-xs font-semibold transition-all ${
+                        personalView === "upcoming"
+                          ? "bg-white text-green-700 shadow"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      Upcoming ({getUpcomingMeetings().length})
+                    </button>
+                    <button
+                      onClick={() => setPersonalView("history")}
+                      className={`px-4 py-2 rounded-md text-xs font-semibold transition-all ${
+                        personalView === "history"
+                          ? "bg-white text-green-700 shadow"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      History ({getCompletedMeetings().length})
+                    </button>
                   </div>
                 </div>
               </div>

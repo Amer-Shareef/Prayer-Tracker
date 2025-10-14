@@ -3,8 +3,12 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import weeklyMeetingsService from "../services/weeklyMeetingsService";
 import { areaService } from "../services/api";
+import userService from "../services/userService";
 
-const WeeklyMeetings = () => {
+const WeeklyMeetings = ({
+  searchTermFromParent = "",
+  selectedAreaFromParent = null,
+}) => {
   const { user } = useAuth();
 
   const allowedRoles = ["Founder", "WCM", "SuperAdmin"];
@@ -25,9 +29,8 @@ const WeeklyMeetings = () => {
 
   const [parentMeetings, setParentMeetings] = useState([]);
   const [areas, setAreas] = useState([]);
-  const [selectedArea, setSelectedArea] = useState(
-    user?.role === "SuperAdmin" ? "all" : ""
-  );
+  const [selectedArea, setSelectedArea] = useState("");
+  const [userAreaName, setUserAreaName] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -48,6 +51,10 @@ const WeeklyMeetings = () => {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Use parent search term if provided, otherwise use local state
+  const effectiveSearchTerm = searchTermFromParent || searchTerm;
+
   const [createForm, setCreateForm] = useState({
     meeting_date: "",
     meeting_time: "10:00",
@@ -55,6 +62,22 @@ const WeeklyMeetings = () => {
     agenda: "",
     area_id: user?.role === "SuperAdmin" ? "" : user?.area_id || "",
   });
+
+  // Expose create modal trigger via window event
+  useEffect(() => {
+    const handleOpenCreateModal = () => {
+      setShowCreateModal(true);
+    };
+
+    window.addEventListener("openWeeklyMeetingModal", handleOpenCreateModal);
+
+    return () => {
+      window.removeEventListener(
+        "openWeeklyMeetingModal",
+        handleOpenCreateModal
+      );
+    };
+  }, []);
 
   // [Keep all the helper functions: formatDate, formatTime, getDayOfWeek, getStatusBadge, etc.]
   const formatDate = useCallback((dateString) => {
@@ -134,16 +157,16 @@ const WeeklyMeetings = () => {
   }, []);
 
   const filteredMeetings = useMemo(() => {
-    if (!searchTerm) return parentMeetings;
+    if (!effectiveSearchTerm) return parentMeetings;
 
-    const searchLower = searchTerm.toLowerCase();
+    const searchLower = effectiveSearchTerm.toLowerCase();
     return parentMeetings.filter(
       (meeting) =>
         meeting.agenda?.toLowerCase().includes(searchLower) ||
         meeting.location?.toLowerCase().includes(searchLower) ||
         meeting.area_name?.toLowerCase().includes(searchLower)
     );
-  }, [parentMeetings, searchTerm]);
+  }, [parentMeetings, effectiveSearchTerm]);
 
   // [Keep all fetch functions and handlers - unchanged]
   const fetchAreas = useCallback(async () => {
@@ -157,19 +180,33 @@ const WeeklyMeetings = () => {
     }
   }, []);
 
+  // Fetch user's area name for Founder/WCM
+  const fetchUserAreaName = useCallback(async (profileData = null) => {
+    try {
+      let userProfile = profileData;
+      if (!userProfile) {
+        const response = await userService.getProfile();
+        if (response.success && response.data) {
+          userProfile = response.data;
+        } else {
+          return;
+        }
+      }
+
+      if (userProfile.area_name) {
+        setUserAreaName(userProfile.area_name);
+      }
+    } catch (error) {
+      console.error("Error fetching user area name:", error);
+    }
+  }, []);
+
   const fetchParentMeetings = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
 
-      const areaId =
-        selectedArea === "all" ? null : selectedArea || user?.area_id;
-
-      if (!areaId && selectedArea !== "all") {
-        setError("No area selected or assigned");
-        setParentMeetings([]);
-        return;
-      }
+      const areaId = selectedArea === "all" ? null : parseInt(selectedArea);
 
       let response;
       if (selectedArea === "all" && user?.role === "SuperAdmin") {
@@ -383,17 +420,63 @@ const WeeklyMeetings = () => {
 
   useEffect(() => {
     if (user?.role === "SuperAdmin") {
-      fetchAreas();
+      setSelectedArea("all");
+    } else if (user?.area_id) {
+      setSelectedArea(user.area_id.toString());
+    } else {
+      setSelectedArea("");
     }
-  }, [user?.role, fetchAreas]);
+
+    // Override with parent-provided area if available
+    if (selectedAreaFromParent !== null && user?.role === "SuperAdmin") {
+      setSelectedArea(selectedAreaFromParent || "all");
+    }
+  }, [user, selectedAreaFromParent]);
+
+  // Fetch user profile if area_id is missing
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await userService.getProfile();
+        if (response.success && response.data.area_id) {
+          // Update the user context or just set selectedArea
+          setSelectedArea(response.data.area_id.toString());
+          // Also fetch the area name using the profile data we just got
+          await fetchUserAreaName(response.data);
+          setLoading(false);
+        } else {
+          setError(
+            "No area assigned to your account. Please contact an administrator."
+          );
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+        setError("Failed to load user information. Please try again.");
+        setLoading(false);
+      }
+    };
+
+    if (user && !user.area_id && user.role !== "SuperAdmin") {
+      fetchUserProfile();
+    }
+  }, [user, fetchUserAreaName]);
+
+  useEffect(() => {
+    if (selectedArea) {
+      fetchParentMeetings();
+    }
+  }, [selectedArea, fetchParentMeetings]);
 
   useEffect(() => {
     if (user?.role === "SuperAdmin") {
-      if (selectedArea) fetchParentMeetings();
-    } else {
-      if (user?.area_id) fetchParentMeetings();
+      fetchAreas();
+    } else if (user?.area_id) {
+      // Fetch area name for Founder/WCM
+      fetchAreas();
+      fetchUserAreaName();
     }
-  }, [selectedArea, user, fetchParentMeetings]);
+  }, [user?.role, user?.area_id, fetchAreas, fetchUserAreaName]);
 
   if (loading) {
     return (
@@ -419,248 +502,229 @@ const WeeklyMeetings = () => {
         </div>
       )}
 
-      {/* Header Card */}
+      {/* Meetings Content */}
       <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200">
-        <div className="p-6">
+        {/* Area Filter Section */}
+        <div className="p-6 border-b-2 border-gray-200">
           <div className="flex items-center justify-between">
-            {user?.role === "SuperAdmin" && (
-              <select
-                value={selectedArea}
-                onChange={(e) => setSelectedArea(e.target.value)}
-                className="px-4 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              >
-                <option value="">Select Area</option>
-                <option value="all">All Areas</option>
-                {areas.map((area) => (
-                  <option key={area.area_id} value={area.area_id}>
-                    {area.area_name}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            <div className="flex items-center space-x-3 ml-auto">
-              <input
-                type="text"
-                placeholder="Search meetings..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="px-4 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="flex items-center px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-all"
-              >
-                <svg
-                  className="w-5 h-5 mr-2"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+            {/* Area Filter on the left - Always visible, locked for Founder/WCM */}
+            <div>
+              {user?.role === "SuperAdmin" ? (
+                <select
+                  value={selectedArea}
+                  onChange={(e) => setSelectedArea(e.target.value)}
+                  className="px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                Create Meeting
-              </button>
+                  <option value="">Select Area</option>
+                  <option value="all">All Areas</option>
+                  {areas.map((area) => (
+                    <option key={area.area_id} value={area.area_id}>
+                      {area.area_name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="px-3 py-2 text-sm bg-gray-100 border-2 border-gray-300 rounded-lg text-gray-700 font-medium">
+                  📍 {userAreaName || "Loading..."}
+                </div>
+              )}
             </div>
+
+            {/* Placeholder for right side (keeping layout consistent) */}
+            <div></div>
           </div>
         </div>
-      </div>
 
-      {/* Meetings Table */}
-      <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 overflow-hidden">
-        {filteredMeetings.length === 0 ? (
-          <div className="text-center py-16">
-            <svg
-              className="mx-auto h-16 w-16 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-            </svg>
-            <p className="mt-4 text-sm font-medium text-gray-900">
-              No meetings found
-            </p>
-            <p className="mt-1 text-xs text-gray-500">
-              {searchTerm
-                ? "Try a different search"
-                : "Create your first meeting"}
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">
-                    Schedule
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">
-                    Agenda
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">
-                    Area
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredMeetings.map((meeting) => {
-                  const dayOfWeek = getDayOfWeek(meeting.meeting_date);
-                  const isSeriesExpanded = expandedSeries.has(meeting.id);
-                  const seriesMeetings = recurringMeetings[meeting.id] || [];
+        {/* Table Content */}
+        <div className="overflow-hidden">
+          {filteredMeetings.length === 0 ? (
+            <div className="text-center py-16">
+              <svg
+                className="mx-auto h-16 w-16 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+              <p className="mt-4 text-sm font-medium text-gray-900">
+                No meetings found
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                {effectiveSearchTerm
+                  ? "Try a different search"
+                  : "Create your first meeting"}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">
+                      Schedule
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">
+                      Agenda
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">
+                      Area
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredMeetings.map((meeting) => {
+                    const dayOfWeek = getDayOfWeek(meeting.meeting_date);
+                    const isSeriesExpanded = expandedSeries.has(meeting.id);
+                    const seriesMeetings = recurringMeetings[meeting.id] || [];
 
-                  return (
-                    <React.Fragment key={meeting.id}>
-                      <tr className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="text-sm font-semibold text-gray-900">
-                            Every {dayOfWeek}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {formatTime(meeting.meeting_time)}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-sm font-medium text-gray-900">
-                            {meeting.location || "TBD"}
-                          </div>
-                          {meeting.agenda && (
-                            <div className="text-xs text-gray-500 truncate max-w-xs">
-                              {meeting.agenda}
+                    return (
+                      <React.Fragment key={meeting.id}>
+                        <tr className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="text-sm font-semibold text-gray-900">
+                              Every {dayOfWeek}
                             </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
-                            {meeting.area_name}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => toggleSeriesExpansion(meeting.id)}
-                            disabled={loadingSeries.has(meeting.id)}
-                            className="text-green-600 hover:text-green-900 text-xs font-semibold transition-colors inline-flex items-center"
-                          >
-                            <svg
-                              className={`w-4 h-4 mr-1 transform transition-transform ${
-                                isSeriesExpanded ? "rotate-180" : ""
-                              }`}
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
+                            <div className="text-xs text-gray-500">
+                              {formatTime(meeting.meeting_time)}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="text-sm font-medium text-gray-900">
+                              {meeting.location || "TBD"}
+                            </div>
+                            {meeting.agenda && (
+                              <div className="text-xs text-gray-500 truncate max-w-xs">
+                                {meeting.agenda}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                              {meeting.area_name}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => toggleSeriesExpansion(meeting.id)}
+                              disabled={loadingSeries.has(meeting.id)}
+                              className="text-green-600 hover:text-green-900 text-xs font-semibold transition-colors inline-flex items-center"
                             >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M19 9l-7 7-7-7"
-                              />
-                            </svg>
-                            {loadingSeries.has(meeting.id)
-                              ? "Loading..."
-                              : (isSeriesExpanded ? "Hide" : "Show") +
-                                " All Meetings"}
-                          </button>
-                        </td>
-                      </tr>
-
-                      {/* Expanded series rows */}
-                      {isSeriesExpanded && seriesMeetings.length > 0 && (
-                        <>
-                          {seriesMeetings.map((meeting) => (
-                            <tr
-                              key={`series-${meeting.id}`}
-                              className={`${
-                                meeting.meeting_type === "parent"
-                                  ? "bg-blue-50 border-l-4 border-blue-300"
-                                  : "bg-gray-50 border-l-4 border-green-200"
-                              }`}
-                            >
-                              <td className="px-6 py-3">
-                                <div className="flex items-center space-x-2">
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {formatDate(meeting.meeting_date)}
-                                  </div>
-                                  {meeting.meeting_type === "parent" && (
-                                    <span className="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
-                                      Original
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  {formatTime(meeting.meeting_time)}
-                                </div>
-                              </td>
-                              <td className="px-6 py-3">
-                                <div className="text-sm text-gray-900">
-                                  {meeting.location || "TBD"}
-                                </div>
-                                {meeting.agenda && (
-                                  <div className="text-xs text-gray-500 truncate max-w-xs">
-                                    {meeting.agenda}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-6 py-3">
-                                <span className="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
-                                  {meeting.area_name}
-                                </span>
-                              </td>
-                              <td className="px-6 py-3 text-center">
-                                <div className="flex items-center justify-center space-x-2">
-                                  <span className="text-xs text-gray-600">
-                                    {meeting.present_count || 0}/
-                                    {meeting.total_area_users || 0} present
-                                  </span>
-                                  <span
-                                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                      (meeting.attendance_rate || 0) >= 80
-                                        ? "bg-green-100 text-green-800"
-                                        : (meeting.attendance_rate || 0) >= 60
-                                        ? "bg-yellow-100 text-yellow-800"
-                                        : "bg-red-100 text-red-800"
-                                    }`}
-                                  >
-                                    {meeting.attendance_rate || 0}%
-                                  </span>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </>
-                      )}
-
-                      {isSeriesExpanded && seriesMeetings.length === 0 && (
-                        <tr className="bg-gray-50">
-                          <td
-                            colSpan="4"
-                            className="px-6 py-4 text-center text-sm text-gray-500"
-                          >
-                            No meetings found in this series.
+                              <svg
+                                className={`w-4 h-4 mr-1 transform transition-transform ${
+                                  isSeriesExpanded ? "rotate-180" : ""
+                                }`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 9l-7 7-7-7"
+                                />
+                              </svg>
+                              {loadingSeries.has(meeting.id)
+                                ? "Loading..."
+                                : (isSeriesExpanded ? "Hide" : "Show") +
+                                  " All Meetings"}
+                            </button>
                           </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+
+                        {/* Expanded series rows */}
+                        {isSeriesExpanded && seriesMeetings.length > 0 && (
+                          <>
+                            {seriesMeetings.map((meeting) => (
+                              <tr
+                                key={`series-${meeting.id}`}
+                                className={`${
+                                  meeting.meeting_type === "parent"
+                                    ? "bg-blue-50 border-l-4 border-blue-300"
+                                    : "bg-gray-50 border-l-4 border-green-200"
+                                }`}
+                              >
+                                <td className="px-6 py-3">
+                                  <div className="flex items-center space-x-2">
+                                    <div className="text-sm font-medium text-gray-900">
+                                      {formatDate(meeting.meeting_date)}
+                                    </div>
+                                    {meeting.meeting_type === "parent" && (
+                                      <span className="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                        Original
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {formatTime(meeting.meeting_time)}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-3">
+                                  <div className="text-sm text-gray-900">
+                                    {meeting.location || "TBD"}
+                                  </div>
+                                  {meeting.agenda && (
+                                    <div className="text-xs text-gray-500 truncate max-w-xs">
+                                      {meeting.agenda}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-6 py-3">
+                                  <span className="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                    {meeting.area_name}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-3 text-center">
+                                  <div className="flex items-center justify-center space-x-2">
+                                    <span className="text-xs text-gray-600">
+                                      {meeting.present_count || 0}/
+                                      {meeting.total_area_users || 0} present
+                                    </span>
+                                    <span
+                                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                        (meeting.attendance_rate || 0) >= 80
+                                          ? "bg-green-100 text-green-800"
+                                          : (meeting.attendance_rate || 0) >= 60
+                                          ? "bg-yellow-100 text-yellow-800"
+                                          : "bg-red-100 text-red-800"
+                                      }`}
+                                    >
+                                      {meeting.attendance_rate || 0}%
+                                    </span>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </>
+                        )}
+
+                        {isSeriesExpanded && seriesMeetings.length === 0 && (
+                          <tr className="bg-gray-50">
+                            <td
+                              colSpan="4"
+                              className="px-6 py-4 text-center text-sm text-gray-500"
+                            >
+                              No meetings found in this series.
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Create Meeting Modal - Horizontal Layout */}
