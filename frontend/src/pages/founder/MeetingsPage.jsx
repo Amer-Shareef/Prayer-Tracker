@@ -37,12 +37,45 @@ const MeetingsPage = () => {
     notes: "",
   });
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [meetingToDelete, setMeetingToDelete] = useState(null);
+  const [openMenuId, setOpenMenuId] = useState(null);
+
+  // Helper function to format time to 12-hour AM/PM format
+  const formatTime = (timeString) => {
+    if (!timeString) return "No time";
+    try {
+      const [hours, minutes] = timeString.split(":");
+      const date = new Date();
+      date.setHours(parseInt(hours), parseInt(minutes));
+      return date.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+    } catch (error) {
+      return timeString;
+    }
+  };
+
   useEffect(() => {
     fetchData();
     if (user?.role === "SuperAdmin") {
       fetchAreas();
     }
   }, [user?.role]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openMenuId && !event.target.closest(".dropdown-menu")) {
+        setOpenMenuId(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openMenuId]);
 
   // Refetch members when area selection changes (SuperAdmin only)
   useEffect(() => {
@@ -212,22 +245,32 @@ const MeetingsPage = () => {
     }
   };
 
-  const handleDeleteSession = async (meetingId) => {
-    if (!window.confirm("Delete this session?")) return;
+  const handleDeleteSession = (meeting) => {
+    setMeetingToDelete(meeting);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!meetingToDelete) return;
 
     try {
       const response = await meetingsService.deleteCounsellingSession(
-        meetingId
+        meetingToDelete.id
       );
       if (response.data?.success || response.status === 404) {
-        alert("Session deleted!");
+        alert("Session deleted successfully!");
+        setShowDeleteModal(false);
+        setMeetingToDelete(null);
         await fetchData();
       }
     } catch (err) {
       if (err.response?.status === 404) {
+        alert("Session not found - it may have already been deleted.");
+        setShowDeleteModal(false);
+        setMeetingToDelete(null);
         await fetchData();
       } else {
-        alert("Failed to delete session");
+        alert("Failed to delete session. Please try again.");
       }
     }
   };
@@ -457,74 +500,187 @@ const MeetingsPage = () => {
                         )}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {getUpcomingMeetings().map((meeting) => (
-                          <div
-                            key={meeting.id}
-                            className="border-2 border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all hover:border-green-300"
-                          >
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex-1">
-                                <h3 className="font-semibold text-gray-900 text-sm">
-                                  {meeting.member_name ||
-                                    meeting.member_full_name ||
-                                    "Unknown"}
-                                </h3>
-                                <span
-                                  className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full font-medium ${
-                                    meeting.status === "scheduled"
-                                      ? "bg-green-100 text-green-800"
-                                      : "bg-yellow-100 text-yellow-800"
-                                  }`}
-                                >
-                                  {meeting.status}
-                                </span>
-                              </div>
-                            </div>
+                      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Member
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Date & Time
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Location
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Working Committee
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {getUpcomingMeetings().map((meeting) => (
+                              <tr key={meeting.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-900">
+                                      {meeting.member_name ||
+                                        meeting.member_full_name ||
+                                        "Unknown"}
+                                    </div>
+                                    {meeting.member_phone && (
+                                      <div className="text-sm text-gray-500">
+                                        📞 {meeting.member_phone}
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900 font-medium">
+                                    {formatTime(meeting.scheduled_time)}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {new Date(
+                                      meeting.scheduled_date
+                                    ).toLocaleDateString("en-US", {
+                                      weekday: "short",
+                                      month: "short",
+                                      day: "numeric",
+                                    })}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900 font-medium">
+                                    📍 {meeting.area_name || "Area TBD"}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900 font-medium">
+                                    👨‍🏫{" "}
+                                    {meeting.counsellor_full_name ||
+                                      meeting.counsellor_name ||
+                                      "TBD"}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span
+                                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                      meeting.status === "scheduled"
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-yellow-100 text-yellow-800"
+                                    }`}
+                                  >
+                                    {meeting.status}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                  <div className="relative dropdown-menu">
+                                    <button
+                                      onClick={() =>
+                                        setOpenMenuId(
+                                          openMenuId === meeting.id
+                                            ? null
+                                            : meeting.id
+                                        )
+                                      }
+                                      className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                                    >
+                                      <svg
+                                        className="w-5 h-5"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                      >
+                                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                      </svg>
+                                    </button>
 
-                            <div className="space-y-2 text-xs text-gray-600 mb-4">
-                              <div className="flex items-center">
-                                <span className="w-5">📅</span>
-                                <span>
-                                  {new Date(
-                                    meeting.scheduled_date
-                                  ).toLocaleDateString("en-US", {
-                                    weekday: "short",
-                                    month: "short",
-                                    day: "numeric",
-                                  })}
-                                </span>
-                              </div>
-                              <div className="flex items-center">
-                                <span className="w-5">🕐</span>
-                                <span>{meeting.scheduled_time}</span>
-                              </div>
-                              <div className="flex items-center">
-                                <span className="w-5">👨‍🏫</span>
-                                <span>
-                                  {meeting.counsellor_full_name ||
-                                    meeting.counsellor_name ||
-                                    "TBD"}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={() => handleCompleteSession(meeting)}
-                                className="flex-1 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-green-700 transition-colors"
-                              >
-                                Complete
-                              </button>
-                              <button
-                                onClick={() => handleDeleteSession(meeting.id)}
-                                className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-200 transition-colors"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                                    {openMenuId === meeting.id && (
+                                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
+                                        <div className="py-1">
+                                          <button
+                                            onClick={() => {
+                                              handleCompleteSession(meeting);
+                                              setOpenMenuId(null);
+                                            }}
+                                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                          >
+                                            <svg
+                                              className="w-4 h-4 mr-3 text-green-600"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M5 13l4 4L19 7"
+                                              />
+                                            </svg>
+                                            Complete Session
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              // TODO: Implement reschedule functionality
+                                              alert(
+                                                "Reschedule functionality coming soon!"
+                                              );
+                                              setOpenMenuId(null);
+                                            }}
+                                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                          >
+                                            <svg
+                                              className="w-4 h-4 mr-3 text-blue-600"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                              />
+                                            </svg>
+                                            Reschedule
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              handleDeleteSession(meeting);
+                                              setOpenMenuId(null);
+                                            }}
+                                            className="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50"
+                                          >
+                                            <svg
+                                              className="w-4 h-4 mr-3 text-red-600"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                              />
+                                            </svg>
+                                            Cancel Session
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     )}
                   </div>
@@ -558,53 +714,94 @@ const MeetingsPage = () => {
                         </p>
                       </div>
                     ) : (
-                      <div className="space-y-3">
-                        {getCompletedMeetings().map((meeting) => (
-                          <div
-                            key={meeting.id}
-                            className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <div>
-                                <h4 className="font-semibold text-sm text-gray-900">
-                                  {meeting.member_name ||
-                                    meeting.member_full_name ||
-                                    "Unknown"}
-                                </h4>
-                                <div className="flex items-center space-x-4 mt-1 text-xs text-gray-600">
-                                  <span>
-                                    📅{" "}
+                      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Member
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Date & Time
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Location
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Working Committee
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Notes
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {getCompletedMeetings().map((meeting) => (
+                              <tr key={meeting.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-900">
+                                      {meeting.member_name ||
+                                        meeting.member_full_name ||
+                                        "Unknown"}
+                                    </div>
+                                    {meeting.member_phone && (
+                                      <div className="text-sm text-gray-500">
+                                        📞 {meeting.member_phone}
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900 font-medium">
+                                    {formatTime(meeting.scheduled_time)}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
                                     {new Date(
                                       meeting.scheduled_date
                                     ).toLocaleDateString("en-US", {
+                                      weekday: "short",
                                       month: "short",
                                       day: "numeric",
-                                      year: "numeric",
                                     })}
-                                  </span>
-                                  <span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900 font-medium">
+                                    📍 {meeting.area_name || "Area TBD"}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900 font-medium">
                                     👨‍🏫{" "}
                                     {meeting.counsellor_full_name ||
-                                      meeting.counsellor_name}
+                                      meeting.counsellor_name ||
+                                      "TBD"}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                    Completed
                                   </span>
-                                </div>
-                              </div>
-                              <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full font-medium">
-                                Completed
-                              </span>
-                            </div>
-                            {meeting.session_notes && (
-                              <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200">
-                                <p className="text-xs font-semibold text-gray-700 mb-1">
-                                  Notes:
-                                </p>
-                                <p className="text-xs text-gray-600">
-                                  {meeting.session_notes}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                                </td>
+                                <td className="px-6 py-4">
+                                  {meeting.session_notes ? (
+                                    <div className="text-sm text-gray-600 max-w-xs truncate">
+                                      {meeting.session_notes}
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-gray-400 italic">
+                                      No notes
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     )}
                   </div>
@@ -718,7 +915,7 @@ const MeetingsPage = () => {
 
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Counselor
+                      Working Committee
                     </label>
                     <select
                       value={createForm.mentorId}
@@ -730,7 +927,7 @@ const MeetingsPage = () => {
                       }
                       className="w-full border-2 border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     >
-                      <option value="">Select counselor...</option>
+                      <option value="">Select working committee...</option>
                       {availableMentors.map((mentor) => (
                         <option key={mentor.id} value={mentor.id}>
                           {mentor.fullName || mentor.username}
@@ -831,6 +1028,120 @@ const MeetingsPage = () => {
                     className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors"
                   >
                     Mark Complete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Session Confirmation Modal */}
+        {showDeleteModal && meetingToDelete && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen px-4">
+              <div
+                className="fixed inset-0 bg-gray-900 opacity-75"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setMeetingToDelete(null);
+                }}
+              ></div>
+              <div className="bg-white rounded-xl p-6 max-w-md w-full relative z-10 shadow-2xl">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Delete Session
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowDeleteModal(false);
+                      setMeetingToDelete(null);
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="mb-6">
+                  <div className="p-4 bg-red-50 rounded-lg border border-red-200 mb-4">
+                    <div className="flex items-center">
+                      <svg
+                        className="w-5 h-5 text-red-600 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                        />
+                      </svg>
+                      <p className="text-sm font-semibold text-red-800">
+                        Are you sure you want to delete this session?
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-sm font-semibold text-gray-900">
+                      {meetingToDelete.member_name ||
+                        meetingToDelete.member_full_name}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      {new Date(
+                        meetingToDelete.scheduled_date
+                      ).toLocaleDateString("en-US", {
+                        weekday: "long",
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })}
+                      {" at "}
+                      {formatTime(meetingToDelete.scheduled_time)}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Working Committee:{" "}
+                      {meetingToDelete.counsellor_full_name ||
+                        meetingToDelete.counsellor_name ||
+                        "TBD"}
+                    </p>
+                  </div>
+
+                  <p className="text-xs text-gray-500 mt-3">
+                    This action cannot be undone. The session will be
+                    permanently deleted.
+                  </p>
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowDeleteModal(false);
+                      setMeetingToDelete(null);
+                    }}
+                    className="flex-1 px-4 py-2.5 border-2 border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDeleteSession}
+                    className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors"
+                  >
+                    Delete Session
                   </button>
                 </div>
               </div>

@@ -68,11 +68,14 @@ router.get("/counselling-sessions", async (req, res) => {
       SELECT cs.*, 
              u1.username as member_username,
              COALESCE(u1.full_name, u1.username, cs.member_name) as member_name,
+             u1.phone as member_phone,
              u2.username as counsellor_username,
-             u2.full_name as counsellor_full_name
+             u2.full_name as counsellor_full_name,
+             a.area_name
       FROM counselling_sessions cs
       LEFT JOIN users u1 ON cs.member_id = u1.id
       LEFT JOIN users u2 ON cs.counsellor_id = u2.id
+      LEFT JOIN areas a ON u2.area_id = a.area_id
       ORDER BY cs.scheduled_date DESC, cs.scheduled_time ASC
     `);
 
@@ -95,12 +98,7 @@ router.post("/counselling-sessions", async (req, res) => {
   console.log("📦 Request body:", req.body);
 
   try {
-    const {
-      memberId,
-      counsellorId,
-      scheduledDate,
-      scheduledTime,
-    } = req.body;
+    const { memberId, counsellorId, scheduledDate, scheduledTime } = req.body;
 
     console.log("🔍 Extracted data:", {
       memberId,
