@@ -8,7 +8,7 @@ const router = express.Router();
 // Helper functions
 function isAuthorized(
   user,
-  requiredRoles = ["Founder", "Admin", "SuperAdmin"]
+  requiredRoles = ["Founder", "WCM", "Admin", "SuperAdmin"]
 ) {
   return requiredRoles.includes(user.role);
 }

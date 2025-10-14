@@ -7,7 +7,7 @@ import { areaService } from "../services/api";
 const WeeklyMeetings = () => {
   const { user } = useAuth();
 
-  const allowedRoles = ["Founder", "SuperAdmin"];
+  const allowedRoles = ["Founder", "WCM", "SuperAdmin"];
   const hasAccess = allowedRoles.includes(user?.role);
 
   if (!hasAccess) {
