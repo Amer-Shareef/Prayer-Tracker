@@ -76,7 +76,10 @@ function ManageMembers() {
       filterUsername ||
       filterEmail ||
       filterMobility !== "all" ||
-      filterArea !== "all" ||
+      // Don't consider area filter as active for Founder and WCM (it's locked)
+      (user?.role !== "Founder" &&
+        user?.role !== "WCM" &&
+        filterArea !== "all") ||
       filterAdditionalInfo !== "all"
     );
   };
@@ -118,7 +121,13 @@ function ManageMembers() {
             user.areaId || user.area_id
           );
           if (response.data.success) {
-            setAreaName(response.data.data.area.name || "Area");
+            const areaName = response.data.data.area.name || "Area";
+            setAreaName(areaName);
+
+            // For Founder and WCM roles, lock the area filter to their area
+            if (user.role === "Founder" || user.role === "WCM") {
+              setFilterArea(areaName);
+            }
           }
         } catch (error) {
           console.error("Error fetching area:", error);
@@ -764,14 +773,25 @@ function ManageMembers() {
                 <select
                   value={filterArea}
                   onChange={(e) => setFilterArea(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-700"
+                  disabled={user?.role === "Founder" || user?.role === "WCM"}
+                  className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-700 ${
+                    user?.role === "Founder" || user?.role === "WCM"
+                      ? "bg-gray-100 cursor-not-allowed"
+                      : ""
+                  }`}
                 >
-                  <option value="all">All Areas</option>
-                  {areas.map((area) => (
-                    <option key={area.area_id} value={area.area_name}>
-                      {area.area_name}
-                    </option>
-                  ))}
+                  {user?.role === "Founder" || user?.role === "WCM" ? (
+                    <option value={filterArea}>{filterArea}</option>
+                  ) : (
+                    <>
+                      <option value="all">All Areas</option>
+                      {areas.map((area) => (
+                        <option key={area.area_id} value={area.area_name}>
+                          {area.area_name}
+                        </option>
+                      ))}
+                    </>
+                  )}
                 </select>
               </div>
 
@@ -843,7 +863,10 @@ function ManageMembers() {
                     setFilterUsername("");
                     setFilterEmail("");
                     setFilterMobility("all");
-                    setFilterArea("all");
+                    // Don't reset area filter for Founder and WCM roles
+                    if (user?.role !== "Founder" && user?.role !== "WCM") {
+                      setFilterArea("all");
+                    }
                     setFilterAdditionalInfo("all");
                     setFilterRole("all");
                   }}

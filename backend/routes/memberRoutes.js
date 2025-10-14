@@ -446,19 +446,19 @@ router.post(
       }
 
       // For Founders and WCMs, verify they can only add members to their own area
-      if (user.role === "Founder" || user.role === "WCM") {
-        const [userData] = await pool.execute(
-          "SELECT area_id FROM users WHERE id = ?",
-          [user.id]
-        );
+      // if (user.role === "Founder" || user.role === "WCM") {
+      //   const [userData] = await pool.execute(
+      //     "SELECT area_id FROM users WHERE id = ?",
+      //     [user.id]
+      //   );
 
-        if (userData[0]?.area_id && userData[0].area_id !== areaId) {
-          return res.status(403).json({
-            success: false,
-            message: "You can only add members to your assigned area.",
-          });
-        }
-      }
+      //   if (userData[0]?.area_id && userData[0].area_id !== areaId) {
+      //     return res.status(403).json({
+      //       success: false,
+      //       message: "You can only add members to your assigned area.",
+      //     });
+      //   }
+      // }
 
       // Hash password
       const saltRounds = 10;
