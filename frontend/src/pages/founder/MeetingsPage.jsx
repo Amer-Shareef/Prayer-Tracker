@@ -500,7 +500,7 @@ const MeetingsPage = () => {
                         )}
                       </div>
                     ) : (
-                      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-visible">
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
                             <tr>
@@ -511,7 +511,7 @@ const MeetingsPage = () => {
                                 Date & Time
                               </th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Location
+                                Area
                               </th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Working Committee
@@ -557,7 +557,7 @@ const MeetingsPage = () => {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="text-sm text-gray-900 font-medium">
-                                    📍 {meeting.area_name || "Area TBD"}
+                                    {meeting.area_name || "Area TBD"}
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
@@ -589,7 +589,7 @@ const MeetingsPage = () => {
                                             : meeting.id
                                         )
                                       }
-                                      className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                                      className="text-gray-400 hover:text-gray-600 transition-colors p-1 cursor-pointer"
                                     >
                                       <svg
                                         className="w-5 h-5"
@@ -601,7 +601,7 @@ const MeetingsPage = () => {
                                     </button>
 
                                     {openMenuId === meeting.id && (
-                                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
+                                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200">
                                         <div className="py-1">
                                           <button
                                             onClick={() => {
@@ -714,7 +714,7 @@ const MeetingsPage = () => {
                         </p>
                       </div>
                     ) : (
-                      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-visible">
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
                             <tr>
@@ -725,7 +725,7 @@ const MeetingsPage = () => {
                                 Date & Time
                               </th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Location
+                                Area
                               </th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Working Committee
@@ -771,7 +771,7 @@ const MeetingsPage = () => {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="text-sm text-gray-900 font-medium">
-                                    📍 {meeting.area_name || "Area TBD"}
+                                    {meeting.area_name || "Area TBD"}
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">

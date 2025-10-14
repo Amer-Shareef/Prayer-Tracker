@@ -507,7 +507,7 @@ const WeeklyMeetings = () => {
                     Schedule
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">
-                    Location
+                    Agenda
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">
                     Area
