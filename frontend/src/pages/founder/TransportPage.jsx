@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import FounderLayout from "../../components/layouts/FounderLayout";
-import { pickupService, memberAPI, areaService } from "../../services/api";
+import { pickupService, memberAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 
 const TransportPage = () => {
@@ -47,6 +47,18 @@ const TransportPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+
+  // Area filtering state
+  const [selectedAreaFilter, setSelectedAreaFilter] = useState("");
+
+  // Status filtering state
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState("");
+
+  // Sorting states
+  const [sortConfig, setSortConfig] = useState({
+    key: null,
+    direction: null,
+  });
 
   // Date and area states
   const [currentDate, setCurrentDate] = useState({
@@ -141,39 +153,73 @@ const TransportPage = () => {
       setLoading(true);
       setError("");
 
-      // Fetch pickup requests
+      // Fetch pickup requests based on user role
       console.log("🔄 Fetching pickup requests...");
-      const requestsResponse = await pickupService.getAllPickupRequests();
+      let requestsResponse;
+
+      if (user.role === "SuperAdmin" || user.role === "superadmin") {
+        // SuperAdmin sees all requests
+        requestsResponse = await pickupService.getAllPickupRequests();
+      } else {
+        // Founders/WCM see only their area requests
+        const userAreaId = user.areaId || user.area_id;
+        if (userAreaId) {
+          requestsResponse = await pickupService.getAllPickupRequests({
+            area_id: userAreaId,
+          });
+        } else {
+          // Fallback: get all and filter on frontend
+          requestsResponse = await pickupService.getAllPickupRequests();
+        }
+      }
+
       console.log("📥 Pickup requests response:", requestsResponse);
       console.log("📦 Response data:", requestsResponse.data);
 
       if (requestsResponse.data.success) {
-        console.log("✅ Setting pickup requests:", requestsResponse.data.data);
-        setPickupRequests(requestsResponse.data.data);
+        let requests = requestsResponse.data.data || [];
+
+        // Additional client-side filtering for non-SuperAdmin users
+        if (user.role !== "SuperAdmin" && user.role !== "superadmin") {
+          const userAreaId = user.areaId || user.area_id;
+          if (userAreaId) {
+            requests = requests.filter(
+              (request) => String(request.area_id) === String(userAreaId)
+            );
+          }
+        }
+
+        console.log("✅ Setting pickup requests:", requests);
+        setPickupRequests(requests);
+
+        // Extract unique areas from the pickup requests data
+        const areaMap = new Map();
+
+        requests.forEach((request) => {
+          if (request.area_id) {
+            const areaId = String(request.area_id); // Normalize to string
+            if (!areaMap.has(areaId)) {
+              areaMap.set(areaId, {
+                area_id: areaId,
+                area_name: request.area_name || `Area ${areaId}`,
+              });
+            }
+          }
+        });
+
+        const extractedAreas = Array.from(areaMap.values());
+        console.log("✅ Extracted areas from requests:", extractedAreas);
+        console.log("📊 Total requests processed:", requests.length);
+        setAreas(extractedAreas);
       } else {
         console.warn("⚠️ Response not successful:", requestsResponse.data);
         setPickupRequests([]);
+        setAreas([]);
       }
 
-      // Fetch areas for SuperAdmin
+      // Fetch additional data based on role
       if (user.role === "SuperAdmin" || user.role === "superadmin") {
-        try {
-          console.log("🔄 Fetching areas for SuperAdmin...");
-          const areasResponse = await areaService.getAllAreas();
-          console.log("📥 Areas response:", areasResponse);
-          // Response structure: { success: true, data: [...] }
-          if (areasResponse.success && areasResponse.data) {
-            console.log("✅ Setting areas:", areasResponse.data);
-            setAreas(areasResponse.data);
-          } else {
-            console.warn("⚠️ Areas response not successful:", areasResponse);
-            setAreas([]);
-          }
-        } catch (err) {
-          console.error("❌ Error fetching areas:", err);
-          setAreas([]);
-        }
-        // Don't fetch members for SuperAdmin on initial load
+        // SuperAdmin doesn't need additional member data on initial load
       } else {
         // Fetch area members for Founder/WCM
         try {
@@ -637,8 +683,28 @@ const TransportPage = () => {
   };
 
   // Sort requests: pending first, then approved, then rejected/completed
+  // Sorting function
+  const handleSort = (key) => {
+    let direction = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setSortConfig({ key, direction });
+  };
+
+  // Get sort icon
+  const getSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) {
+      return "↕️"; // Neutral sort icon
+    }
+    return sortConfig.direction === "asc" ? "↑" : "↓";
+  };
+
   const sortedAndFilteredRequests = pickupRequests
     .filter((request) => {
+      let matchesFilter = true;
+
+      // Always apply search term if provided
       const matchesSearch =
         !searchTerm ||
         request.member_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -648,10 +714,64 @@ const TransportPage = () => {
           .includes(searchTerm.toLowerCase()) ||
         request.driver_name?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      return matchesSearch;
+      // Apply role-specific filters
+      let matchesRoleFilter = true;
+      if (user?.role === "SuperAdmin" || user?.role === "superadmin") {
+        // SuperAdmin can filter by area
+        matchesRoleFilter =
+          !selectedAreaFilter || String(request.area_id) === selectedAreaFilter;
+      } else {
+        // Other roles can filter by status
+        matchesRoleFilter =
+          !selectedStatusFilter || request.status === selectedStatusFilter;
+      }
+
+      return matchesSearch && matchesRoleFilter;
     })
     .sort((a, b) => {
-      // Priority order: pending > approved > rejected/completed
+      // First apply column sorting if configured
+      if (sortConfig.key) {
+        let aValue, bValue;
+
+        switch (sortConfig.key) {
+          case "member_name":
+            aValue = a.member_name || "";
+            bValue = b.member_name || "";
+            break;
+          case "area_name":
+            aValue = a.area_name || "";
+            bValue = b.area_name || "";
+            break;
+          case "pickup_location":
+            aValue = a.pickup_location || "";
+            bValue = b.pickup_location || "";
+            break;
+          case "status":
+            aValue = a.status || "";
+            bValue = b.status || "";
+            break;
+          case "driver_name":
+            aValue = a.driver_name || "";
+            bValue = b.driver_name || "";
+            break;
+          case "created_at":
+            aValue = new Date(a.created_at);
+            bValue = new Date(b.created_at);
+            break;
+          default:
+            aValue = "";
+            bValue = "";
+        }
+
+        if (aValue < bValue) {
+          return sortConfig.direction === "asc" ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === "asc" ? 1 : -1;
+        }
+      }
+
+      // Default priority sorting: pending > approved > rejected/completed
       const statusPriority = {
         pending: 1,
         approved: 2,
@@ -666,13 +786,17 @@ const TransportPage = () => {
       return new Date(b.created_at) - new Date(a.created_at);
     });
 
-  // Calculate status statistics
+  // Calculate status statistics based on filtered requests
   const statusStats = {
-    total: pickupRequests.length,
-    pending: pickupRequests.filter((r) => r.status === "pending").length,
-    approved: pickupRequests.filter((r) => r.status === "approved").length,
-    rejected: pickupRequests.filter((r) => r.status === "rejected").length,
-    completed: pickupRequests.filter((r) => r.status === "completed").length,
+    total: sortedAndFilteredRequests.length,
+    pending: sortedAndFilteredRequests.filter((r) => r.status === "pending")
+      .length,
+    approved: sortedAndFilteredRequests.filter((r) => r.status === "approved")
+      .length,
+    rejected: sortedAndFilteredRequests.filter((r) => r.status === "rejected")
+      .length,
+    completed: sortedAndFilteredRequests.filter((r) => r.status === "completed")
+      .length,
   };
 
   // Pagination logic
@@ -684,10 +808,10 @@ const TransportPage = () => {
   );
   const totalPages = Math.ceil(sortedAndFilteredRequests.length / itemsPerPage);
 
-  // Reset to first page when search changes
+  // Reset to first page when search, area filter, status filter, or sort changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, selectedAreaFilter, selectedStatusFilter, sortConfig]);
 
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber);
@@ -865,37 +989,13 @@ const TransportPage = () => {
         {/* Search Bar with Compact Stats */}
         <div className="bg-white rounded-lg shadow-sm mb-6 p-4 border border-gray-200">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            {/* Search */}
-            <div className="relative flex-1 max-w-md">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg
-                  className="h-5 w-5 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-              </div>
-              <input
-                type="text"
-                placeholder="Search by member, area, location, or driver..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-700 placeholder-gray-400"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm("")}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                >
+            {/* Search and Filters */}
+            <div className="flex flex-col sm:flex-row gap-4 flex-1 max-w-2xl">
+              {/* Search Bar - Always shown */}
+              <div className="relative flex-1">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <svg
-                    className="h-5"
+                    className="h-5 w-5 text-gray-400"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -904,11 +1004,70 @@ const TransportPage = () => {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                     />
                   </svg>
-                </button>
-              )}
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search by member, area, location, or driver..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-700 placeholder-gray-400"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                  >
+                    <svg
+                      className="h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              {/* Role-based Filter */}
+              <div className="sm:w-48">
+                {user?.role === "SuperAdmin" || user?.role === "superadmin" ? (
+                  // Area Filter for SuperAdmin
+                  <select
+                    value={selectedAreaFilter}
+                    onChange={(e) => setSelectedAreaFilter(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-700"
+                  >
+                    <option value="">All Areas</option>
+                    {areas.map((area) => (
+                      <option key={area.area_id} value={area.area_id}>
+                        {area.area_name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  // Status Filter for other roles
+                  <select
+                    value={selectedStatusFilter}
+                    onChange={(e) => setSelectedStatusFilter(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-700"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                )}
+              </div>
             </div>
 
             {/* Compact Stats */}
@@ -944,32 +1103,87 @@ const TransportPage = () => {
         {/* Requests Table */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Pickup Requests
-            </h3>
-            <p className="text-sm text-gray-600 mt-1">
-              Review pending requests and track assigned drivers
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Pickup Requests
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Review pending requests and track assigned drivers
+                </p>
+              </div>
+
+              {/* Search and Filter Controls - Now handled in top section */}
+            </div>
           </div>
 
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Member Details
+                  <th
+                    className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handleSort("member_name")}
+                  >
+                    <div className="flex items-center gap-1">
+                      Member Details
+                      <span className="text-xs">
+                        {getSortIcon("member_name")}
+                      </span>
+                    </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Pickup Information
+                  <th
+                    className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handleSort("area_name")}
+                  >
+                    <div className="flex items-center gap-1">
+                      Area
+                      <span className="text-xs">
+                        {getSortIcon("area_name")}
+                      </span>
+                    </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Status
+                  <th
+                    className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handleSort("pickup_location")}
+                  >
+                    <div className="flex items-center gap-1">
+                      Pickup Information
+                      <span className="text-xs">
+                        {getSortIcon("pickup_location")}
+                      </span>
+                    </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Assigned Driver
+                  <th
+                    className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handleSort("status")}
+                  >
+                    <div className="flex items-center gap-1">
+                      Status
+                      <span className="text-xs">{getSortIcon("status")}</span>
+                    </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Requested
+                  <th
+                    className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handleSort("driver_name")}
+                  >
+                    <div className="flex items-center gap-1">
+                      Assigned Driver
+                      <span className="text-xs">
+                        {getSortIcon("driver_name")}
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handleSort("created_at")}
+                  >
+                    <div className="flex items-center gap-1">
+                      Requested
+                      <span className="text-xs">
+                        {getSortIcon("created_at")}
+                      </span>
+                    </div>
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Actions
@@ -979,7 +1193,7 @@ const TransportPage = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {currentItems.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="px-6 py-12 text-center">
+                    <td colSpan="7" className="px-6 py-12 text-center">
                       <svg
                         className="mx-auto h-12 w-12 text-gray-400"
                         fill="none"
@@ -1049,6 +1263,11 @@ const TransportPage = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900 font-medium">
+                          {request.area_name || "N/A"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
                           <div className="flex items-start">
                             <svg
@@ -1072,17 +1291,17 @@ const TransportPage = () => {
                             </svg>
                             <div>
                               {request.pickup_location ? (
-                                <>
-                                  <div className="font-medium">
-                                    {request.pickup_location}
-                                  </div>
-                                  <div className="text-xs text-gray-500 mt-0.5">
-                                    {request.area_name || "N/A"}
-                                  </div>
-                                </>
-                              ) : (
                                 <div className="font-medium">
-                                  {request.area_name || "N/A"}
+                                  {request.pickup_location}
+                                </div>
+                              ) : (
+                                <div className="font-medium text-gray-500">
+                                  No location specified
+                                </div>
+                              )}
+                              {request.emergency_contact && (
+                                <div className="text-xs text-gray-500 mt-0.5">
+                                  Emergency: {request.emergency_contact}
                                 </div>
                               )}
                             </div>
