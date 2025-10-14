@@ -238,7 +238,8 @@ router.put("/counselling-sessions/:id", async (req, res) => {
   console.log("🔄 Updating counselling session");
   try {
     const { id } = req.params;
-    const { status, sessionNotes, scheduledDate, scheduledTime } = req.body;
+    const { status, sessionNotes, scheduledDate, scheduledTime, counsellorId } =
+      req.body;
 
     const connection = await pool.getConnection();
 
@@ -264,6 +265,11 @@ router.put("/counselling-sessions/:id", async (req, res) => {
     if (scheduledTime) {
       updateFields.push("scheduled_time = ?");
       values.push(scheduledTime);
+    }
+
+    if (counsellorId) {
+      updateFields.push("counsellor_id = ?");
+      values.push(counsellorId);
     }
 
     // Always update the timestamp

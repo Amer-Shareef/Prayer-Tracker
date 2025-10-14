@@ -41,6 +41,15 @@ const MeetingsPage = () => {
   const [meetingToDelete, setMeetingToDelete] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null);
 
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [meetingToReschedule, setMeetingToReschedule] = useState(null);
+
+  const [rescheduleForm, setRescheduleForm] = useState({
+    date: "",
+    time: "",
+    mentorId: "",
+  });
+
   // Helper function to format time to 12-hour AM/PM format
   const formatTime = (timeString) => {
     if (!timeString) return "No time";
@@ -250,28 +259,52 @@ const MeetingsPage = () => {
     setShowDeleteModal(true);
   };
 
-  const confirmDeleteSession = async () => {
-    if (!meetingToDelete) return;
+  const handleRescheduleSession = (meeting) => {
+    setMeetingToReschedule(meeting);
+    setRescheduleForm({
+      date: meeting.scheduled_date,
+      time: meeting.scheduled_time,
+      mentorId: meeting.counsellor_id ? meeting.counsellor_id.toString() : "",
+    });
+    setShowRescheduleModal(true);
+  };
+
+  const submitRescheduleSession = async () => {
+    if (!rescheduleForm.date || !rescheduleForm.time) {
+      alert("Please fill date and time");
+      return;
+    }
 
     try {
-      const response = await meetingsService.deleteCounsellingSession(
-        meetingToDelete.id
-      );
-      if (response.data?.success || response.status === 404) {
-        alert("Session deleted successfully!");
-        setShowDeleteModal(false);
-        setMeetingToDelete(null);
-        await fetchData();
+      const updateData = {
+        scheduledDate: rescheduleForm.date,
+        scheduledTime: rescheduleForm.time,
+        status: "rescheduled", // Update status to rescheduled
+      };
+
+      // If counsellor changed, include it in the update
+      if (
+        rescheduleForm.mentorId &&
+        rescheduleForm.mentorId !==
+          meetingToReschedule.counsellor_id?.toString()
+      ) {
+        updateData.counsellorId = parseInt(rescheduleForm.mentorId);
       }
-    } catch (err) {
-      if (err.response?.status === 404) {
-        alert("Session not found - it may have already been deleted.");
-        setShowDeleteModal(false);
-        setMeetingToDelete(null);
+
+      const response = await meetingsService.updateCounsellingSession(
+        meetingToReschedule.id,
+        updateData
+      );
+
+      if (response.data && response.data.success) {
+        alert("Session rescheduled successfully!");
+        setShowRescheduleModal(false);
         await fetchData();
       } else {
-        alert("Failed to delete session. Please try again.");
+        alert(`Failed: ${response.data?.message || "Unknown error"}`);
       }
+    } catch (err) {
+      alert(`Failed: ${err.response?.data?.message || err.message}`);
     }
   };
 
@@ -627,10 +660,7 @@ const MeetingsPage = () => {
                                           </button>
                                           <button
                                             onClick={() => {
-                                              // TODO: Implement reschedule functionality
-                                              alert(
-                                                "Reschedule functionality coming soon!"
-                                              );
+                                              handleRescheduleSession(meeting);
                                               setOpenMenuId(null);
                                             }}
                                             className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -1028,6 +1058,144 @@ const MeetingsPage = () => {
                     className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors"
                   >
                     Mark Complete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reschedule Session Modal */}
+        {showRescheduleModal && meetingToReschedule && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen px-4">
+              <div
+                className="fixed inset-0 bg-gray-900 opacity-75"
+                onClick={() => setShowRescheduleModal(false)}
+              ></div>
+              <div className="bg-white rounded-xl p-6 max-w-lg w-full relative z-10 shadow-2xl">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Reschedule Session
+                  </h3>
+                  <button
+                    onClick={() => setShowRescheduleModal(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-sm font-semibold text-gray-900">
+                    {meetingToReschedule.member_name ||
+                      meetingToReschedule.member_full_name}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    Current:{" "}
+                    {new Date(
+                      meetingToReschedule.scheduled_date
+                    ).toLocaleDateString()}
+                    {" at "}
+                    {meetingToReschedule.scheduled_time}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    Working Committee:{" "}
+                    {meetingToReschedule.counsellor_full_name ||
+                      meetingToReschedule.counsellor_name ||
+                      "TBD"}
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        New Date <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={rescheduleForm.date}
+                        onChange={(e) =>
+                          setRescheduleForm({
+                            ...rescheduleForm,
+                            date: e.target.value,
+                          })
+                        }
+                        min={new Date().toISOString().split("T")[0]}
+                        className="w-full border-2 border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        New Time <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={rescheduleForm.time}
+                        onChange={(e) =>
+                          setRescheduleForm({
+                            ...rescheduleForm,
+                            time: e.target.value,
+                          })
+                        }
+                        className="w-full border-2 border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Working Committee (Optional)
+                    </label>
+                    <select
+                      value={rescheduleForm.mentorId}
+                      onChange={(e) =>
+                        setRescheduleForm({
+                          ...rescheduleForm,
+                          mentorId: e.target.value,
+                        })
+                      }
+                      className="w-full border-2 border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Keep current counsellor</option>
+                      {availableMentors.map((mentor) => (
+                        <option key={mentor.id} value={mentor.id}>
+                          {mentor.fullName || mentor.username}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Leave empty to keep the current working committee
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex space-x-3 mt-6">
+                  <button
+                    onClick={() => setShowRescheduleModal(false)}
+                    className="flex-1 px-4 py-2.5 border-2 border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={submitRescheduleSession}
+                    className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+                  >
+                    Reschedule Session
                   </button>
                 </div>
               </div>
