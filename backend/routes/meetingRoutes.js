@@ -175,13 +175,13 @@ router.post("/counselling-sessions", async (req, res) => {
       match: counsellor.area_id === member.area_id,
     });
 
-    if (counsellor.area_id !== member.area_id) {
-      connection.release();
-      return res.status(403).json({
-        success: false,
-        message: "Counsellor must be from the same area as the member",
-      });
-    }
+    // if (counsellor.area_id !== member.area_id) {
+    //   connection.release();
+    //   return res.status(403).json({
+    //     success: false,
+    //     message: "Counsellor must be from the same area as the member",
+    //   });
+    // }
 
     // Create counselling session
     console.log("💾 Creating counselling session with data:", {
