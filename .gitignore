@@ -1,2 +1,3 @@
 backend/yarn.lock
 localdocker
+database_schema_and_samples.md
