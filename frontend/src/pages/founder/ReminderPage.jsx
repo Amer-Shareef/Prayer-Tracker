@@ -40,6 +40,10 @@ const PostFeeds = () => {
   const [imageUploadError, setImageUploadError] = useState("");
   const [videoUrlError, setVideoUrlError] = useState("");
 
+  // Image preview modal state
+  const [showImagePreview, setShowImagePreview] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState("");
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -107,7 +111,7 @@ const PostFeeds = () => {
   // Helper function to validate YouTube URL
   const isValidYouTubeUrl = (url) => {
     if (!url || !url.trim()) return true; // Empty URL is valid (optional field)
-    
+
     const youtubeRegex =
       /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})(\S*)?$/;
     return youtubeRegex.test(url);
@@ -152,7 +156,9 @@ const PostFeeds = () => {
       const maxSize = 5 * 1024 * 1024; // 5MB in bytes
       if (file.size > maxSize) {
         const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
-        setImageUploadError(`Image file is too large (${fileSizeMB}MB). Maximum allowed size is 5MB.`);
+        setImageUploadError(
+          `Image file is too large (${fileSizeMB}MB). Maximum allowed size is 5MB.`
+        );
         e.target.value = ""; // Clear the file input
         return;
       }
@@ -187,11 +193,16 @@ const PostFeeds = () => {
       setLoading(true);
       setApiError("");
 
-      // Use getFeeds which supports pagination (limit of 5)
-      const response = await feedsService.getFeeds({
+      // Use getAllFeeds which returns all feeds without area restrictions
+      const response = await feedsService.getAllFeeds({
         page: page,
         limit: 15, // #Change for Production
       });
+      // get only area based feeds
+      //  const response = await feedsService.getFeeds({
+      //   page: page,
+      //   limit: 15, // #Change for Production
+      // });
 
       if (response.success) {
         setFeeds(response.data);
@@ -214,8 +225,7 @@ const PostFeeds = () => {
     // Test UploadThing endpoint
     const testEndpoint = async () => {
       try {
-        const backendUrl =
-          process.env.REACT_APP_BACKEND_URL;
+        const backendUrl = process.env.REACT_APP_BACKEND_URL;
         const response = await fetch(`${backendUrl}/api/uploadthing`);
         console.log(
           "🧪 UploadThing endpoint test:",
@@ -294,7 +304,7 @@ const PostFeeds = () => {
           setVideoThumbnail("");
         } else {
           setVideoUrlError("");
-          
+
           // Show alert if image is selected
           if (uploadedImageUrl || selectedImageFile) {
             const confirmed = window.confirm(
@@ -307,13 +317,15 @@ const PostFeeds = () => {
 
           // Clear image data when video URL is entered
           clearImageData();
-          
+
           // Generate YouTube thumbnail
           const thumbnail = getYouTubeThumbnail(value);
           if (thumbnail) {
             setVideoThumbnail(thumbnail);
           } else {
-            setVideoUrlError("Could not generate video thumbnail. Please check the YouTube URL.");
+            setVideoUrlError(
+              "Could not generate video thumbnail. Please check the YouTube URL."
+            );
           }
         }
       } else {
@@ -755,11 +767,35 @@ const PostFeeds = () => {
                             />
                           </a>
                         ) : feed.image_url ? (
-                          <img
-                            src={feed.image_url}
-                            alt="Feed image"
-                            className="w-28 h-20 object-cover rounded-lg border-2 border-gray-300 shadow-sm"
-                          />
+                          <button
+                            onClick={() => {
+                              setPreviewImageUrl(feed.image_url);
+                              setShowImagePreview(true);
+                            }}
+                            className="block group relative cursor-pointer"
+                            title="Click to view full image"
+                          >
+                            <img
+                              src={feed.image_url}
+                              alt="Feed image"
+                              className="w-28 h-20 object-cover rounded-lg border-2 border-gray-300 group-hover:border-blue-500 transition-all shadow-sm"
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 rounded-lg transition-all flex items-center justify-center">
+                              <svg
+                                className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
+                                />
+                              </svg>
+                            </div>
+                          </button>
                         ) : (
                           <div className="w-28 h-20 bg-gray-100 rounded-lg flex items-center justify-center border-2 border-gray-200">
                             <svg
@@ -1105,7 +1141,9 @@ const PostFeeds = () => {
                             </svg>
                           </div>
                           <div className="ml-3">
-                            <p className="text-sm font-medium">{imageUploadError}</p>
+                            <p className="text-sm font-medium">
+                              {imageUploadError}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -1177,7 +1215,9 @@ const PostFeeds = () => {
                             </svg>
                           </div>
                           <div className="ml-3">
-                            <p className="text-sm font-medium">{videoUrlError}</p>
+                            <p className="text-sm font-medium">
+                              {videoUrlError}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -1244,6 +1284,45 @@ const PostFeeds = () => {
                   </div>
                 </form>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Image Preview Modal */}
+        {showImagePreview && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowImagePreview(false)}
+          >
+            <div className="relative max-w-7xl max-h-[90vh] w-full h-full flex items-center justify-center">
+              {/* Close button */}
+              <button
+                onClick={() => setShowImagePreview(false)}
+                className="absolute top-4 right-4 bg-white text-gray-800 rounded-full p-2 hover:bg-gray-100 transition-colors shadow-lg z-10"
+                title="Close preview"
+              >
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+
+              {/* Image */}
+              <img
+                src={previewImageUrl}
+                alt="Full size preview"
+                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              />
             </div>
           </div>
         )}

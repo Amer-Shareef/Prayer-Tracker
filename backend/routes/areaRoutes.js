@@ -4,6 +4,47 @@ const { authenticateToken, authorizeRole } = require("../middleware/auth");
 
 const router = express.Router();
 
+
+
+// Helper function to get date strings for queries
+const getDateRanges = () => {
+  const today = new Date();
+  
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  const last7Days = new Date(today);
+  last7Days.setDate(last7Days.getDate() - 7);
+  
+  const last30Days = new Date(today);
+  last30Days.setDate(last30Days.getDate() - 30);
+  
+  return {
+    today: today.toISOString().split('T')[0],
+    yesterday: yesterday.toISOString().split('T')[0],
+    last7Days: last7Days.toISOString().split('T')[0],
+    last30Days: last30Days.toISOString().split('T')[0]
+  };
+};
+
+// Helper function to safely calculate percentage
+const safePercentage = (count, total) => {
+  if (total === 0) return 0;
+  return Math.min(Math.round((count / total) * 100), 100);
+};
+
+// Helper function to get total areas count
+async function getTotalAreas() {
+  try {
+    const [result] = await pool.execute("SELECT COUNT(*) as total FROM areas");
+    return result[0].total;
+  } catch (error) {
+    console.error("Error getting total areas:", error);
+    return 0;
+  }
+}
+
+
 // GET /api/areas - Get all areas (no authentication required for members to see areas)
 router.get("/areas", async (req, res) => {
   try {
@@ -584,162 +625,151 @@ router.delete(
 // GET /api/areas/global/stats - Get global statistics for SuperAdmin (all areas combined)
 router.get("/areas/global/stats", async (req, res) => {
   try {
-    const period = parseInt(req.query.period) || 31; // Default to 31 days (30 + today)
+    console.log(`🌍 Fetching global stats for all areas`);
 
-    console.log(`🌍 Fetching global stats for all areas, period: ${period} days`);
-
-    // Get today's date in local timezone
-    const today = new Date().toISOString().split('T')[0];
+    const dates = getDateRanges();
     
-    // Get total members across all areas
+    // Get total members across all areas (only Members role)
     const [totalMembersResult] = await pool.execute(
-      "SELECT COUNT(*) as total FROM users WHERE role = 'Member'"
+      "SELECT COUNT(*) as total FROM users WHERE role = 'Member' AND status = 'active'"
     );
     const totalMembers = totalMembersResult[0].total;
 
-    // Get today's prayer counts for all areas
-    const [todayPrayerCounts] = await pool.execute(`
+    console.log(`👥 Total active members globally: ${totalMembers}`);
+
+    // Single optimized query for all time periods
+    const [prayerStats] = await pool.execute(`
       SELECT 
-        SUM(COALESCE(p.fajr, 0)) AS total_fajr,
-        SUM(COALESCE(p.dhuhr, 0)) AS total_dhuhr,
-        SUM(COALESCE(p.asr, 0)) AS total_asr,
-        SUM(COALESCE(p.maghrib, 0)) AS total_maghrib,
-        SUM(COALESCE(p.isha, 0)) AS total_isha
+        -- Today's prayers
+        SUM(CASE WHEN p.prayer_date = ? THEN p.fajr ELSE 0 END) as today_fajr,
+        SUM(CASE WHEN p.prayer_date = ? THEN p.dhuhr ELSE 0 END) as today_dhuhr,
+        SUM(CASE WHEN p.prayer_date = ? THEN p.asr ELSE 0 END) as today_asr,
+        SUM(CASE WHEN p.prayer_date = ? THEN p.maghrib ELSE 0 END) as today_maghrib,
+        SUM(CASE WHEN p.prayer_date = ? THEN p.isha ELSE 0 END) as today_isha,
+        
+        -- Last 7 days prayers
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.fajr ELSE 0 END) as week_fajr,
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.dhuhr ELSE 0 END) as week_dhuhr,
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.asr ELSE 0 END) as week_asr,
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.maghrib ELSE 0 END) as week_maghrib,
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.isha ELSE 0 END) as week_isha,
+        
+        -- Last 30 days prayers
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.fajr ELSE 0 END) as month_fajr,
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.dhuhr ELSE 0 END) as month_dhuhr,
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.asr ELSE 0 END) as month_asr,
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.maghrib ELSE 0 END) as month_maghrib,
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.isha ELSE 0 END) as month_isha
+        
       FROM prayers p
-      JOIN users u ON p.user_id = u.id
-      WHERE p.prayer_date = ?
-    `, [today]);
+      INNER JOIN users u ON p.user_id = u.id
+      WHERE u.role = 'Member' AND u.status = 'active'
+    `, [
+      // Today (5 params)
+      dates.today, dates.today, dates.today, dates.today, dates.today,
+      // Week (10 params)
+      dates.last7Days, dates.today,
+      dates.last7Days, dates.today,
+      dates.last7Days, dates.today,
+      dates.last7Days, dates.today,
+      dates.last7Days, dates.today,
+      // Month (10 params)
+      dates.last30Days, dates.today,
+      dates.last30Days, dates.today,
+      dates.last30Days, dates.today,
+      dates.last30Days, dates.today,
+      dates.last30Days, dates.today
+    ]);
 
-    const todayStats = todayPrayerCounts[0] || {
-      total_fajr: 0, total_dhuhr: 0, total_asr: 0, total_maghrib: 0, total_isha: 0
-    };
+    const stats = prayerStats[0];
 
-    // Calculate today's prayer breakdown with percentages
+    // Calculate today's statistics
+    const todayTotalPrayers = (stats.today_fajr || 0) + (stats.today_dhuhr || 0) + 
+                              (stats.today_asr || 0) + (stats.today_maghrib || 0) + 
+                              (stats.today_isha || 0);
+    const todayMaxPossible = totalMembers * 5;
+
     const prayerBreakdown = {
-      fajr: { 
-        count: todayStats.total_fajr, 
-        percentage: totalMembers > 0 ? Math.round((todayStats.total_fajr / totalMembers) * 100) : 0 
+      fajr: {
+        count: stats.today_fajr || 0,
+        percentage: safePercentage(stats.today_fajr || 0, totalMembers)
       },
-      dhuhr: { 
-        count: todayStats.total_dhuhr, 
-        percentage: totalMembers > 0 ? Math.round((todayStats.total_dhuhr / totalMembers) * 100) : 0 
+      dhuhr: {
+        count: stats.today_dhuhr || 0,
+        percentage: safePercentage(stats.today_dhuhr || 0, totalMembers)
       },
-      asr: { 
-        count: todayStats.total_asr, 
-        percentage: totalMembers > 0 ? Math.round((todayStats.total_asr / totalMembers) * 100) : 0 
+      asr: {
+        count: stats.today_asr || 0,
+        percentage: safePercentage(stats.today_asr || 0, totalMembers)
       },
-      maghrib: { 
-        count: todayStats.total_maghrib, 
-        percentage: totalMembers > 0 ? Math.round((todayStats.total_maghrib / totalMembers) * 100) : 0 
+      maghrib: {
+        count: stats.today_maghrib || 0,
+        percentage: safePercentage(stats.today_maghrib || 0, totalMembers)
       },
-      isha: { 
-        count: todayStats.total_isha, 
-        percentage: totalMembers > 0 ? Math.round((todayStats.total_isha / totalMembers) * 100) : 0 
+      isha: {
+        count: stats.today_isha || 0,
+        percentage: safePercentage(stats.today_isha || 0, totalMembers)
       }
     };
 
-    // Calculate today's overall stats
-    const todayTotalPrayers = todayStats.total_fajr + todayStats.total_dhuhr + todayStats.total_asr + todayStats.total_maghrib + todayStats.total_isha;
-    const todayMaxPossible = totalMembers * 5; // 5 prayers per day
-    const todayPercentage = todayMaxPossible > 0 ? Math.round((todayTotalPrayers / todayMaxPossible) * 100) : 0;
-
-    // --- Period helpers ---
-    const periodStart = (days) => {
-      const d = new Date(); 
-      d.setDate(d.getDate() - days); 
-      return d.toISOString().split("T")[0];
-    };
-
-    // Get weekly attendance (last 7 days) - global
-    const weekStartStr = periodStart(6); // 7 days including today = go back 6 days
-
-    // weekly totals, global
-    const [weeklyTotalsRows] = await pool.execute(`
-      SELECT 
-        SUM(COALESCE(p.fajr, 0))    AS total_fajr,
-        SUM(COALESCE(p.dhuhr, 0))   AS total_dhuhr,
-        SUM(COALESCE(p.asr, 0))     AS total_asr,
-        SUM(COALESCE(p.maghrib, 0)) AS total_maghrib,
-        SUM(COALESCE(p.isha, 0))    AS total_isha
-      FROM prayers p
-      JOIN users u ON p.user_id = u.id
-      WHERE p.prayer_date BETWEEN ? AND ?
-    `, [weekStartStr, today]);
-
-    const weeklyTotals = weeklyTotalsRows[0] || {};
-    const weeklyTotalPrayers = (weeklyTotals.total_fajr || 0) + (weeklyTotals.total_dhuhr || 0) + (weeklyTotals.total_asr || 0) + (weeklyTotals.total_maghrib || 0) + (weeklyTotals.total_isha || 0);
-    const weeklyMaxPossible = totalMembers * 5 * 7; // 5 prayers × 7 days
-    const weeklyPercentage = weeklyMaxPossible > 0 ? Math.round((weeklyTotalPrayers / weeklyMaxPossible) * 100) : 0;
+    // Calculate weekly statistics (7 days)
+    const weeklyTotalPrayers = (stats.week_fajr || 0) + (stats.week_dhuhr || 0) + 
+                               (stats.week_asr || 0) + (stats.week_maghrib || 0) + 
+                               (stats.week_isha || 0);
+    const weeklyMaxPossible = totalMembers * 5 * 7;
 
     const weekly = {
       totals: {
-        fajr: weeklyTotals.total_fajr || 0,
-        dhuhr: weeklyTotals.total_dhuhr || 0,
-        asr: weeklyTotals.total_asr || 0,
-        maghrib: weeklyTotals.total_maghrib || 0,
-        isha: weeklyTotals.total_isha || 0,
+        fajr: stats.week_fajr || 0,
+        dhuhr: stats.week_dhuhr || 0,
+        asr: stats.week_asr || 0,
+        maghrib: stats.week_maghrib || 0,
+        isha: stats.week_isha || 0,
       },
       percentages: {
-        fajr:     totalMembers > 0 ? Math.round(((weeklyTotals.total_fajr || 0) / (totalMembers * 7)) * 100) : 0,
-        dhuhr:    totalMembers > 0 ? Math.round(((weeklyTotals.total_dhuhr || 0) / (totalMembers * 7)) * 100) : 0,
-        asr:      totalMembers > 0 ? Math.round(((weeklyTotals.total_asr || 0) / (totalMembers * 7)) * 100) : 0,
-        maghrib:  totalMembers > 0 ? Math.round(((weeklyTotals.total_maghrib || 0) / (totalMembers * 7)) * 100) : 0,
-        isha:     totalMembers > 0 ? Math.round(((weeklyTotals.total_isha || 0) / (totalMembers * 7)) * 100) : 0,
+        fajr: safePercentage(stats.week_fajr || 0, totalMembers * 7),
+        dhuhr: safePercentage(stats.week_dhuhr || 0, totalMembers * 7),
+        asr: safePercentage(stats.week_asr || 0, totalMembers * 7),
+        maghrib: safePercentage(stats.week_maghrib || 0, totalMembers * 7),
+        isha: safePercentage(stats.week_isha || 0, totalMembers * 7),
       },
-      // Overall weekly stats for frontend compatibility
       total: weeklyTotalPrayers,
-      percentage: weeklyPercentage
+      percentage: safePercentage(weeklyTotalPrayers, weeklyMaxPossible)
     };
 
-    // Get monthly attendance (last 30 days + today = 31 days) - global
-    const monthStartStr = periodStart(30); // 31 days including today = go back 30 days
-
-    // monthly totals, global
-    const [monthlyTotalsRows] = await pool.execute(`
-      SELECT 
-        SUM(COALESCE(p.fajr, 0))    AS total_fajr,
-        SUM(COALESCE(p.dhuhr, 0))   AS total_dhuhr,
-        SUM(COALESCE(p.asr, 0))     AS total_asr,
-        SUM(COALESCE(p.maghrib, 0)) AS total_maghrib,
-        SUM(COALESCE(p.isha, 0))    AS total_isha
-      FROM prayers p
-      JOIN users u ON p.user_id = u.id
-      WHERE p.prayer_date BETWEEN ? AND ?
-    `, [monthStartStr, today]);
-
-    const monthlyTotals = monthlyTotalsRows[0] || {};
-    const monthlyTotalPrayers = (monthlyTotals.total_fajr || 0) + (monthlyTotals.total_dhuhr || 0) + (monthlyTotals.total_asr || 0) + (monthlyTotals.total_maghrib || 0) + (monthlyTotals.total_isha || 0);
-    const monthlyMaxPossible = totalMembers * 5 * 31; // 5 prayers × 31 days
-    const monthlyPercentage = monthlyMaxPossible > 0 ? Math.round((monthlyTotalPrayers / monthlyMaxPossible) * 100) : 0;
+    // Calculate monthly statistics (30 days)
+    const monthlyTotalPrayers = (stats.month_fajr || 0) + (stats.month_dhuhr || 0) + 
+                                (stats.month_asr || 0) + (stats.month_maghrib || 0) + 
+                                (stats.month_isha || 0);
+    const monthlyMaxPossible = totalMembers * 5 * 30;
 
     const monthly = {
       totals: {
-        fajr: monthlyTotals.total_fajr || 0,
-        dhuhr: monthlyTotals.total_dhuhr || 0,
-        asr: monthlyTotals.total_asr || 0,
-        maghrib: monthlyTotals.total_maghrib || 0,
-        isha: monthlyTotals.total_isha || 0,
+        fajr: stats.month_fajr || 0,
+        dhuhr: stats.month_dhuhr || 0,
+        asr: stats.month_asr || 0,
+        maghrib: stats.month_maghrib || 0,
+        isha: stats.month_isha || 0,
       },
       percentages: {
-        fajr:     totalMembers > 0 ? Math.round(((monthlyTotals.total_fajr || 0) / (totalMembers * 31)) * 100) : 0,
-        dhuhr:    totalMembers > 0 ? Math.round(((monthlyTotals.total_dhuhr || 0) / (totalMembers * 31)) * 100) : 0,
-        asr:      totalMembers > 0 ? Math.round(((monthlyTotals.total_asr || 0) / (totalMembers * 31)) * 100) : 0,
-        maghrib:  totalMembers > 0 ? Math.round(((monthlyTotals.total_maghrib || 0) / (totalMembers * 31)) * 100) : 0,
-        isha:     totalMembers > 0 ? Math.round(((monthlyTotals.total_isha || 0) / (totalMembers * 31)) * 100) : 0,
+        fajr: safePercentage(stats.month_fajr || 0, totalMembers * 30),
+        dhuhr: safePercentage(stats.month_dhuhr || 0, totalMembers * 30),
+        asr: safePercentage(stats.month_asr || 0, totalMembers * 30),
+        maghrib: safePercentage(stats.month_maghrib || 0, totalMembers * 30),
+        isha: safePercentage(stats.month_isha || 0, totalMembers * 30),
       },
-      // Overall monthly stats for frontend compatibility
       total: monthlyTotalPrayers,
-      percentage: monthlyPercentage
+      percentage: safePercentage(monthlyTotalPrayers, monthlyMaxPossible)
     };
 
-    const stats = {
+    const responseData = {
       global: {
         totalMembers: totalMembers,
         totalAreas: await getTotalAreas()
       },
       today: {
         total: todayTotalPrayers,
-        percentage: todayPercentage,
+        percentage: safePercentage(todayTotalPrayers, todayMaxPossible),
         prayerBreakdown: prayerBreakdown
       },
       weekly,
@@ -747,10 +777,13 @@ router.get("/areas/global/stats", async (req, res) => {
     };
 
     console.log(`✅ Global stats fetched successfully`);
+    console.log(`📊 Today: ${todayTotalPrayers}/${todayMaxPossible} (${responseData.today.percentage}%)`);
+    console.log(`📊 Week: ${weeklyTotalPrayers}/${weeklyMaxPossible} (${weekly.percentage}%)`);
+    console.log(`📊 Month: ${monthlyTotalPrayers}/${monthlyMaxPossible} (${monthly.percentage}%)`);
 
     res.json({
       success: true,
-      data: stats,
+      data: responseData,
     });
   } catch (error) {
     console.error("❌ Error fetching global stats:", error);
@@ -762,24 +795,12 @@ router.get("/areas/global/stats", async (req, res) => {
   }
 });
 
-// Helper function to get total areas count
-async function getTotalAreas() {
-  try {
-    const [result] = await pool.execute("SELECT COUNT(*) as total FROM areas");
-    return result[0].total;
-  } catch (error) {
-    console.error("Error getting total areas:", error);
-    return 0;
-  }
-}
-
 // GET /api/areas/:id/stats - Get area statistics (attendance, members, etc.)
-router.get("/areas/:id/stats",  async (req, res) => {
+router.get("/areas/:id/stats", async (req, res) => {
   try {
     const { id } = req.params;
-    const period = parseInt(req.query.period) || 31; // Default to 31 days (30 + today)
 
-    console.log(`📊 Fetching area stats for area ID: ${id}, period: ${period} days`);
+    console.log(`📊 Fetching area stats for area ID: ${id}`);
 
     // Check if area exists
     const [areaExists] = await pool.execute(
@@ -794,193 +815,167 @@ router.get("/areas/:id/stats",  async (req, res) => {
       });
     }
 
-    // Get today's date in local timezone
-    const today = new Date().toISOString().split('T')[0];
-    console.log(`📅 Today's date: ${today}`);
+    const dates = getDateRanges();
+    console.log(`📅 Date ranges - Today: ${dates.today}, Last 7: ${dates.last7Days}, Last 30: ${dates.last30Days}`);
     
-    // Get total members in this area
+    // Get total members in this area (only Members role)
     const [totalMembersResult] = await pool.execute(
-      "SELECT COUNT(*) as total FROM users WHERE area_id = ? AND role = 'Member'",
+      "SELECT COUNT(*) as total FROM users WHERE area_id = ? AND role = 'Member' AND status = 'active'",
       [id]
     );
     const totalMembers = totalMembersResult[0].total;
-    console.log(`👥 Total members in area ${id}: ${totalMembers}`);
+    console.log(`👥 Total active members in area ${id}: ${totalMembers}`);
 
-    // Get today's prayer attendance using the new prayer structure
-    const [todayPrayerCounts] = await pool.execute(`
+    // Single optimized query for all time periods
+    const [prayerStats] = await pool.execute(`
       SELECT 
-        SUM(p.fajr) AS total_fajr,
-        SUM(p.dhuhr) AS total_dhuhr,
-        SUM(p.asr) AS total_asr,
-        SUM(p.maghrib) AS total_maghrib,
-        SUM(p.isha) AS total_isha
+        -- Today's prayers
+        SUM(CASE WHEN p.prayer_date = ? THEN p.fajr ELSE 0 END) as today_fajr,
+        SUM(CASE WHEN p.prayer_date = ? THEN p.dhuhr ELSE 0 END) as today_dhuhr,
+        SUM(CASE WHEN p.prayer_date = ? THEN p.asr ELSE 0 END) as today_asr,
+        SUM(CASE WHEN p.prayer_date = ? THEN p.maghrib ELSE 0 END) as today_maghrib,
+        SUM(CASE WHEN p.prayer_date = ? THEN p.isha ELSE 0 END) as today_isha,
+        
+        -- Last 7 days prayers
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.fajr ELSE 0 END) as week_fajr,
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.dhuhr ELSE 0 END) as week_dhuhr,
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.asr ELSE 0 END) as week_asr,
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.maghrib ELSE 0 END) as week_maghrib,
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.isha ELSE 0 END) as week_isha,
+        
+        -- Last 30 days prayers
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.fajr ELSE 0 END) as month_fajr,
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.dhuhr ELSE 0 END) as month_dhuhr,
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.asr ELSE 0 END) as month_asr,
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.maghrib ELSE 0 END) as month_maghrib,
+        SUM(CASE WHEN p.prayer_date >= ? AND p.prayer_date <= ? THEN p.isha ELSE 0 END) as month_isha
+        
       FROM prayers p
-      JOIN users u ON p.user_id = u.id
-      WHERE u.area_id = ? AND p.prayer_date = ?
-    `, [id, today]);
+      INNER JOIN users u ON p.user_id = u.id
+      WHERE u.area_id = ? AND u.role = 'Member' AND u.status = 'active'
+    `, [
+      // Today (5 params)
+      dates.today, dates.today, dates.today, dates.today, dates.today,
+      // Week (10 params)
+      dates.last7Days, dates.today,
+      dates.last7Days, dates.today,
+      dates.last7Days, dates.today,
+      dates.last7Days, dates.today,
+      dates.last7Days, dates.today,
+      // Month (10 params)
+      dates.last30Days, dates.today,
+      dates.last30Days, dates.today,
+      dates.last30Days, dates.today,
+      dates.last30Days, dates.today,
+      dates.last30Days, dates.today,
+      // Area filter
+      id
+    ]);
 
-    const todayStats = todayPrayerCounts[0] || {
-      total_fajr: 0, total_dhuhr: 0, total_asr: 0, total_maghrib: 0, total_isha: 0
-    };
-    console.log(`📊 Today's prayer counts:`, todayStats);
+    const stats = prayerStats[0];
 
-    // Cap today's values to prevent astronomical numbers
-    const safeFajrT = Math.min(parseInt(todayStats.total_fajr) || 0, totalMembers);
-    const safeDhuhrT = Math.min(parseInt(todayStats.total_dhuhr) || 0, totalMembers);
-    const safeAsrT = Math.min(parseInt(todayStats.total_asr) || 0, totalMembers);
-    const safeMaghribT = Math.min(parseInt(todayStats.total_maghrib) || 0, totalMembers);
-    const safeIshaT = Math.min(parseInt(todayStats.total_isha) || 0, totalMembers);
+    // Calculate today's statistics
+    const todayTotalPrayers = (stats.today_fajr || 0) + (stats.today_dhuhr || 0) + 
+                              (stats.today_asr || 0) + (stats.today_maghrib || 0) + 
+                              (stats.today_isha || 0);
+    const todayMaxPossible = totalMembers * 5;
 
-    // Calculate today's overall stats
-    const todayTotalPrayers = safeFajrT + safeDhuhrT + safeAsrT + safeMaghribT + safeIshaT;
-    const todayMaxPossible = totalMembers * 5; // 5 prayers per day
-    const todayPercentage = todayMaxPossible > 0 ? Math.min(Math.round((todayTotalPrayers / todayMaxPossible) * 100), 100) : 0;
-
-    // --- Period helpers ---
-    const periodStart = (days) => {
-      const d = new Date(); 
-      d.setDate(d.getDate() - days); 
-      return d.toISOString().split("T")[0];
-    };
-
-    // Weekly (7 days) – total attendance instances calculation
-    const weekStartStr = periodStart(6); // 7 days including today = go back 6 days
-
-    // totals (raw counts of attended flags over the 7-day period)
-    const [weeklyTotalsRows] = await pool.execute(`
-      SELECT 
-        SUM(COALESCE(p.fajr, 0))    AS total_fajr,
-        SUM(COALESCE(p.dhuhr, 0))   AS total_dhuhr,
-        SUM(COALESCE(p.asr, 0))     AS total_asr,
-        SUM(COALESCE(p.maghrib, 0)) AS total_maghrib,
-        SUM(COALESCE(p.isha, 0))    AS total_isha
-      FROM prayers p
-      JOIN users u ON p.user_id = u.id
-      WHERE u.area_id = ? AND p.prayer_date BETWEEN ? AND ?
-    `, [id, weekStartStr, today]);
-
-    const weeklyTotals = weeklyTotalsRows[0] || {};
-    
-    // Validate and cap the numbers - prayer values should be 0 or 1, so cap individual prayers
-    const safeFajr = Math.min(parseInt(weeklyTotals.total_fajr) || 0, totalMembers * 7);
-    const safeDhuhr = Math.min(parseInt(weeklyTotals.total_dhuhr) || 0, totalMembers * 7);
-    const safeAsr = Math.min(parseInt(weeklyTotals.total_asr) || 0, totalMembers * 7);
-    const safeMaghrib = Math.min(parseInt(weeklyTotals.total_maghrib) || 0, totalMembers * 7);
-    const safeIsha = Math.min(parseInt(weeklyTotals.total_isha) || 0, totalMembers * 7);
-    
-    const weeklyTotalPrayers = safeFajr + safeDhuhr + safeAsr + safeMaghrib + safeIsha;
-    const weeklyMaxPossible = totalMembers * 5 * 7; // 5 prayers × 7 days
-    const weeklyPercentage = weeklyMaxPossible > 0 ? Math.min(Math.round((weeklyTotalPrayers / weeklyMaxPossible) * 100), 100) : 0;
-
-    const weekly = {
-      totals: {
-        fajr: safeFajr,
-        dhuhr: safeDhuhr,
-        asr: safeAsr,
-        maghrib: safeMaghrib,
-        isha: safeIsha,
-      },
-      percentages: {
-        fajr:     totalMembers > 0 ? Math.min(Math.round((safeFajr / (totalMembers * 7)) * 100), 100) : 0,
-        dhuhr:    totalMembers > 0 ? Math.min(Math.round((safeDhuhr / (totalMembers * 7)) * 100), 100) : 0,
-        asr:      totalMembers > 0 ? Math.min(Math.round((safeAsr / (totalMembers * 7)) * 100), 100) : 0,
-        maghrib:  totalMembers > 0 ? Math.min(Math.round((safeMaghrib / (totalMembers * 7)) * 100), 100) : 0,
-        isha:     totalMembers > 0 ? Math.min(Math.round((safeIsha / (totalMembers * 7)) * 100), 100) : 0,
-      },
-      // Overall weekly stats for frontend compatibility
-      total: weeklyTotalPrayers,
-      percentage: weeklyPercentage
-    };
-
-    // Monthly (last 30 days + today = 31 days total)
-    const monthStartStr = periodStart(30); // 31 days including today = go back 30 days
-    console.log(`📅 Monthly date range: ${monthStartStr} to ${today} (31 days total)`);
-
-    const [monthlyTotalsRows] = await pool.execute(`
-      SELECT 
-        SUM(COALESCE(p.fajr, 0))    AS total_fajr,
-        SUM(COALESCE(p.dhuhr, 0))   AS total_dhuhr,
-        SUM(COALESCE(p.asr, 0))     AS total_asr,
-        SUM(COALESCE(p.maghrib, 0)) AS total_maghrib,
-        SUM(COALESCE(p.isha, 0))    AS total_isha
-      FROM prayers p
-      JOIN users u ON p.user_id = u.id
-      WHERE u.area_id = ? AND p.prayer_date BETWEEN ? AND ?
-    `, [id, monthStartStr, today]);
-
-    const monthlyTotals = monthlyTotalsRows[0] || {};
-    // Cap each prayer count to prevent corrupted data from causing astronomical numbers
-    const safeFajrM = Math.min(parseInt(monthlyTotals.total_fajr) || 0, totalMembers * 31);
-    const safeDhuhrM = Math.min(parseInt(monthlyTotals.total_dhuhr) || 0, totalMembers * 31);
-    const safeAsrM = Math.min(parseInt(monthlyTotals.total_asr) || 0, totalMembers * 31);
-    const safeMaghribM = Math.min(parseInt(monthlyTotals.total_maghrib) || 0, totalMembers * 31);
-    const safeIshaM = Math.min(parseInt(monthlyTotals.total_isha) || 0, totalMembers * 31);
-    
-    const monthlyTotalPrayers = safeFajrM + safeDhuhrM + safeAsrM + safeMaghribM + safeIshaM;
-    const monthlyMaxPossible = totalMembers * 5 * 31; // 5 prayers × 31 days
-    const monthlyPercentage = monthlyMaxPossible > 0 ? Math.min(Math.round((monthlyTotalPrayers / monthlyMaxPossible) * 100), 100) : 0;
-
-    const monthly = {
-      totals: {
-        fajr: safeFajrM,
-        dhuhr: safeDhuhrM,
-        asr: safeAsrM,
-        maghrib: safeMaghribM,
-        isha: safeIshaM,
-      },
-      percentages: {
-        fajr:     totalMembers > 0 ? Math.min(Math.round((safeFajrM / (totalMembers * 31)) * 100), 100) : 0,
-        dhuhr:    totalMembers > 0 ? Math.min(Math.round((safeDhuhrM / (totalMembers * 31)) * 100), 100) : 0,
-        asr:      totalMembers > 0 ? Math.min(Math.round((safeAsrM / (totalMembers * 31)) * 100), 100) : 0,
-        maghrib:  totalMembers > 0 ? Math.min(Math.round((safeMaghribM / (totalMembers * 31)) * 100), 100) : 0,
-        isha:     totalMembers > 0 ? Math.min(Math.round((safeIshaM / (totalMembers * 31)) * 100), 100) : 0,
-      },
-      // Overall monthly stats for frontend compatibility
-      total: monthlyTotalPrayers,
-      percentage: monthlyPercentage
-    };
-
-    console.log(`📊 Monthly calculation: ${monthlyTotalPrayers} total prayers out of ${monthlyMaxPossible} possible (${monthlyPercentage}%)`);
-    console.log(`📊 Weekly calculation: ${weeklyTotalPrayers} total prayers out of ${weeklyMaxPossible} possible (${weeklyPercentage}%)`);
-    console.log(`📊 Today calculation: ${todayTotalPrayers} total prayers out of ${todayMaxPossible} possible (${todayPercentage}%)`);
-    
-    // Build prayer breakdown for today with correct counts and percentages
     const prayerBreakdown = {
-      fajr: { 
-        count: safeFajrT, 
-        percentage: totalMembers > 0 ? Math.min(Math.round((safeFajrT / totalMembers) * 100), 100) : 0 
+      fajr: {
+        count: stats.today_fajr || 0,
+        percentage: safePercentage(stats.today_fajr || 0, totalMembers)
       },
-      dhuhr: { 
-        count: safeDhuhrT, 
-        percentage: totalMembers > 0 ? Math.min(Math.round((safeDhuhrT / totalMembers) * 100), 100) : 0 
+      dhuhr: {
+        count: stats.today_dhuhr || 0,
+        percentage: safePercentage(stats.today_dhuhr || 0, totalMembers)
       },
-      asr: { 
-        count: safeAsrT, 
-        percentage: totalMembers > 0 ? Math.min(Math.round((safeAsrT / totalMembers) * 100), 100) : 0 
+      asr: {
+        count: stats.today_asr || 0,
+        percentage: safePercentage(stats.today_asr || 0, totalMembers)
       },
-      maghrib: { 
-        count: safeMaghribT, 
-        percentage: totalMembers > 0 ? Math.min(Math.round((safeMaghribT / totalMembers) * 100), 100) : 0 
+      maghrib: {
+        count: stats.today_maghrib || 0,
+        percentage: safePercentage(stats.today_maghrib || 0, totalMembers)
       },
-      isha: { 
-        count: safeIshaT, 
-        percentage: totalMembers > 0 ? Math.min(Math.round((safeIshaT / totalMembers) * 100), 100) : 0 
+      isha: {
+        count: stats.today_isha || 0,
+        percentage: safePercentage(stats.today_isha || 0, totalMembers)
       }
     };
 
-    // include in your response payload:
-    const stats = {
-      area: { id: parseInt(id, 10), name: areaExists[0].area_name, totalMembers },
-      today: { total: todayTotalPrayers, percentage: todayPercentage, prayerBreakdown },
-      weekly,
-      monthly,
+    // Calculate weekly statistics (7 days)
+    const weeklyTotalPrayers = (stats.week_fajr || 0) + (stats.week_dhuhr || 0) + 
+                               (stats.week_asr || 0) + (stats.week_maghrib || 0) + 
+                               (stats.week_isha || 0);
+    const weeklyMaxPossible = totalMembers * 5 * 7;
+
+    const weekly = {
+      totals: {
+        fajr: stats.week_fajr || 0,
+        dhuhr: stats.week_dhuhr || 0,
+        asr: stats.week_asr || 0,
+        maghrib: stats.week_maghrib || 0,
+        isha: stats.week_isha || 0,
+      },
+      percentages: {
+        fajr: safePercentage(stats.week_fajr || 0, totalMembers * 7),
+        dhuhr: safePercentage(stats.week_dhuhr || 0, totalMembers * 7),
+        asr: safePercentage(stats.week_asr || 0, totalMembers * 7),
+        maghrib: safePercentage(stats.week_maghrib || 0, totalMembers * 7),
+        isha: safePercentage(stats.week_isha || 0, totalMembers * 7),
+      },
+      total: weeklyTotalPrayers,
+      percentage: safePercentage(weeklyTotalPrayers, weeklyMaxPossible)
     };
 
-    console.log(`✅ Area stats fetched successfully for area: ${areaExists[0].area_name}`);
+    // Calculate monthly statistics (30 days)
+    const monthlyTotalPrayers = (stats.month_fajr || 0) + (stats.month_dhuhr || 0) + 
+                                (stats.month_asr || 0) + (stats.month_maghrib || 0) + 
+                                (stats.month_isha || 0);
+    const monthlyMaxPossible = totalMembers * 5 * 30;
+
+    const monthly = {
+      totals: {
+        fajr: stats.month_fajr || 0,
+        dhuhr: stats.month_dhuhr || 0,
+        asr: stats.month_asr || 0,
+        maghrib: stats.month_maghrib || 0,
+        isha: stats.month_isha || 0,
+      },
+      percentages: {
+        fajr: safePercentage(stats.month_fajr || 0, totalMembers * 30),
+        dhuhr: safePercentage(stats.month_dhuhr || 0, totalMembers * 30),
+        asr: safePercentage(stats.month_asr || 0, totalMembers * 30),
+        maghrib: safePercentage(stats.month_maghrib || 0, totalMembers * 30),
+        isha: safePercentage(stats.month_isha || 0, totalMembers * 30),
+      },
+      total: monthlyTotalPrayers,
+      percentage: safePercentage(monthlyTotalPrayers, monthlyMaxPossible)
+    };
+
+    const responseData = {
+      area: {
+        id: parseInt(id, 10),
+        name: areaExists[0].area_name,
+        totalMembers
+      },
+      today: {
+        total: todayTotalPrayers,
+        percentage: safePercentage(todayTotalPrayers, todayMaxPossible),
+        prayerBreakdown
+      },
+      weekly,
+      monthly
+    };
+
+    console.log(`✅ Area stats fetched for: ${areaExists[0].area_name}`);
+    console.log(`📊 Today: ${todayTotalPrayers}/${todayMaxPossible} (${responseData.today.percentage}%)`);
+    console.log(`📊 Week: ${weeklyTotalPrayers}/${weeklyMaxPossible} (${weekly.percentage}%)`);
+    console.log(`📊 Month: ${monthlyTotalPrayers}/${monthlyMaxPossible} (${monthly.percentage}%)`);
 
     res.json({
       success: true,
-      data: stats,
+      data: responseData,
     });
   } catch (error) {
     console.error("❌ Error fetching area stats:", error);

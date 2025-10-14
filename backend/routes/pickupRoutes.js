@@ -21,7 +21,7 @@ router.get(
         limit,
         limitType: typeof limit,
         userId: user.id,
-        assignedDriverId: user.assigned_driver_id,
+        assigned_driver_id: user.assigned_driver_id,
       });
 
       // Build query dynamically WITHOUT using LIMIT in prepared statement
@@ -71,10 +71,29 @@ WHERE pr.user_id = ? OR pr.assigned_driver_id = ?
         `✅ Found ${allResults.length} total requests, returning ${results.length} with limit ${limitValue}`
       );
 
+      // Add role indicator for each request
+      const resultsWithRole = results.map((request) => {
+        let userRole = null;
+
+        // Only set role if status is approved
+        if (request.status === "approved") {
+          if (request.user_id === user.id) {
+            userRole = "member";
+          } else if (request.assigned_driver_id === user.id) {
+            userRole = "driver";
+          }
+        }
+
+        return {
+          ...request,
+          user_role: userRole,
+        };
+      });
+
       res.json({
         success: true,
-        data: results,
-        count: results.length,
+        data: resultsWithRole,
+        count: resultsWithRole.length,
         total: allResults.length,
       });
     } catch (error) {
@@ -186,10 +205,29 @@ u.username as member_username,
 
     console.log(`✅ Found ${requests.length} pickup requests for ${user.role}`);
 
+    // Add role indicator for each request
+    const requestsWithRole = requests.map((request) => {
+      let userRole = null;
+
+      // Only set role if status is approved
+      if (request.status === "approved") {
+        if (request.user_id === user.id) {
+          userRole = "member";
+        } else if (request.assigned_driver_id === user.id) {
+          userRole = "driver";
+        }
+      }
+
+      return {
+        ...request,
+        user_role: userRole,
+      };
+    });
+
     res.json({
       success: true,
-      data: requests,
-      total: requests.length,
+      data: requestsWithRole,
+      total: requestsWithRole.length,
     });
   } catch (error) {
     console.error("❌ Error fetching pickup requests:", error);
@@ -217,11 +255,11 @@ router.post(
         prayers,
       } = req.body;
 
-      // Simplified validation - only pickup_location and area_id are mandatory
-      if (!pickup_location || !area_id) {
+      // Simplified validation - only area_id is mandatory
+      if (!area_id) {
         return res.status(400).json({
           success: false,
-          message: "Pickup location and area_id are required",
+          message: "Area ID is required",
         });
       }
 
@@ -604,13 +642,13 @@ router.put(
   dbHealthCheck,
   async (req, res) => {
     const requestId = req.params.id;
-    const { assignedDriverId, assignedDriverName } = req.body;
+    const { assigned_driver_id, assigned_driver_name } = req.body;
 
     console.log(
       "🟢 Approving pickup request:",
       requestId,
       "with driver:",
-      assignedDriverName
+      assigned_driver_name
     );
 
     try {
@@ -627,7 +665,7 @@ router.put(
         approved_at = NOW()
       WHERE id = ?
     `,
-        [assignedDriverId, assignedDriverName, requestId]
+        [assigned_driver_id, assigned_driver_name, requestId]
       );
 
       if (result.affectedRows === 0) {
@@ -793,6 +831,274 @@ router.put(
   }
 );
 
+// DELETE /api/pickup-requests/:id/admin - Delete pickup request (Admin only)
+router.delete(
+  "/pickup-requests/:id/admin",
+  authenticateToken,
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
+  dbHealthCheck,
+  async (req, res) => {
+    const requestId = req.params.id;
+
+    console.log(
+      "🗑️ Admin deleting pickup request:",
+      requestId,
+      "by user:",
+      req.user.id
+    );
+
+    try {
+      const connection = await pool.getConnection();
+
+      // First, check if the pickup request exists
+      const [existingRequest] = await connection.query(
+        "SELECT id, status, user_id, pickup_location FROM pickup_requests WHERE id = ?",
+        [requestId]
+      );
+
+      if (existingRequest.length === 0) {
+        connection.release();
+        return res.status(404).json({
+          success: false,
+          message: "Pickup request not found",
+        });
+      }
+
+      const request = existingRequest[0];
+      console.log("📋 Found pickup request to delete:", {
+        id: request.id,
+        status: request.status,
+        user_id: request.user_id,
+        pickup_location: request.pickup_location,
+      });
+
+      // Delete the pickup request from database
+      const [result] = await connection.query(
+        "DELETE FROM pickup_requests WHERE id = ?",
+        [requestId]
+      );
+
+      console.log("📊 Delete result:", {
+        affectedRows: result.affectedRows,
+      });
+
+      if (result.affectedRows === 0) {
+        connection.release();
+        return res.status(404).json({
+          success: false,
+          message: "Pickup request not found",
+        });
+      }
+
+      connection.release();
+
+      console.log("✅ Pickup request deleted successfully by admin");
+      res.json({
+        success: true,
+        message: "Pickup request deleted successfully",
+      });
+    } catch (error) {
+      console.error("❌ Error deleting pickup request:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to delete pickup request",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// POST /api/pickup-requests/admin - Create pickup request as admin (assign member and driver)
+router.post(
+  "/pickup-requests/admin",
+  authenticateToken,
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
+  dbHealthCheck,
+  async (req, res) => {
+    try {
+      const {
+        user_id,
+        area_id,
+        pickup_location,
+        contact_number,
+        special_instructions,
+        days,
+        prayers,
+        assigned_driver_id,
+        assigned_driver_name,
+        auto_approve,
+      } = req.body;
+
+      console.log("🔧 Admin creating pickup request:", {
+        user_id,
+        area_id,
+        assigned_driver_id,
+        auto_approve,
+      });
+
+      // Validate required fields
+      if (!user_id) {
+        return res.status(400).json({
+          success: false,
+          message: "Member user ID is required",
+        });
+      }
+
+      if (!area_id) {
+        return res.status(400).json({
+          success: false,
+          message: "Area ID is required",
+        });
+      }
+
+      // Validate days array if provided
+      if (days && Array.isArray(days) && days.length > 0) {
+        const validDays = [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday",
+        ];
+        const invalidDays = days.filter(
+          (day) => !validDays.includes(day.toLowerCase())
+        );
+        if (invalidDays.length > 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid days: ${invalidDays.join(", ")}`,
+          });
+        }
+      }
+
+      // Validate prayers array if provided
+      if (prayers && Array.isArray(prayers) && prayers.length > 0) {
+        const validPrayers = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
+        const invalidPrayers = prayers.filter(
+          (prayer) => !validPrayers.includes(prayer.toLowerCase())
+        );
+        if (invalidPrayers.length > 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid prayers: ${invalidPrayers.join(", ")}`,
+          });
+        }
+      }
+
+      // Verify user exists and belongs to the specified area
+      const [userCheck] = await pool.execute(
+        "SELECT id, area_id, full_name, phone FROM users WHERE id = ?",
+        [user_id]
+      );
+
+      if (userCheck.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Member not found",
+        });
+      }
+
+      if (userCheck[0].area_id !== area_id) {
+        return res.status(400).json({
+          success: false,
+          message: "Member does not belong to the specified area",
+        });
+      }
+
+      // Check for duplicate active requests
+      const [existingRequests] = await pool.execute(
+        `SELECT id FROM pickup_requests 
+         WHERE user_id = ? AND status NOT IN ('cancelled', 'completed', 'rejected')`,
+        [user_id]
+      );
+
+      if (existingRequests.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "This member already has an active pickup request. Please cancel it first.",
+        });
+      }
+
+      // Determine status based on auto_approve and driver assignment
+      let status = "pending";
+      let approvedAt = null;
+
+      if (auto_approve && assigned_driver_id) {
+        status = "approved";
+        approvedAt = new Date();
+      }
+
+      // Create the pickup request
+      const [result] = await pool.execute(
+        `INSERT INTO pickup_requests 
+         (user_id, area_id, sub_areas_id, pickup_location, special_instructions, contact_number,
+          days, prayers, status, assigned_driver_id, assigned_driver_name, 
+          approved_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [
+          user_id,
+          area_id,
+          req.body.sub_areas_id || null,
+          pickup_location ? pickup_location.trim() : null,
+          special_instructions ? special_instructions.trim() : null,
+          contact_number || userCheck[0].phone || null,
+          days && days.length > 0
+            ? JSON.stringify(days.map((d) => d.toLowerCase()))
+            : JSON.stringify(["daily"]),
+          prayers && prayers.length > 0
+            ? JSON.stringify(prayers.map((p) => p.toLowerCase()))
+            : JSON.stringify(["fajr"]),
+          status,
+          assigned_driver_id || null,
+          assigned_driver_name || null,
+          approvedAt,
+        ]
+      );
+
+      // Get the created request with full details
+      const [createdRequest] = await pool.execute(
+        `SELECT pr.*, 
+                u.username as member_username, 
+                u.email as member_email, 
+                u.phone as member_phone,
+                u.full_name as member_name,
+                a.area_name,
+                du.username as driver_username,
+                du.phone as driver_phone,
+                du.full_name as driver_name
+         FROM pickup_requests pr
+         LEFT JOIN users u ON pr.user_id = u.id
+         LEFT JOIN areas a ON pr.area_id = a.area_id
+         LEFT JOIN users du ON pr.assigned_driver_id = du.id
+         WHERE pr.id = ?`,
+        [result.insertId]
+      );
+
+      console.log(
+        `✅ Admin created pickup request: ID ${result.insertId}, status: ${status}`
+      );
+
+      res.status(201).json({
+        success: true,
+        message: `Pickup request created successfully${
+          status === "approved" ? " and approved" : ""
+        }`,
+        data: createdRequest[0],
+      });
+    } catch (error) {
+      console.error("❌ Error creating admin pickup request:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to create pickup request",
+        error: error.message,
+      });
+    }
+  }
+);
+
 // GET /api/pickup-requests/available-drivers - Get members who can be assigned as drivers
 router.get(
   "/pickup-requests/available-drivers",
@@ -843,6 +1149,118 @@ router.get(
       res.status(500).json({
         success: false,
         message: "Failed to fetch available drivers",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// GET /api/pickup-requests/check-user/:userId - Get user's pickup requests with full details (for mobile view)
+router.get(
+  "/pickup-requests/check-user/:userId",
+  authenticateToken,
+  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      console.log(`🔍 Getting pickup requests for user ID: ${userId}`);
+
+      const userIdNum = parseInt(userId, 10);
+
+      // Get user's pickup requests with full details (same as /all endpoint)
+      console.log(`🔎 Executing SQL query for user_id = ${userIdNum}`);
+
+      const [requests] = await pool.execute(
+        `SELECT 
+         pr.id,
+         pr.user_id,
+         pr.area_id,
+         pr.pickup_location,
+         pr.status,
+         pr.contact_number,
+         pr.special_instructions,
+         pr.days,
+         pr.prayers,
+         pr.created_at,
+         pr.updated_at,
+         pr.assigned_driver_id,
+         pr.assigned_driver_name,
+         pr.approved_at,
+         pr.rejected_at,
+         a.area_name,
+         u.username as member_username,
+         u.phone as member_phone,
+         u.full_name as member_name,
+         u.email as member_email,
+         du.username as driver_username,
+         du.phone as driver_phone,
+         du.full_name as driver_name
+         FROM pickup_requests pr
+         LEFT JOIN areas a ON pr.area_id = a.area_id
+         LEFT JOIN users u ON pr.user_id = u.id
+         LEFT JOIN users du ON pr.assigned_driver_id = du.id
+         WHERE pr.user_id = ? OR pr.assigned_driver_id = ?
+         ORDER BY pr.created_at DESC`,
+        [userIdNum, userIdNum]
+      );
+
+      console.log(`📊 Raw query returned ${requests.length} rows`);
+
+      // Calculate active requests count
+      const activeRequests = requests.filter(
+        (req) => req.status === "pending" || req.status === "approved"
+      );
+
+      // Determine user's role based on requests
+      let userRole = null;
+      const hasMemberRequests = requests.some(
+        (req) => req.user_id === userIdNum
+      );
+      const hasDriverRequests = requests.some(
+        (req) => req.assigned_driver_id === userIdNum
+      );
+
+      if (hasMemberRequests && hasDriverRequests) {
+        userRole = "both";
+      } else if (hasDriverRequests) {
+        userRole = "driver";
+      } else if (hasMemberRequests) {
+        userRole = "member";
+      }
+
+      // Add role indicator for each request
+      const requestsWithRole = requests.map((request) => {
+        let requestUserRole = null;
+
+        // Only set role if status is approved
+        if (request.status === "approved") {
+          if (request.user_id === userIdNum) {
+            requestUserRole = "member";
+          } else if (request.assigned_driver_id === userIdNum) {
+            requestUserRole = "driver";
+          }
+        }
+
+        return {
+          ...request,
+          user_role: requestUserRole,
+        };
+      });
+
+      const response = {
+        success: true,
+        user_role: userRole,
+        userId: userIdNum,
+        pickupRequests: requestsWithRole,
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error("❌ Error checking user pickup requests:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to check user pickup requests",
         error: error.message,
       });
     }

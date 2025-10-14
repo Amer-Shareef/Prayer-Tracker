@@ -105,7 +105,7 @@ const weeklyMeetingsService = {
     }
   },
 
-  // Get recurring meetings for a specific parent meeting (past dates only)
+  // Get all meetings in a series for a specific parent meeting (past and future)
   getRecurringMeetings: async (parentId) => {
     console.log(
       "Frontend: getRecurringMeetings called with parentId:",

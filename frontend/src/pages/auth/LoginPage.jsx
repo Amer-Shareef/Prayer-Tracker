@@ -18,6 +18,7 @@ const LoginPage = () => {
   const [resendLoading, setResendLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [testOtp, setTestOtp] = useState(""); // For development testing
+  const [showPassword, setShowPassword] = useState(false);
 
   // Redirect if user is already logged in
   useEffect(() => {
@@ -27,15 +28,15 @@ const LoginPage = () => {
       if (role === "Member" || role === "WCM") {
         navigate("/member/dashboard", { replace: true });
       } else if (role === "Founder" || role === "SuperAdmin") {
-        navigate("/founder/dashboard", { replace: true });
+        navigate("/founder/view-attendance", { replace: true });
       } else {
         navigate("/member/dashboard", { replace: true });
       }
     }
   }, [user, authLoading, navigate]);
 
-  // Show loading state while checking authentication
-  if (authLoading) {
+  // Show loading state while checking authentication or redirecting authenticated user
+  if (authLoading || user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
@@ -113,7 +114,7 @@ const LoginPage = () => {
             // WCM users get Member UI in web app
             navigate("/member/dashboard");
           } else if (role === "Founder" || role === "SuperAdmin") {
-              navigate("/founder/view-attendance");
+            navigate("/founder/view-attendance");
           } else {
             navigate("/member/dashboard");
           }
@@ -181,6 +182,7 @@ const LoginPage = () => {
     setShowOtpInput(false);
     setMaskedEmail("");
     setTestOtp("");
+    setShowPassword(false);
     setFormData({
       username: "",
       password: "",
@@ -199,10 +201,10 @@ const LoginPage = () => {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl w-full grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Login Form */}
-        <div className="bg-white p-8 rounded-lg shadow-md">
+        <div className="bg-white p-8 rounded-lg shadow-xl shadow-gray-900/10">
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900">
-              {showOtpInput ? "Email Verification" : "Prayer Tracker Login"}
+              {showOtpInput ? "Email Verification" : "Login"}
             </h2>
             <p className="text-gray-600 mt-2">
               {showOtpInput
@@ -240,16 +242,59 @@ const LoginPage = () => {
                   >
                     Password
                   </label>
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    required
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                    placeholder="Enter your password"
-                  />
+                  <div className="relative mt-1">
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      className="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                      placeholder="Enter your password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                    >
+                      {showPassword ? (
+                        <svg
+                          className="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
+                          />
+                        </svg>
+                      ) : (
+                        <svg
+                          className="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </>
             ) : (

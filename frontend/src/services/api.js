@@ -603,19 +603,19 @@ export const pickupService = {
   // Approve pickup request with driver assignment
   approvePickupRequest: async (
     requestId,
-    assignedDriverId,
-    assignedDriverName
+    assigned_driver_id,
+    assigned_driver_name
   ) => {
     try {
       console.log(
         "🟢 Approving pickup request:",
         requestId,
         "with driver:",
-        assignedDriverName
+        assigned_driver_name
       );
       const response = await api.put(`/pickup-requests/${requestId}/approve`, {
-        assignedDriverId,
-        assignedDriverName,
+        assigned_driver_id,
+        assigned_driver_name,
       });
       console.log("✅ Pickup request approved:", response.data);
       return response;
@@ -995,6 +995,65 @@ export const feedsService = {
       return response;
     } catch (error) {
       console.error("❌ Failed to delete feed:", error);
+      throw error;
+    }
+  },
+};
+
+// Attendance Statistics service - NEW
+export const attendanceService = {
+  // Get overview statistics
+  getOverview: async (role) => {
+    try {
+      console.log("📊 Getting attendance overview for role:", role);
+      const response = await api.get("/attendance/overview", {
+        params: { role },
+      });
+      console.log("✅ Overview fetched:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Failed to fetch overview:", error);
+      throw error;
+    }
+  },
+
+  // Get prayer breakdown statistics
+  getPrayerBreakdown: async (role) => {
+    try {
+      console.log("📊 Getting prayer breakdown for role:", role);
+      const response = await api.get("/attendance/prayer-breakdown", {
+        params: { role },
+      });
+      console.log("✅ Prayer breakdown fetched:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Failed to fetch prayer breakdown:", error);
+      throw error;
+    }
+  },
+
+  // Get areas performance (SuperAdmin only)
+  getAreasPerformance: async () => {
+    try {
+      console.log("📊 Getting areas performance");
+      const response = await api.get("/attendance/areas");
+      console.log("✅ Areas performance fetched:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Failed to fetch areas performance:", error);
+      throw error;
+    }
+  },
+
+  // Get members attendance list
+  getMembersAttendance: async (params = {}) => {
+    try {
+      console.log("📊 Getting members attendance with params:", params);
+      const response = await api.get("/attendance/members", { params });
+      console.log("✅ Members attendance fetched:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Failed to fetch members attendance:", error);
       throw error;
     }
   },

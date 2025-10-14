@@ -8,7 +8,7 @@ const router = express.Router();
 // Helper functions
 function isAuthorized(
   user,
-  requiredRoles = ["Founder", "Admin", "SuperAdmin"]
+  requiredRoles = ["Founder", "WCM", "Admin", "SuperAdmin"]
 ) {
   return requiredRoles.includes(user.role);
 }
@@ -204,6 +204,21 @@ router.post(
 
       const { meeting_date, meeting_time, location, agenda, area_id } =
         req.body;
+
+      // Validate required fields
+      if (!meeting_date) {
+        throw new Error("Meeting date is required");
+      }
+      if (!meeting_time) {
+        throw new Error("Meeting time is required");
+      }
+      if (!location || location.trim() === "") {
+        throw new Error("Location is required");
+      }
+      if (!area_id && !user.area_id) {
+        throw new Error("Area ID is required");
+      }
+
       const formattedMeetingTime = formatTimeToHHMM(meeting_time);
       const { user } = req;
 
@@ -244,7 +259,7 @@ router.post(
           meetingAreaId,
           meetingDateStr,
           formattedMeetingTime,
-          location || "Community Center",
+          location,
           agenda || "Weekly Committee Meeting",
           user.id,
         ]
@@ -265,7 +280,7 @@ router.post(
           created_by: user.id,
           parent_id: null,
         },
-        2
+        6
       );
 
       await connection.commit();
@@ -280,6 +295,10 @@ router.post(
         [parentMeetingId]
       );
 
+      console.log(
+        `✅ Successfully created weekly meeting series with ID: ${parentMeetingId}`
+      );
+
       res.status(201).json({
         success: true,
         message: "Weekly meeting series created successfully",
@@ -288,11 +307,25 @@ router.post(
       });
     } catch (error) {
       await connection.rollback();
-      console.error("Error creating meeting:", error);
+      console.error("❌ Error creating meeting:", error);
 
-      res.status(500).json({
+      // Provide user-friendly error messages
+      let errorMessage = "Failed to create meeting";
+      if (error.message.includes("Area ID")) {
+        errorMessage = error.message;
+      } else if (error.message.includes("Location")) {
+        errorMessage = error.message;
+      } else if (error.message.includes("already exists")) {
+        errorMessage = error.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      res.status(400).json({
         success: false,
-        message: error.message || "Failed to create meeting",
+        message: errorMessage,
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
       });
     } finally {
       connection.release();
@@ -1182,7 +1215,7 @@ router.get(
         });
       }
 
-      // Get the parent meeting details
+      // Get the parent meeting details first
       const [parentMeetingDetails] = await pool.execute(
         `SELECT
           wm.*,
@@ -1221,18 +1254,21 @@ router.get(
          LEFT JOIN weekly_meeting_attendance wma ON wm.id = wma.weekly_meeting_id
          WHERE wm.parent_id = ?
          GROUP BY wm.id
-         ORDER BY wm.meeting_date DESC`,
+         ORDER BY wm.meeting_date ASC`,
         [parentId]
       );
 
-      // Return only recurring meetings (latest dates first), no parent meeting
-      const allMeetings = [...recurringMeetings];
+      // Combine parent and recurring meetings in chronological order
+      const allMeetings = [parentMeetingDetails[0], ...recurringMeetings].sort(
+        (a, b) => new Date(a.meeting_date) - new Date(b.meeting_date)
+      );
 
-      console.log("Found meetings:", {
+      console.log("Found meetings in series:", {
         parent_id: parentId,
+        parent_meeting: parentMeetingDetails.length > 0 ? 1 : 0,
         recurring: recurringMeetings.length,
         total: allMeetings.length,
-        order: "latest_first",
+        order: "chronological (oldest first)",
       });
 
       res.json({

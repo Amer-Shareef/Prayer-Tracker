@@ -4,6 +4,24 @@ const { uploadRouter } = require("./middleware/uploadthing");
 const dotenv = require("dotenv");
 dotenv.config();
 
+// Disable console logs in production
+if (process.env.NODE_ENV === "production") {
+  const noop = function () {};
+  const methods = ["log", "debug", "info", "warn"];
+
+  // Save original console.error for critical errors
+  const originalError = console.error;
+
+  methods.forEach((method) => {
+    console[method] = noop;
+  });
+
+  // Keep console.error functional for critical errors
+  console.error = originalError;
+
+  // Optional: Log that console is disabled (using error which is still active)
+  console.error("ℹ️  Console logs disabled in production mode");
+}
 const express = require("express");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
@@ -13,19 +31,27 @@ const app = express();
 
 // Simple CORS configuration - Production default, comment for localhost
 const getAllowedOrigins = () => {
-  const origins = process.env.CORS_ORIGINS
+  const envOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(",")
         .map((o) => o.trim())
         .filter(Boolean)
-    : [
-        "http://13.60.193.171:3000",
-        "http://13.60.193.171:5000",
-        "http://localhost:3000", // Add localhost for development
-        "http://localhost:5000",
-      ];
+    : [];
 
-  console.log("🌐 Allowed CORS origins:", origins);
-  return origins;
+  // Always include localhost origins for development
+  const localhostOrigins = [
+    "http://localhost:3000",
+    "http://localhost:5000",
+    "http://192.168.1.36:3000",
+    "http://192.168.1.36:5000",
+  ];
+
+  const allOrigins = [...envOrigins, ...localhostOrigins];
+
+  // Remove duplicates
+  const uniqueOrigins = [...new Set(allOrigins)];
+
+  console.log("🌐 Allowed CORS origins:", uniqueOrigins);
+  return uniqueOrigins;
 };
 
 const corsOptions = {

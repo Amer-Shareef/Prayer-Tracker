@@ -1,14 +1,25 @@
-import axiosInstance from '../utils/axiosInstance';
+import axiosInstance from "../utils/axiosInstance";
 
 export const areaService = {
   // Areas CRUD
   getAllAreas: async () => {
-    const response = await axiosInstance.get('/areas');
+    const response = await axiosInstance.get("/areas");
+    return response.data;
+  },
+
+  // Alias for getAllAreas to maintain compatibility
+  getAreas: async () => {
+    const response = await axiosInstance.get("/areas");
+    return response.data;
+  },
+
+  getAreaById: async (areaId) => {
+    const response = await axiosInstance.get(`/areas/${areaId}`);
     return response.data;
   },
 
   createArea: async (areaData) => {
-    const response = await axiosInstance.post('/areas', areaData);
+    const response = await axiosInstance.post("/areas", areaData);
     return response.data;
   },
 
@@ -22,36 +33,53 @@ export const areaService = {
     return response.data;
   },
 
+  // Area Statistics
+  getAreaStats: async (areaId, period = 31) => {
+    const response = await axiosInstance.get(
+      `/areas/${areaId}/stats?period=${period}`
+    );
+    return response.data;
+  },
+
+  getGlobalStats: async (period = 31) => {
+    const response = await axiosInstance.get(
+      `/areas/global/stats?period=${period}`
+    );
+    return response.data;
+  },
+
   // Sub-areas CRUD
   getSubAreas: async (areaId) => {
-    const response = await axiosInstance.get(`/areas/subareas?area_id=${areaId}`);
+    const response = await axiosInstance.get(
+      `/areas/subareas?area_id=${areaId}`
+    );
     return response.data;
   },
 
   createSubArea: async (areaId, address) => {
-    const response = await axiosInstance.post('/areas/subareas', {
+    const response = await axiosInstance.post("/areas/subareas", {
       area_id: areaId,
-      address: address
+      address: address,
     });
     return response.data;
   },
 
   updateSubArea: async (areaId, subAreaId, address) => {
-    const response = await axiosInstance.put('/areas/subareas', {
+    const response = await axiosInstance.put("/areas/subareas", {
       area_id: areaId,
       subarea_id: subAreaId,
-      address: address
+      address: address,
     });
     return response.data;
   },
 
   deleteSubArea: async (areaId, subAreaId) => {
-    const response = await axiosInstance.delete('/areas/subareas', {
+    const response = await axiosInstance.delete("/areas/subareas", {
       data: {
         area_id: areaId,
-        subarea_id: subAreaId
-      }
+        subarea_id: subAreaId,
+      },
     });
     return response.data;
-  }
+  },
 };

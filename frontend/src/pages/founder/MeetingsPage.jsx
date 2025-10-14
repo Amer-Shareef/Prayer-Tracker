@@ -1,45 +1,36 @@
+// filepath: src/pages/founder/MeetingsPage.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import FounderLayout from "../../components/layouts/FounderLayout";
 import { meetingsService, memberAPI, areaService } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import WeeklyMeetings from "../../components/WeeklyMeetings";
+import userService from "../../services/userService";
 
 const MeetingsPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // State management
   const [members, setMembers] = useState([]);
+  const [areas, setAreas] = useState([]);
+  const [selectedAreaForMembers, setSelectedAreaForMembers] = useState("");
+  const [userAreaName, setUserAreaName] = useState("");
   const [meetings, setMeetings] = useState([]);
   const [availableMentors, setAvailableMentors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Tab management - simplified
   const [activeTab, setActiveTab] = useState("weekly");
-  const [personalSubTab, setPersonalSubTab] = useState("scheduled");
+  const [personalView, setPersonalView] = useState("upcoming");
 
-  // Search and filter functionality
-  const [memberSearchTerm, setMemberSearchTerm] = useState("");
-  const [meetingSearchTerm, setMeetingSearchTerm] = useState("");
-  const [memberAreaFilter, setMemberAreaFilter] = useState("all");
-  const [meetingStatusFilter, setMeetingStatusFilter] = useState("all");
-
-  // Areas for filtering
-  const [areas, setAreas] = useState([]);
-
-  // Filter for members tab
-  const [memberFilter, setMemberFilter] = useState("all");
-
-  // Modals
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [weeklySearchTerm, setWeeklySearchTerm] = useState("");
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
-  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
-  const [selectedMember, setSelectedMember] = useState(null);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
 
-  const [scheduleForm, setScheduleForm] = useState({
+  const [createForm, setCreateForm] = useState({
+    memberId: "",
     date: "",
     time: "",
     mentorId: "",
@@ -49,93 +40,85 @@ const MeetingsPage = () => {
     notes: "",
   });
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [meetingToDelete, setMeetingToDelete] = useState(null);
+  const [openMenuId, setOpenMenuId] = useState(null);
+
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [meetingToReschedule, setMeetingToReschedule] = useState(null);
+
   const [rescheduleForm, setRescheduleForm] = useState({
     date: "",
     time: "",
+    mentorId: "",
   });
 
-  // Add date and area state
-  const [currentDate, setCurrentDate] = useState({
-    gregorian: "Loading...",
-    hijri: "Loading...",
-  });
-  const [areaName, setAreaName] = useState("Loading...");
-
-  // Fetch current date
-  useEffect(() => {
-    const today = new Date();
-
-    const gregorianDate = today.toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-
-    let hijriDate;
+  // Helper function to format time to 12-hour AM/PM format
+  const formatTime = (timeString) => {
+    if (!timeString) return "No time";
     try {
-      hijriDate = new Intl.DateTimeFormat("en-TN-u-ca-islamic", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      }).format(today);
+      const [hours, minutes] = timeString.split(":");
+      const date = new Date();
+      date.setHours(parseInt(hours), parseInt(minutes));
+      return date.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
     } catch (error) {
-      hijriDate = "Hijri date not supported";
-    }
-
-    setCurrentDate({
-      gregorian: gregorianDate,
-      hijri: hijriDate,
-    });
-  }, []);
-
-  // Fetch user area name
-  useEffect(() => {
-    const fetchUserArea = async () => {
-      if (user?.areaId || user?.area_id) {
-        try {
-          const response = await areaService.getAreaStats(
-            user.areaId || user.area_id
-          );
-          if (response.data.success) {
-            setAreaName(response.data.data.area.name || "Area");
-          }
-        } catch (error) {
-          console.error("Error fetching area:", error);
-          setAreaName("Area");
-        }
-      }
-    };
-
-    if (user) {
-      fetchUserArea();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    fetchData();
-    fetchAreas();
-  }, []);
-
-  const fetchAvailableMentors = async () => {
-    try {
-      // Fetch founders from the same mosque as the current user
-      const response = await memberAPI.getFounders();
-      if (response && response.success) {
-        return { success: true, data: response.data };
-      }
-      return { success: false, data: [] };
-    } catch (error) {
-      console.error("Error fetching mentors:", error);
-      return { success: false, data: [] };
+      return timeString;
     }
   };
 
+  useEffect(() => {
+    fetchData();
+    if (user?.role === "SuperAdmin") {
+      fetchAreas();
+    } else {
+      // Fetch user profile to get area name for Founder/WCM
+      fetchUserAreaName();
+    }
+  }, [user?.role]);
+
+  // Fetch user's area name for Founder/WCM
+  const fetchUserAreaName = async () => {
+    try {
+      const response = await userService.getProfile();
+      if (response.success && response.data) {
+        // Use area_name directly from profile since it's already joined
+        if (response.data.area_name) {
+          setUserAreaName(response.data.area_name);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user area name:", error);
+    }
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openMenuId && !event.target.closest(".dropdown-menu")) {
+        setOpenMenuId(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openMenuId]);
+
+  // Refetch members when area selection changes (SuperAdmin only)
+  useEffect(() => {
+    if (user?.role === "SuperAdmin" && areas.length > 0) {
+      fetchData();
+    }
+  }, [selectedAreaForMembers]);
+
   const fetchAreas = async () => {
     try {
-      const response = await areaService.getAreas();
-      if (response.data && response.data.success) {
-        setAreas(response.data.data || []);
+      const response = await areaService.getAllAreas();
+      if (response?.success) {
+        setAreas(response.data || []);
       }
     } catch (error) {
       console.error("Error fetching areas:", error);
@@ -147,9 +130,30 @@ const MeetingsPage = () => {
       setLoading(true);
       setError("");
 
+      // Determine which member API to use based on role and selection
+      let membersPromise;
+      if (user?.role === "SuperAdmin") {
+        if (selectedAreaForMembers === "all" || !selectedAreaForMembers) {
+          // Fetch all members across all areas
+          membersPromise = memberAPI
+            .getAllMembers()
+            .catch(() => ({ success: false, data: [] }));
+        } else {
+          // Fetch members from specific area
+          membersPromise = memberAPI
+            .getMembers({ area_id: selectedAreaForMembers })
+            .catch(() => ({ success: false, data: [] }));
+        }
+      } else {
+        // Founder/WCM: fetch only their area members
+        membersPromise = memberAPI
+          .getMembers()
+          .catch(() => ({ success: false, data: [] }));
+      }
+
       const [membersResponse, meetingsResponse, mentorsResponse] =
         await Promise.all([
-          memberAPI.getMembers().catch(() => ({ success: false, data: [] })),
+          membersPromise,
           meetingsService
             .getCounsellingSessions()
             .catch(() => ({ data: { success: false, data: [] } })),
@@ -157,7 +161,6 @@ const MeetingsPage = () => {
         ]);
 
       if (membersResponse && membersResponse.success) {
-        // Filter to show only active members with Member role
         const activeMembers = (membersResponse.data || []).filter(
           (member) => member.status === "active" && member.role === "Member"
         );
@@ -179,119 +182,73 @@ const MeetingsPage = () => {
     }
   };
 
-  const handleScheduleMeeting = (member) => {
-    setSelectedMember(member);
-    setScheduleForm({ date: "", time: "", mentorId: "" });
-    setShowScheduleModal(true);
-  };
-
-  const handleCompleteMeeting = (meeting) => {
-    setSelectedMeeting(meeting);
-    setCompleteForm({ notes: "" });
-    setShowCompleteModal(true);
-  };
-
-  const handleRescheduleMeeting = (meeting) => {
-    setSelectedMeeting(meeting);
-    setRescheduleForm({
-      date: meeting.scheduled_date ? meeting.scheduled_date.split("T")[0] : "",
-      time: meeting.scheduled_time || "",
-    });
-    setShowRescheduleModal(true);
-  };
-
-  const handleDeleteMeeting = async (meeting) => {
-    if (!window.confirm("Are you sure you want to delete this meeting?")) {
-      return;
-    }
-
+  const fetchAvailableMentors = async () => {
     try {
-      console.log("🗑️ Attempting to delete meeting:", meeting.id);
-
-      const response = await meetingsService.deleteCounsellingSession(
-        meeting.id
-      );
-
-      console.log("📥 Delete response:", response);
-
-      // Check response.data.success instead of response.success
-      if (response.data && response.data.success) {
-        alert("Meeting deleted successfully!");
-        await fetchData(); // Refresh data
-      } else {
-        console.error("❌ Delete failed:", response);
-        alert(
-          "Failed to delete meeting: " +
-            (response.data?.message || "Unknown error")
-        );
+      const response = await memberAPI.getFounders();
+      if (response && response.success) {
+        return { success: true, data: response.data };
       }
-    } catch (err) {
-      console.error("❌ Error deleting meeting:", err);
-
-      // If it's a 404 error, it means the meeting was already deleted
-      if (err.response?.status === 404) {
-        alert("Meeting deleted successfully!");
-        await fetchData(); // Refresh data
-        return;
-      }
-
-      const errorMessage =
-        err.response?.data?.message || err.message || "Unknown error occurred";
-      alert("Failed to delete meeting: " + errorMessage);
+      return { success: false, data: [] };
+    } catch (error) {
+      console.error("Error fetching mentors:", error);
+      return { success: false, data: [] };
     }
   };
 
-  const submitSchedule = async () => {
-    if (!scheduleForm.date || !scheduleForm.time) {
-      alert("Please select date and time");
-      return;
-    }
+  const handleCreateSession = () => {
+    setCreateForm({
+      memberId: "",
+      date: "",
+      time: "",
+      mentorId: "",
+    });
+    setShowCreateModal(true);
+  };
 
-    if (!scheduleForm.mentorId) {
-      alert("Please select a mentor");
+  const submitCreateSession = async () => {
+    if (
+      !createForm.memberId ||
+      !createForm.date ||
+      !createForm.time ||
+      !createForm.mentorId
+    ) {
+      alert("Please fill all fields");
       return;
     }
 
     try {
       const sessionData = {
-        memberId: selectedMember.id,
-        counsellorId: parseInt(scheduleForm.mentorId), // Ensure it's a number
-        scheduledDate: scheduleForm.date,
-        scheduledTime: scheduleForm.time,
+        memberId: parseInt(createForm.memberId),
+        counsellorId: parseInt(createForm.mentorId),
+        scheduledDate: createForm.date,
+        scheduledTime: createForm.time,
       };
-
-      console.log("📤 Sending session data:", sessionData);
 
       const response = await meetingsService.scheduleCounsellingSession(
         sessionData
       );
 
-      console.log("📥 Response:", response);
-
       if (response.data && response.data.success) {
-        alert("Meeting scheduled successfully!");
-        setShowScheduleModal(false);
-        setSelectedMember(null);
-        await fetchData(); // Refresh data
+        alert("Session scheduled successfully!");
+        setShowCreateModal(false);
+        await fetchData();
       } else {
-        console.error("❌ Failed response:", response);
-        alert(
-          `Failed to schedule meeting: ${
-            response.data?.message || "Unknown error"
-          }`
-        );
+        alert(`Failed: ${response.data?.message || "Unknown error"}`);
       }
     } catch (err) {
-      console.error("❌ Error scheduling:", err);
-      const errorMessage =
-        err.response?.data?.message || err.message || "Unknown error occurred";
-      alert(`Failed to schedule meeting: ${errorMessage}`);
+      alert(`Failed: ${err.response?.data?.message || err.message}`);
     }
   };
 
-  const submitComplete = async () => {
+  const handleCompleteSession = (meeting) => {
+    setSelectedMeeting(meeting);
+    setCompleteForm({ notes: meeting.session_notes || "" });
+    setShowCompleteModal(true);
+  };
+
+  const submitCompleteSession = async () => {
     if (!completeForm.notes.trim()) {
-      alert("Please add notes");
+      alert("Please add session notes");
       return;
     }
 
@@ -307,158 +264,95 @@ const MeetingsPage = () => {
       );
 
       if (response.data && response.data.success) {
-        alert("Meeting completed!");
+        alert("Session completed!");
         setShowCompleteModal(false);
-        setSelectedMeeting(null);
-        await fetchData(); // Refresh data
+        await fetchData();
       } else {
-        alert("Failed to complete meeting");
+        alert("Failed to complete session");
       }
     } catch (err) {
-      console.error("Error completing:", err);
-      alert("Failed to complete meeting");
+      alert("Failed to complete session");
     }
   };
 
-  const submitReschedule = async () => {
+  const handleDeleteSession = (meeting) => {
+    setMeetingToDelete(meeting);
+    setShowDeleteModal(true);
+  };
+
+  const handleRescheduleSession = (meeting) => {
+    setMeetingToReschedule(meeting);
+    setRescheduleForm({
+      date: meeting.scheduled_date,
+      time: meeting.scheduled_time,
+      mentorId: meeting.counsellor_id ? meeting.counsellor_id.toString() : "",
+    });
+    setShowRescheduleModal(true);
+  };
+
+  const submitRescheduleSession = async () => {
     if (!rescheduleForm.date || !rescheduleForm.time) {
-      alert("Please select new date and time");
+      alert("Please fill date and time");
       return;
     }
 
     try {
       const updateData = {
-        status: "rescheduled",
         scheduledDate: rescheduleForm.date,
         scheduledTime: rescheduleForm.time,
+        status: "rescheduled", // Update status to rescheduled
       };
 
-      console.log("📤 Sending reschedule data:", updateData);
+      // If counsellor changed, include it in the update
+      if (
+        rescheduleForm.mentorId &&
+        rescheduleForm.mentorId !==
+          meetingToReschedule.counsellor_id?.toString()
+      ) {
+        updateData.counsellorId = parseInt(rescheduleForm.mentorId);
+      }
 
       const response = await meetingsService.updateCounsellingSession(
-        selectedMeeting.id,
+        meetingToReschedule.id,
         updateData
       );
 
       if (response.data && response.data.success) {
-        alert("Meeting rescheduled successfully!");
+        alert("Session rescheduled successfully!");
         setShowRescheduleModal(false);
-        setSelectedMeeting(null);
-        await fetchData(); // Refresh data
+        await fetchData();
       } else {
-        console.error("❌ Failed response:", response);
-        alert(
-          `Failed to reschedule meeting: ${
-            response.data?.message || "Unknown error"
-          }`
-        );
+        alert(`Failed: ${response.data?.message || "Unknown error"}`);
       }
     } catch (err) {
-      console.error("❌ Error rescheduling:", err);
-      const errorMessage =
-        err.response?.data?.message || err.message || "Unknown error occurred";
-      alert(`Failed to reschedule meeting: ${errorMessage}`);
+      alert(`Failed: ${err.response?.data?.message || err.message}`);
     }
   };
 
-  // Helper function to calculate age from date of birth
-  const calculateAge = (dateOfBirth) => {
-    if (!dateOfBirth) return "-";
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (
-      monthDiff < 0 ||
-      (monthDiff === 0 && today.getDate() < birthDate.getDate())
-    ) {
-      age--;
-    }
-    return age;
-  };
-
-  // Helper function to format date
-  const formatDate = (dateString) => {
-    if (!dateString) return "-";
-    try {
-      return new Date(dateString).toLocaleDateString();
-    } catch {
-      return "-";
-    }
-  };
-
-  // Filter members based on search and filter criteria
-  const getFilteredMembers = () => {
-    let filtered = members;
-
-    // Filter by search term (name, email, phone)
-    if (memberSearchTerm) {
-      filtered = filtered.filter(
-        (member) =>
-          (member.full_name || "")
-            .toLowerCase()
-            .includes(memberSearchTerm.toLowerCase()) ||
-          (member.email || "")
-            .toLowerCase()
-            .includes(memberSearchTerm.toLowerCase()) ||
-          (member.phone || "")
-            .toLowerCase()
-            .includes(memberSearchTerm.toLowerCase())
-      );
-    }
-
-    // Filter by area (SuperAdmin only)
-    if (user?.role === "SuperAdmin" && memberAreaFilter !== "all") {
-      filtered = filtered.filter(
-        (member) => member.area_id === parseInt(memberAreaFilter)
-      );
-    }
-    return filtered;
-  };
-
-  // Filter meetings for different tabs with search functionality
-  const getScheduledMeetings = () => {
-    let filtered = meetings.filter(
-      (m) => m.status === "scheduled" || m.status === "rescheduled"
-    );
-
-    if (meetingSearchTerm) {
-      filtered = filtered.filter(
-        (meeting) =>
-          (meeting.member_name || meeting.member_full_name || "")
-            .toLowerCase()
-            .includes(meetingSearchTerm.toLowerCase()) ||
-          (meeting.counsellor_full_name || meeting.counsellor_name || "")
-            .toLowerCase()
-            .includes(meetingSearchTerm.toLowerCase())
-      );
-    }
-
-    if (meetingStatusFilter !== "all") {
-      filtered = filtered.filter(
-        (meeting) => meeting.status === meetingStatusFilter
-      );
-    }
-
-    return filtered;
+  const getUpcomingMeetings = () => {
+    return meetings
+      .filter((m) => m.status === "scheduled" || m.status === "rescheduled")
+      .filter((m) =>
+        searchTerm
+          ? (m.member_name || m.member_full_name || "")
+              .toLowerCase()
+              .includes(searchTerm.toLowerCase())
+          : true
+      )
+      .sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date));
   };
 
   const getCompletedMeetings = () => {
-    let filtered = meetings.filter((m) => m.status === "completed");
-
-    if (meetingSearchTerm) {
-      filtered = filtered.filter(
-        (meeting) =>
-          (meeting.member_name || meeting.member_full_name || "")
-            .toLowerCase()
-            .includes(meetingSearchTerm.toLowerCase()) ||
-          (meeting.counsellor_full_name || meeting.counsellor_name || "")
-            .toLowerCase()
-            .includes(meetingSearchTerm.toLowerCase())
-      );
-    }
-
-    return filtered;
+    return meetings
+      .filter((m) => m.status === "completed")
+      .filter((m) =>
+        searchTerm
+          ? (m.member_name || m.member_full_name || "")
+              .toLowerCase()
+              .includes(searchTerm.toLowerCase())
+          : true
+      )
+      .sort((a, b) => new Date(b.scheduled_date) - new Date(a.scheduled_date));
   };
 
   if (loading) {
@@ -466,7 +360,6 @@ const MeetingsPage = () => {
       <FounderLayout>
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
-          <div className="ml-4 text-lg">Loading...</div>
         </div>
       </FounderLayout>
     );
@@ -474,165 +367,210 @@ const MeetingsPage = () => {
 
   return (
     <FounderLayout>
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Meetings</h1>
+          <p className="text-sm text-gray-600">
+            Manage weekly committee meetings and personal counseling sessions
+          </p>
+        </div>
+
         {error && (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6">
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded">
             {error}
           </div>
         )}
 
-        {/* Main Tabs - Two Categories */}
-        <div className="mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveTab("weekly")}
-                className={`py-3 px-4 border-b-2 font-medium text-base ${
-                  activeTab === "weekly"
-                    ? "border-green-500 text-green-600 bg-green-50"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                <div className="flex items-center space-x-2">
-                  <span>📅</span>
-                  <span>Weekly Meetings</span>
-                </div>
-                <p className="text-xs mt-1 text-gray-500">
-                  Working committee sessions
-                </p>
-              </button>
+        {/* Main Tabs with integrated header */}
+        <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 mb-6">
+          <div className="p-6">
+            <div className="flex items-center justify-between">
+              {/* Tab Switcher on the left */}
+              <div className="bg-gray-100 rounded-lg p-1 inline-flex border-2 border-gray-200">
+                <button
+                  onClick={() => setActiveTab("weekly")}
+                  className={`px-6 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    activeTab === "weekly"
+                      ? "bg-green-600 text-white shadow-lg"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  }`}
+                >
+                  📅 Weekly Meetings
+                </button>
+                <button
+                  onClick={() => setActiveTab("personal")}
+                  className={`px-6 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    activeTab === "personal"
+                      ? "bg-green-600 text-white shadow-lg"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  }`}
+                >
+                  👥 Personal Sessions
+                </button>
+              </div>
 
-              <button
-                onClick={() => setActiveTab("personal")}
-                className={`py-3 px-4 border-b-2 font-medium text-base ${
-                  activeTab === "personal"
-                    ? "border-green-500 text-green-600 bg-green-50"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                <div className="flex items-center space-x-2">
-                  <span>👥</span>
-                  <span>Personal Meetings</span>
-                </div>
-                <p className="text-xs mt-1 text-gray-500">
-                  One-on-one member sessions
-                </p>
-              </button>
-            </nav>
+              {/* Search and Create Button on the right */}
+              <div className="flex items-center space-x-3">
+                {activeTab === "weekly" ? (
+                  <>
+                    {user?.role === "SuperAdmin" && areas.length > 0 && (
+                      <select
+                        value={selectedAreaForMembers}
+                        onChange={(e) =>
+                          setSelectedAreaForMembers(e.target.value)
+                        }
+                        className="px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      >
+                        <option value="">Select Area</option>
+                        <option value="all">All Areas</option>
+                        {areas.map((area) => (
+                          <option key={area.area_id} value={area.area_id}>
+                            {area.area_name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <input
+                      type="text"
+                      placeholder="Search meetings..."
+                      value={weeklySearchTerm}
+                      onChange={(e) => setWeeklySearchTerm(e.target.value)}
+                      className="px-4 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={() =>
+                        window.dispatchEvent(
+                          new Event("openWeeklyMeetingModal")
+                        )
+                      }
+                      className="flex items-center px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-all"
+                    >
+                      <svg
+                        className="w-5 h-5 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
+                      Create Meeting
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Search sessions..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="px-4 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+
+                    <button
+                      onClick={handleCreateSession}
+                      className="flex items-center px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-all"
+                    >
+                      <svg
+                        className="w-5 h-5 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
+                      Create Session
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Tab Content */}
-        <div className="bg-white rounded-lg shadow">
-          {/* Weekly Committee Meetings Tab */}
-          {activeTab === "weekly" && (
-            <div className="p-6">
-              <WeeklyMeetings />
-            </div>
-          )}
+        {activeTab === "weekly" ? (
+          <WeeklyMeetings
+            searchTermFromParent={weeklySearchTerm}
+            selectedAreaFromParent={selectedAreaForMembers}
+          />
+        ) : (
+          <div className="space-y-6">
+            {/* Personal Sessions Content */}
+            <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200">
+              <div className="p-6 border-b-2 border-gray-200">
+                {/* Area Filter & View Toggle */}
+                <div className="flex items-center justify-between">
+                  {/* Area Filter on the left - Always visible, locked for Founder/WCM */}
+                  <div>
+                    {user?.role === "SuperAdmin" ? (
+                      <select
+                        value={selectedAreaForMembers}
+                        onChange={(e) =>
+                          setSelectedAreaForMembers(e.target.value)
+                        }
+                        className="px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      >
+                        <option value="">Select Area</option>
+                        <option value="all">All Areas</option>
+                        {areas.map((area) => (
+                          <option key={area.area_id} value={area.area_id}>
+                            {area.area_name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="px-3 py-2 text-sm bg-gray-100 border-2 border-gray-300 rounded-lg text-gray-700 font-medium">
+                        📍 {userAreaName || "Loading..."}
+                      </div>
+                    )}
+                  </div>
 
-          {/* Personal Counseling Tab */}
-          {activeTab === "personal" && (
-            <div>
-              {/* Personal Counseling Sub-tabs */}
-              <div className="bg-gray-50 px-6 py-4 border-b">
-                <div className="flex space-x-6">
-                  <button
-                    onClick={() => setPersonalSubTab("scheduled")}
-                    className={`py-2 px-4 rounded-lg font-medium text-sm ${
-                      personalSubTab === "scheduled"
-                        ? "bg-green-100 text-green-700"
-                        : "text-gray-600 hover:text-gray-800"
-                    }`}
-                  >
-                    Scheduled ({getScheduledMeetings().length})
-                  </button>
-                  <button
-                    onClick={() => setPersonalSubTab("members")}
-                    className={`py-2 px-4 rounded-lg font-medium text-sm ${
-                      personalSubTab === "members"
-                        ? "bg-green-100 text-green-700"
-                        : "text-gray-600 hover:text-gray-800"
-                    }`}
-                  >
-                    Members ({getFilteredMembers().length})
-                  </button>
-                  <button
-                    onClick={() => setPersonalSubTab("completed")}
-                    className={`py-2 px-4 rounded-lg font-medium text-sm ${
-                      personalSubTab === "completed"
-                        ? "bg-green-100 text-green-700"
-                        : "text-gray-600 hover:text-gray-800"
-                    }`}
-                  >
-                    Completed ({getCompletedMeetings().length})
-                  </button>
+                  {/* View Toggle on the right */}
+                  <div className="flex space-x-2 bg-gray-100 rounded-lg p-1">
+                    <button
+                      onClick={() => setPersonalView("upcoming")}
+                      className={`px-4 py-2 rounded-md text-xs font-semibold transition-all ${
+                        personalView === "upcoming"
+                          ? "bg-white text-green-700 shadow"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      Upcoming ({getUpcomingMeetings().length})
+                    </button>
+                    <button
+                      onClick={() => setPersonalView("history")}
+                      className={`px-4 py-2 rounded-md text-xs font-semibold transition-all ${
+                        personalView === "history"
+                          ? "bg-white text-green-700 shadow"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      History ({getCompletedMeetings().length})
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Scheduled Meetings Sub-tab */}
-              {personalSubTab === "scheduled" && (
-                <div className="p-6">
-                  <div className="mb-6">
-                    <div className="flex justify-between items-center mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          Scheduled Sessions
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          Upcoming one-on-one counseling sessions
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Search and Filter Controls for Meetings */}
-                    <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                      <div className="flex-1">
-                        <div className="relative">
-                          <input
-                            type="text"
-                            placeholder="Search by member or counselor name..."
-                            value={meetingSearchTerm}
-                            onChange={(e) =>
-                              setMeetingSearchTerm(e.target.value)
-                            }
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                          />
-                          <svg
-                            className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                      <div className="sm:w-48">
-                        <select
-                          value={meetingStatusFilter}
-                          onChange={(e) =>
-                            setMeetingStatusFilter(e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        >
-                          <option value="all">All Status</option>
-                          <option value="scheduled">Scheduled</option>
-                          <option value="rescheduled">Rescheduled</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                  {getScheduledMeetings().length === 0 ? (
-                    <div className="text-center py-8">
-                      <div className="text-gray-400 mb-4">
+              {/* Content Area */}
+              <div className="p-6">
+                {/* Upcoming Sessions */}
+                {personalView === "upcoming" && (
+                  <div>
+                    {getUpcomingMeetings().length === 0 ? (
+                      <div className="text-center py-16">
                         <svg
-                          className="mx-auto h-12 w-12"
+                          className="mx-auto h-16 w-16 text-gray-400"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -640,196 +578,43 @@ const MeetingsPage = () => {
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            strokeWidth={1}
-                            d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0V6a2 2 0 012-2h4a2 2 0 012 2v1m-6 0h8l1 7H7l1-7z"
+                            strokeWidth={1.5}
+                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                           />
                         </svg>
-                      </div>
-                      <p className="text-gray-500">
-                        {meetingSearchTerm
-                          ? "No scheduled sessions found matching your search"
-                          : "No sessions scheduled"}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        Schedule meetings from the Members tab
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {getScheduledMeetings().map((meeting) => (
-                        <div
-                          key={meeting.id}
-                          className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-                        >
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-3 mb-2">
-                                <h4 className="font-medium text-gray-900">
-                                  {meeting.member_name ||
-                                    meeting.member_full_name ||
-                                    "Unknown Member"}
-                                </h4>
-                                <span
-                                  className={`px-2 py-1 text-xs rounded-full font-medium ${
-                                    meeting.status === "scheduled"
-                                      ? "bg-green-100 text-green-700"
-                                      : meeting.status === "rescheduled"
-                                      ? "bg-yellow-100 text-yellow-700"
-                                      : "bg-gray-100 text-gray-700"
-                                  }`}
-                                >
-                                  {meeting.status}
-                                </span>
-                              </div>
-                              <div className="space-y-1 text-sm text-gray-600">
-                                <p className="flex items-center">
-                                  <span className="w-4 h-4 mr-2">📅</span>
-                                  {new Date(
-                                    meeting.scheduled_date
-                                  ).toLocaleDateString("en-US", {
-                                    weekday: "long",
-                                    year: "numeric",
-                                    month: "long",
-                                    day: "numeric",
-                                  })}
-                                </p>
-                                <p className="flex items-center">
-                                  <span className="w-4 h-4 mr-2">🕐</span>
-                                  {meeting.scheduled_time}
-                                </p>
-                                <p className="flex items-center">
-                                  <span className="w-4 h-4 mr-2">👨‍🏫</span>
-                                  {meeting.counsellor_full_name ||
-                                    meeting.counsellor_name ||
-                                    "Not assigned"}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex flex-col space-y-2 ml-4">
-                              <button
-                                onClick={() => handleCompleteMeeting(meeting)}
-                                className="bg-green-600 text-white px-3 py-1.5 rounded text-sm hover:bg-green-700 transition-colors"
-                              >
-                                Complete
-                              </button>
-                              <button
-                                onClick={() => handleRescheduleMeeting(meeting)}
-                                className="bg-yellow-600 text-white px-3 py-1.5 rounded text-sm hover:bg-yellow-700 transition-colors"
-                              >
-                                Reschedule
-                              </button>
-                              <button
-                                onClick={() => handleDeleteMeeting(meeting)}
-                                className="bg-red-600 text-white px-3 py-1.5 rounded text-sm hover:bg-red-700 transition-colors"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-              {/* Members Sub-tab */}
-              {personalSubTab === "members" && (
-                <div className="p-6">
-                  <div className="mb-6">
-                    <div className="flex justify-between items-center mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          Member Directory
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          Schedule new counseling sessions
+                        <p className="mt-4 text-sm font-medium text-gray-900">
+                          No upcoming sessions
                         </p>
-                      </div>
-                    </div>
-
-                    {/* Search and Filter Controls */}
-                    <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                      <div className="flex-1">
-                        <div className="relative">
-                          <input
-                            type="text"
-                            placeholder="Search members by name, email, or phone..."
-                            value={memberSearchTerm}
-                            onChange={(e) =>
-                              setMemberSearchTerm(e.target.value)
-                            }
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                          />
-                          <svg
-                            className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
+                        <p className="mt-1 text-xs text-gray-500">
+                          {searchTerm
+                            ? "No sessions match your search"
+                            : "Schedule a new session to get started"}
+                        </p>
+                        {!searchTerm && (
+                          <button
+                            onClick={handleCreateSession}
+                            className="mt-4 px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                            />
-                          </svg>
-                        </div>
+                            Schedule Session
+                          </button>
+                        )}
                       </div>
-                      {user?.role === "SuperAdmin" && (
-                        <div className="sm:w-48">
-                          <select
-                            value={memberAreaFilter}
-                            onChange={(e) =>
-                              setMemberAreaFilter(e.target.value)
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                          >
-                            <option value="all">All Areas</option>
-                            {areas.map((area) => (
-                              <option key={area.area_id} value={area.area_id}>
-                                {area.area_name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {getFilteredMembers().length === 0 ? (
-                    <div className="text-center py-8">
-                      <div className="text-gray-400 mb-4">
-                        <svg
-                          className="mx-auto h-12 w-12"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={1}
-                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
-                          />
-                        </svg>
-                      </div>
-                      <p className="text-gray-500">
-                        {memberSearchTerm
-                          ? "No members found matching your search"
-                          : "No active members found"}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                      <div className="overflow-x-auto">
+                    ) : (
+                      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-visible">
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
                             <tr>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Member Info
+                                Member
                               </th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Contact
+                                Date & Time
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Area
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Working Committee
                               </th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Status
@@ -840,101 +625,171 @@ const MeetingsPage = () => {
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
-                            {getFilteredMembers().map((member) => (
-                              <tr key={member.id} className="hover:bg-gray-50">
+                            {getUpcomingMeetings().map((meeting) => (
+                              <tr key={meeting.id} className="hover:bg-gray-50">
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div>
                                     <div className="text-sm font-medium text-gray-900">
-                                      {member.username || "No Name"}
+                                      {meeting.member_name ||
+                                        meeting.member_full_name ||
+                                        "Unknown"}
                                     </div>
+                                    {meeting.member_phone && (
+                                      <div className="text-sm text-gray-500">
+                                        📞 {meeting.member_phone}
+                                      </div>
+                                    )}
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="text-sm text-gray-900">
-                                    {member.email || "-"}
+                                  <div className="text-sm text-gray-900 font-medium">
+                                    {formatTime(meeting.scheduled_time)}
                                   </div>
                                   <div className="text-sm text-gray-500">
-                                    {member.phone || "-"}
+                                    {new Date(
+                                      meeting.scheduled_date
+                                    ).toLocaleDateString("en-US", {
+                                      weekday: "short",
+                                      month: "short",
+                                      day: "numeric",
+                                    })}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900 font-medium">
+                                    {meeting.area_name || "Area TBD"}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900 font-medium">
+                                    👨‍🏫{" "}
+                                    {meeting.counsellor_full_name ||
+                                      meeting.counsellor_name ||
+                                      "TBD"}
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <span
-                                    className={`px-2 py-1 text-xs rounded-full font-medium ${
-                                      member.status === "active"
-                                        ? "bg-green-100 text-green-700"
-                                        : "bg-gray-100 text-gray-700"
+                                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                      meeting.status === "scheduled"
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-yellow-100 text-yellow-800"
                                     }`}
                                   >
-                                    {member.status}
+                                    {meeting.status}
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                  <button
-                                    onClick={() =>
-                                      handleScheduleMeeting(member)
-                                    }
-                                    className="bg-green-600 text-white px-3 py-1.5 rounded text-sm hover:bg-green-700 transition-colors"
-                                  >
-                                    Schedule Meeting
-                                  </button>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                  <div className="relative dropdown-menu">
+                                    <button
+                                      onClick={() =>
+                                        setOpenMenuId(
+                                          openMenuId === meeting.id
+                                            ? null
+                                            : meeting.id
+                                        )
+                                      }
+                                      className="text-gray-400 hover:text-gray-600 transition-colors p-1 cursor-pointer"
+                                    >
+                                      <svg
+                                        className="w-5 h-5"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                      >
+                                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                      </svg>
+                                    </button>
+
+                                    {openMenuId === meeting.id && (
+                                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200">
+                                        <div className="py-1">
+                                          <button
+                                            onClick={() => {
+                                              handleCompleteSession(meeting);
+                                              setOpenMenuId(null);
+                                            }}
+                                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                          >
+                                            <svg
+                                              className="w-4 h-4 mr-3 text-green-600"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M5 13l4 4L19 7"
+                                              />
+                                            </svg>
+                                            Complete Session
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              handleRescheduleSession(meeting);
+                                              setOpenMenuId(null);
+                                            }}
+                                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                          >
+                                            <svg
+                                              className="w-4 h-4 mr-3 text-blue-600"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                              />
+                                            </svg>
+                                            Reschedule
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              handleDeleteSession(meeting);
+                                              setOpenMenuId(null);
+                                            }}
+                                            className="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50"
+                                          >
+                                            <svg
+                                              className="w-4 h-4 mr-3 text-red-600"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                              />
+                                            </svg>
+                                            Cancel Session
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Completed Sessions Sub-tab */}
-              {personalSubTab === "completed" && (
-                <div className="p-6">
-                  <div className="mb-6">
-                    <div className="flex justify-between items-center mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          Completed Sessions
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          Previous counseling sessions and notes
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Search Control for Completed Meetings */}
-                    <div className="mb-6">
-                      <div className="relative max-w-md">
-                        <input
-                          type="text"
-                          placeholder="Search completed sessions..."
-                          value={meetingSearchTerm}
-                          onChange={(e) => setMeetingSearchTerm(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
-                        <svg
-                          className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                          />
-                        </svg>
-                      </div>
-                    </div>
+                    )}
                   </div>
+                )}
 
-                  {getCompletedMeetings().length === 0 ? (
-                    <div className="text-center py-8">
-                      <div className="text-gray-400 mb-4">
+                {/* History */}
+                {personalView === "history" && (
+                  <div>
+                    {getCompletedMeetings().length === 0 ? (
+                      <div className="text-center py-16">
                         <svg
-                          className="mx-auto h-12 w-12"
+                          className="mx-auto h-16 w-16 text-gray-400"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -942,161 +797,255 @@ const MeetingsPage = () => {
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            strokeWidth={1}
+                            strokeWidth={1.5}
                             d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                           />
                         </svg>
+                        <p className="mt-4 text-sm font-medium text-gray-900">
+                          No completed sessions
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          {searchTerm
+                            ? "No sessions match your search"
+                            : "Completed sessions will appear here"}
+                        </p>
                       </div>
-                      <p className="text-gray-500">
-                        {meetingSearchTerm
-                          ? "No completed sessions found matching your search"
-                          : "No completed sessions yet"}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {getCompletedMeetings().map((meeting) => (
-                        <div
-                          key={meeting.id}
-                          className="border border-gray-200 rounded-lg p-4 bg-gray-50"
-                        >
-                          <div className="flex justify-between items-start mb-3">
-                            <div className="flex-1">
-                              <h4 className="font-medium text-gray-900">
-                                {meeting.member_name ||
-                                  meeting.member_full_name ||
-                                  "Unknown Member"}
-                              </h4>
-                              <p className="text-sm text-gray-600">
-                                📅{" "}
-                                {new Date(
-                                  meeting.scheduled_date
-                                ).toLocaleDateString("en-US", {
-                                  weekday: "long",
-                                  year: "numeric",
-                                  month: "long",
-                                  day: "numeric",
-                                })}
-                              </p>
-                              <p className="text-sm text-gray-600">
-                                👨‍🏫{" "}
-                                {meeting.counsellor_full_name ||
-                                  meeting.counsellor_name ||
-                                  "Unknown Counselor"}
-                              </p>
-                            </div>
-                            <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
-                              Completed
-                            </span>
-                          </div>
-                          {meeting.session_notes && (
-                            <div className="mt-3 p-3 bg-white rounded border">
-                              <p className="text-sm text-gray-600 font-medium mb-1">
-                                Session Notes:
-                              </p>
-                              <p className="text-sm text-gray-700">
-                                {meeting.session_notes}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                    ) : (
+                      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-visible">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Member
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Date & Time
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Area
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Working Committee
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Notes
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {getCompletedMeetings().map((meeting) => (
+                              <tr key={meeting.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-900">
+                                      {meeting.member_name ||
+                                        meeting.member_full_name ||
+                                        "Unknown"}
+                                    </div>
+                                    {meeting.member_phone && (
+                                      <div className="text-sm text-gray-500">
+                                        📞 {meeting.member_phone}
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900 font-medium">
+                                    {formatTime(meeting.scheduled_time)}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {new Date(
+                                      meeting.scheduled_date
+                                    ).toLocaleDateString("en-US", {
+                                      weekday: "short",
+                                      month: "short",
+                                      day: "numeric",
+                                    })}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900 font-medium">
+                                    {meeting.area_name || "Area TBD"}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900 font-medium">
+                                    👨‍🏫{" "}
+                                    {meeting.counsellor_full_name ||
+                                      meeting.counsellor_name ||
+                                      "TBD"}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                    Completed
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  {meeting.session_notes ? (
+                                    <div className="text-sm text-gray-600 max-w-xs truncate">
+                                      {meeting.session_notes}
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-gray-400 italic">
+                                      No notes
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Schedule Modal */}
-        {showScheduleModal && (
+        {/* Create Session Modal */}
+        {showCreateModal && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-center justify-center min-h-screen px-4">
-              <div className="fixed inset-0 bg-gray-500 opacity-75"></div>
-              <div className="bg-white rounded-lg p-6 max-w-md w-full relative">
-                <h3 className="text-lg font-medium mb-4">
-                  Schedule Meeting -{" "}
-                  {selectedMember?.memberName || selectedMember?.username}
-                </h3>
+              <div
+                className="fixed inset-0 bg-gray-900 opacity-75"
+                onClick={() => setShowCreateModal(false)}
+              ></div>
+              <div className="bg-white rounded-xl p-6 max-w-lg w-full relative z-10 shadow-2xl">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Schedule New Session
+                  </h3>
+                  <button
+                    onClick={() => setShowCreateModal(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Date
-                    </label>
-                    <input
-                      type="date"
-                      value={scheduleForm.date}
-                      onChange={(e) =>
-                        setScheduleForm({
-                          ...scheduleForm,
-                          date: e.target.value,
-                        })
-                      }
-                      min={new Date().toISOString().split("T")[0]}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Time
-                    </label>
-                    <input
-                      type="time"
-                      value={scheduleForm.time}
-                      onChange={(e) =>
-                        setScheduleForm({
-                          ...scheduleForm,
-                          time: e.target.value,
-                        })
-                      }
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Assign Mentor
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Select Member
                     </label>
                     <select
-                      value={scheduleForm.mentorId}
+                      value={createForm.memberId}
                       onChange={(e) =>
-                        setScheduleForm({
-                          ...scheduleForm,
-                          mentorId: e.target.value,
+                        setCreateForm({
+                          ...createForm,
+                          memberId: e.target.value,
                         })
                       }
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                      className="w-full border-2 border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     >
-                      <option value="">Select a mentor from your mosque</option>
-                      {availableMentors.map((mentor) => (
-                        <option key={mentor.id} value={mentor.id}>
-                          {mentor.fullName || mentor.username} ({mentor.email})
+                      <option value="">Choose a member...</option>
+                      {members.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.full_name || member.username}
+                          {member.area && ` - ${member.area}`}
                         </option>
                       ))}
                     </select>
-                    {availableMentors.length === 0 && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        No mentors available from your mosque
+                    {user?.role === "SuperAdmin" && members.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {selectedAreaForMembers === "all" ||
+                        !selectedAreaForMembers
+                          ? "Showing members from all areas"
+                          : `Showing members from ${
+                              areas.find(
+                                (a) =>
+                                  a.area_id === parseInt(selectedAreaForMembers)
+                              )?.area_name || "selected area"
+                            }`}
                       </p>
                     )}
                   </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Date
+                      </label>
+                      <input
+                        type="date"
+                        value={createForm.date}
+                        onChange={(e) =>
+                          setCreateForm({ ...createForm, date: e.target.value })
+                        }
+                        min={new Date().toISOString().split("T")[0]}
+                        className="w-full border-2 border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Time
+                      </label>
+                      <input
+                        type="time"
+                        value={createForm.time}
+                        onChange={(e) =>
+                          setCreateForm({ ...createForm, time: e.target.value })
+                        }
+                        className="w-full border-2 border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Working Committee
+                    </label>
+                    <select
+                      value={createForm.mentorId}
+                      onChange={(e) =>
+                        setCreateForm({
+                          ...createForm,
+                          mentorId: e.target.value,
+                        })
+                      }
+                      className="w-full border-2 border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="">Select working committee...</option>
+                      {availableMentors.map((mentor) => (
+                        <option key={mentor.id} value={mentor.id}>
+                          {mentor.fullName || mentor.username}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                <div className="flex justify-end space-x-3 mt-6">
+                <div className="flex space-x-3 mt-6">
                   <button
-                    onClick={() => setShowScheduleModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                    onClick={() => setShowCreateModal(false)}
+                    className="flex-1 px-4 py-2.5 border-2 border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
-                    onClick={submitSchedule}
-                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                    onClick={submitCreateSession}
+                    className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors"
                   >
-                    Schedule Meeting
+                    Schedule Session
                   </button>
                 </div>
               </div>
@@ -1104,44 +1053,78 @@ const MeetingsPage = () => {
           </div>
         )}
 
-        {/* Complete Modal */}
+        {/* Complete Session Modal */}
         {showCompleteModal && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-center justify-center min-h-screen px-4">
-              <div className="fixed inset-0 bg-gray-500 opacity-75"></div>
-              <div className="bg-white rounded-lg p-6 max-w-md w-full relative">
-                <h3 className="text-lg font-medium mb-4">
-                  Complete Meeting -{" "}
-                  {selectedMeeting?.member_name ||
-                    selectedMeeting?.member_username ||
-                    "Unknown Member"}
-                </h3>
+              <div
+                className="fixed inset-0 bg-gray-900 opacity-75"
+                onClick={() => setShowCompleteModal(false)}
+              ></div>
+              <div className="bg-white rounded-xl p-6 max-w-md w-full relative z-10 shadow-2xl">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Complete Session
+                  </h3>
+                  <button
+                    onClick={() => setShowCompleteModal(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-sm font-semibold text-gray-900">
+                    {selectedMeeting?.member_name ||
+                      selectedMeeting?.member_full_name}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    {new Date(
+                      selectedMeeting?.scheduled_date
+                    ).toLocaleDateString()}
+                    {" at "}
+                    {selectedMeeting?.scheduled_time}
+                  </p>
+                </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Meeting Notes
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Session Notes <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     value={completeForm.notes}
                     onChange={(e) => setCompleteForm({ notes: e.target.value })}
-                    rows="4"
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    placeholder="What was discussed in the meeting?"
+                    rows="6"
+                    placeholder="What was discussed? Any action items or follow-ups needed?"
+                    className="w-full border-2 border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
                 </div>
 
-                <div className="flex justify-end space-x-3 mt-6">
+                <div className="flex space-x-3 mt-6">
                   <button
                     onClick={() => setShowCompleteModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                    className="flex-1 px-4 py-2.5 border-2 border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
-                    onClick={submitComplete}
-                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                    onClick={submitCompleteSession}
+                    className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors"
                   >
-                    Complete Meeting
+                    Mark Complete
                   </button>
                 </div>
               </div>
@@ -1149,84 +1132,251 @@ const MeetingsPage = () => {
           </div>
         )}
 
-        {/* Reschedule Modal */}
-        {showRescheduleModal && (
+        {/* Reschedule Session Modal */}
+        {showRescheduleModal && meetingToReschedule && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-center justify-center min-h-screen px-4">
-              <div className="fixed inset-0 bg-gray-500 opacity-75"></div>
-              <div className="bg-white rounded-lg p-6 max-w-md w-full relative">
-                <h3 className="text-lg font-medium mb-4">
-                  Reschedule Meeting -{" "}
-                  {selectedMeeting?.member_name ||
-                    selectedMeeting?.member_username ||
-                    "Unknown Member"}
-                </h3>
+              <div
+                className="fixed inset-0 bg-gray-900 opacity-75"
+                onClick={() => setShowRescheduleModal(false)}
+              ></div>
+              <div className="bg-white rounded-xl p-6 max-w-lg w-full relative z-10 shadow-2xl">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Reschedule Session
+                  </h3>
+                  <button
+                    onClick={() => setShowRescheduleModal(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-sm font-semibold text-gray-900">
+                    {meetingToReschedule.member_name ||
+                      meetingToReschedule.member_full_name}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    Current:{" "}
+                    {new Date(
+                      meetingToReschedule.scheduled_date
+                    ).toLocaleDateString()}
+                    {" at "}
+                    {meetingToReschedule.scheduled_time}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    Working Committee:{" "}
+                    {meetingToReschedule.counsellor_full_name ||
+                      meetingToReschedule.counsellor_name ||
+                      "TBD"}
+                  </p>
+                </div>
 
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Current Date & Time
-                    </label>
-                    <div className="mt-1 p-2 bg-gray-100 rounded-md text-sm text-gray-600">
-                      {selectedMeeting && (
-                        <>
-                          {new Date(
-                            selectedMeeting.scheduled_date
-                          ).toLocaleDateString()}{" "}
-                          at {selectedMeeting.scheduled_time}
-                        </>
-                      )}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        New Date <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={rescheduleForm.date}
+                        onChange={(e) =>
+                          setRescheduleForm({
+                            ...rescheduleForm,
+                            date: e.target.value,
+                          })
+                        }
+                        min={new Date().toISOString().split("T")[0]}
+                        className="w-full border-2 border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        New Time <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={rescheduleForm.time}
+                        onChange={(e) =>
+                          setRescheduleForm({
+                            ...rescheduleForm,
+                            time: e.target.value,
+                          })
+                        }
+                        className="w-full border-2 border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      New Date
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Working Committee (Optional)
                     </label>
-                    <input
-                      type="date"
-                      value={rescheduleForm.date}
+                    <select
+                      value={rescheduleForm.mentorId}
                       onChange={(e) =>
                         setRescheduleForm({
                           ...rescheduleForm,
-                          date: e.target.value,
+                          mentorId: e.target.value,
                         })
                       }
-                      min={new Date().toISOString().split("T")[0]}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      New Time
-                    </label>
-                    <input
-                      type="time"
-                      value={rescheduleForm.time}
-                      onChange={(e) =>
-                        setRescheduleForm({
-                          ...rescheduleForm,
-                          time: e.target.value,
-                        })
-                      }
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    />
+                      className="w-full border-2 border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Keep current counsellor</option>
+                      {availableMentors.map((mentor) => (
+                        <option key={mentor.id} value={mentor.id}>
+                          {mentor.fullName || mentor.username}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Leave empty to keep the current working committee
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex justify-end space-x-3 mt-6">
+                <div className="flex space-x-3 mt-6">
                   <button
                     onClick={() => setShowRescheduleModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                    className="flex-1 px-4 py-2.5 border-2 border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
-                    onClick={submitReschedule}
-                    className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700"
+                    onClick={submitRescheduleSession}
+                    className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
                   >
-                    Reschedule Meeting
+                    Reschedule Session
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Session Confirmation Modal */}
+        {showDeleteModal && meetingToDelete && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen px-4">
+              <div
+                className="fixed inset-0 bg-gray-900 opacity-75"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setMeetingToDelete(null);
+                }}
+              ></div>
+              <div className="bg-white rounded-xl p-6 max-w-md w-full relative z-10 shadow-2xl">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Delete Session
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowDeleteModal(false);
+                      setMeetingToDelete(null);
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="mb-6">
+                  <div className="p-4 bg-red-50 rounded-lg border border-red-200 mb-4">
+                    <div className="flex items-center">
+                      <svg
+                        className="w-5 h-5 text-red-600 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                        />
+                      </svg>
+                      <p className="text-sm font-semibold text-red-800">
+                        Are you sure you want to delete this session?
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-sm font-semibold text-gray-900">
+                      {meetingToDelete.member_name ||
+                        meetingToDelete.member_full_name}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      {new Date(
+                        meetingToDelete.scheduled_date
+                      ).toLocaleDateString("en-US", {
+                        weekday: "long",
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })}
+                      {" at "}
+                      {formatTime(meetingToDelete.scheduled_time)}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Working Committee:{" "}
+                      {meetingToDelete.counsellor_full_name ||
+                        meetingToDelete.counsellor_name ||
+                        "TBD"}
+                    </p>
+                  </div>
+
+                  <p className="text-xs text-gray-500 mt-3">
+                    This action cannot be undone. The session will be
+                    permanently deleted.
+                  </p>
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowDeleteModal(false);
+                      setMeetingToDelete(null);
+                    }}
+                    className="flex-1 px-4 py-2.5 border-2 border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDeleteSession}
+                    className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors"
+                  >
+                    Delete Session
                   </button>
                 </div>
               </div>
