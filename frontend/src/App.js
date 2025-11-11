@@ -11,6 +11,7 @@ import ProtectedRoute from "./utils/ProtectedRoute";
 import LoginPage from "./pages/auth/LoginPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
+import DeleteAccountPage from "./pages/auth/DeleteAccountPage";
 
 // Member Pages
 import Dashboard from "./pages/member/Dashboard";
@@ -47,6 +48,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/delete-account" element={<DeleteAccountPage />} />
 
           {/* Member Routes */}
           <Route

@@ -34,6 +34,23 @@ const userService = {
       );
     }
   },
+
+  // Delete user account
+  deleteAccount: async () => {
+    try {
+      console.log("🗑️ Deleting user account...");
+      const response = await api.delete("/users/profile");
+      console.log("✅ Account deleted:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Delete account error:", error);
+      throw (
+        error.response?.data || {
+          message: "An error occurred while deleting account",
+        }
+      );
+    }
+  },
 };
 
 export default userService;

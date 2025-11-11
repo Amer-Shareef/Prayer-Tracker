@@ -25,6 +25,7 @@ function ManageMembers() {
   const [filterMobility, setFilterMobility] = useState("all");
   const [filterArea, setFilterArea] = useState("all");
   const [filterAdditionalInfo, setFilterAdditionalInfo] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [operatingMembers, setOperatingMembers] = useState(new Set()); // Track members being operated on
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -80,7 +81,8 @@ function ManageMembers() {
       (user?.role !== "Founder" &&
         user?.role !== "WCM" &&
         filterArea !== "all") ||
-      filterAdditionalInfo !== "all"
+      filterAdditionalInfo !== "all" ||
+      (user?.role === "SuperAdmin" && filterStatus !== "all")
     );
   };
 
@@ -256,6 +258,43 @@ function ManageMembers() {
           return newSet;
         });
       }
+    }
+  };
+
+  const handlePermanentDeleteMember = async (memberId) => {
+    // Add to operating members
+    setOperatingMembers((prev) => new Set([...prev, memberId]));
+
+    try {
+      // Optimistic UI update - remove member immediately
+      const memberToDelete = members.find((m) => m.id === memberId);
+      const previousMembers = [...members];
+      setMembers(members.filter((m) => m.id !== memberId));
+      setError(""); // Clear any existing errors
+
+      // Make API call for permanent delete
+      const response = await memberAPI.permanentDeleteMember(memberId);
+
+      if (!response.success) {
+        // Revert on failure
+        setMembers(previousMembers);
+        setError(response.message || "Failed to permanently delete member");
+      } else {
+        setSuccessMessage("Member permanently deleted successfully");
+      }
+    } catch (err) {
+      // Revert on error
+      setError("Error permanently deleting member. Please try again.");
+      console.error("Error permanently deleting member:", err);
+      // Refetch to ensure data consistency
+      await fetchMembers();
+    } finally {
+      // Remove from operating members
+      setOperatingMembers((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(memberId);
+        return newSet;
+      });
     }
   };
 
@@ -499,6 +538,12 @@ function ManageMembers() {
       filterMobility === "all" || member.mobility === filterMobility;
     const matchesArea = filterArea === "all" || member.area === filterArea;
 
+    // Status filtering (only for SuperAdmin)
+    const matchesStatus =
+      user?.role !== "SuperAdmin" ||
+      filterStatus === "all" ||
+      member.status === filterStatus;
+
     // Additional Info filtering
     const matchesAdditionalInfo =
       filterAdditionalInfo === "all" ||
@@ -521,6 +566,7 @@ function ManageMembers() {
       matchesEmail &&
       matchesMobility &&
       matchesArea &&
+      matchesStatus &&
       matchesAdditionalInfo &&
       matchesMinAge &&
       matchesMaxAge
@@ -768,6 +814,21 @@ function ManageMembers() {
                 </select>
               </div>
 
+              {/* Status Filter - Only for SuperAdmin */}
+              {user?.role === "SuperAdmin" && (
+                <div>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-700"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="deleted">Deleted</option>
+                  </select>
+                </div>
+              )}
+
               {/* Area Filter */}
               <div>
                 <select
@@ -869,6 +930,9 @@ function ManageMembers() {
                     }
                     setFilterAdditionalInfo("all");
                     setFilterRole("all");
+                    if (user?.role === "SuperAdmin") {
+                      setFilterStatus("all");
+                    }
                   }}
                   className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center transition-colors duration-200"
                 >
@@ -938,6 +1002,17 @@ function ManageMembers() {
                   </th>
                   {user?.role === "SuperAdmin" && (
                     <th
+                      onClick={() => handleSort("status")}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150 w-20"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>Status</span>
+                        <SortIcon column="status" />
+                      </div>
+                    </th>
+                  )}
+                  {user?.role === "SuperAdmin" && (
+                    <th
                       onClick={() => handleSort("area")}
                       className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150"
                     >
@@ -974,7 +1049,7 @@ function ManageMembers() {
                 {loading && !members.length ? (
                   <tr>
                     <td
-                      colSpan={user?.role === "SuperAdmin" ? "8" : "7"}
+                      colSpan={user?.role === "SuperAdmin" ? "9" : "7"}
                       className="px-4 py-8 text-center"
                     >
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
@@ -988,7 +1063,11 @@ function ManageMembers() {
                       <React.Fragment key={member.id}>
                         {/* Main Row - Clickable */}
                         <tr
-                          className="hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                          className={`${
+                            member.status === "deleted"
+                              ? "bg-red-50 hover:bg-red-100 opacity-75"
+                              : "hover:bg-gray-50"
+                          } cursor-pointer transition-colors duration-150`}
                           onClick={(e) => {
                             // Don't expand if clicking on action buttons
                             if (!e.target.closest(".action-buttons")) {
@@ -1003,7 +1082,14 @@ function ManageMembers() {
 
                           {/* Full Name */}
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {member.fullName || "-"}
+                            <div className="flex items-center space-x-2">
+                              <span>{member.fullName || "-"}</span>
+                              {member.status === "deleted" && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                  Deleted
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           {/* Prayer Attendance */}
@@ -1053,6 +1139,27 @@ function ManageMembers() {
                                 : member.role || "-"}
                             </span>
                           </td>
+
+                          {/* Status - Only for SuperAdmin */}
+                          {user?.role === "SuperAdmin" && (
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              <span
+                                className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                  member.status === "active"
+                                    ? "bg-green-100 text-green-800"
+                                    : member.status === "deleted"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-gray-100 text-gray-800"
+                                }`}
+                              >
+                                {member.status === "active"
+                                  ? "Active"
+                                  : member.status === "deleted"
+                                  ? "Deleted"
+                                  : member.status || "Active"}
+                              </span>
+                            </td>
+                          )}
 
                           {/* Area - Only for SuperAdmin */}
                           {user?.role === "SuperAdmin" && (
@@ -1291,10 +1398,79 @@ function ManageMembers() {
                                               d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                                             />
                                           </svg>
-                                          Delete Member
+                                            Permanent Delete Member
                                         </>
                                       )}
                                     </button>
+
+                                    {/* SuperAdmin Options for Deleted Members */}
+                                    {user?.role === "SuperAdmin" &&
+                                      member.status === "deleted" && (
+                                        <>
+                                          {/* Divider */}
+                                          <div className="border-t border-gray-100"></div>
+
+                                          {/* Restore Member */}
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleUpdateStatus(
+                                                member.id,
+                                                "active"
+                                              );
+                                              setOpenDropdown(null);
+                                            }}
+                                            disabled={operatingMembers.has(
+                                              member.id
+                                            )}
+                                            className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 hover:text-green-700 flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+                                          >
+                                            {operatingMembers.has(member.id) ? (
+                                              <>
+                                                <svg
+                                                  className="w-5 h-5 mr-3 animate-spin"
+                                                  fill="none"
+                                                  viewBox="0 0 24 24"
+                                                >
+                                                  <circle
+                                                    className="opacity-25"
+                                                    cx="12"
+                                                    cy="12"
+                                                    r="10"
+                                                    stroke="currentColor"
+                                                    strokeWidth="4"
+                                                  ></circle>
+                                                  <path
+                                                    className="opacity-75"
+                                                    fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                                  ></path>
+                                                </svg>
+                                                Processing...
+                                              </>
+                                            ) : (
+                                              <>
+                                                <svg
+                                                  className="w-5 h-5 mr-3"
+                                                  fill="none"
+                                                  stroke="currentColor"
+                                                  viewBox="0 0 24 24"
+                                                >
+                                                  <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                                  />
+                                                </svg>
+                                                Restore Member
+                                              </>
+                                            )}
+                                          </button>
+
+                      
+                                        </>
+                                      )}
                                   </div>
                                 </div>
                               )}

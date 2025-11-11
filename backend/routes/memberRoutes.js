@@ -239,16 +239,36 @@ router.get(
       let countQuery = `SELECT COUNT(DISTINCT u.id) as total FROM users u`;
 
       // Add area restriction based on user role
+      let whereConditions = [];
+      let whereParams = [];
+
       if (
         user.role === "Founder" ||
         user.role === "WCM" ||
         user.role === "SuperAdmin"
       ) {
-        baseQuery += ` WHERE u.area_id = (SELECT area_id FROM users WHERE id = ${user.id})`;
-        countQuery += ` WHERE u.area_id = (SELECT area_id FROM users WHERE id = ${user.id})`;
-      } else if (user.role === "Member") {
-        baseQuery += ` WHERE u.id = ${user.id}`;
-        countQuery += ` WHERE u.id = ${user.id}`;
+        // Get user's area_id first
+        const [userData] = await pool.execute(
+          "SELECT area_id FROM users WHERE id = ?",
+          [user.id]
+        );
+
+        if (userData.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: "User area not found",
+          });
+        }
+
+        whereConditions.push("u.area_id = ?");
+        whereParams.push(userData[0].area_id);
+      }
+
+      // Apply WHERE conditions to both queries
+      if (whereConditions.length > 0) {
+        const whereClause = " WHERE " + whereConditions.join(" AND ");
+        baseQuery += whereClause;
+        countQuery += whereClause;
       }
 
       baseQuery += ` GROUP BY u.id ORDER BY u.created_at DESC`;
@@ -261,8 +281,8 @@ router.get(
 
         const paginatedQuery = baseQuery + ` LIMIT ${limit} OFFSET ${offset}`;
 
-        const [members] = await pool.execute(paginatedQuery);
-        const [countResult] = await pool.execute(countQuery);
+        const [members] = await pool.execute(paginatedQuery, whereParams);
+        const [countResult] = await pool.execute(countQuery, whereParams);
 
         const totalMembers = countResult[0].total;
         const totalPages = Math.ceil(totalMembers / limit);
@@ -283,7 +303,7 @@ router.get(
         });
       } else {
         // Return ALL area members without any limit
-        const [members] = await pool.execute(baseQuery);
+        const [members] = await pool.execute(baseQuery, whereParams);
 
         console.log(
           `✅ Fetched ALL ${members.length} area members (no pagination)`
@@ -862,6 +882,75 @@ router.get(
       res.status(500).json({
         success: false,
         message: "Failed to fetch prayer statistics",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Permanent delete member (SuperAdmin only) - HARD DELETE from database
+router.delete(
+  "/members/:id/permanent",
+  authenticateToken,
+  authorizeRole(["SuperAdmin"]),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      console.log(`🗑️ Permanently deleting member ID: ${id}`);
+
+      // Check if member exists and is deleted
+      const [existingMember] = await pool.execute(
+        "SELECT id, full_name, username, status FROM users WHERE id = ?",
+        [id]
+      );
+
+      if (existingMember.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Member not found",
+        });
+      }
+
+      if (existingMember[0].status !== "deleted") {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Member must be soft-deleted first before permanent deletion",
+        });
+      }
+
+      // Perform hard delete - remove from database completely
+      const [deleteResult] = await pool.execute(
+        "DELETE FROM users WHERE id = ? AND status = 'deleted'",
+        [id]
+      );
+
+      if (deleteResult.affectedRows === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Member not found or not in deleted status",
+        });
+      }
+
+      console.log(
+        `✅ Member permanently deleted: ${existingMember[0].full_name} (${existingMember[0].username})`
+      );
+
+      res.json({
+        success: true,
+        message: "Member permanently deleted from database",
+        deletedMember: {
+          id: existingMember[0].id,
+          fullName: existingMember[0].full_name,
+          username: existingMember[0].username,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error permanently deleting member:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to permanently delete member",
         error: error.message,
       });
     }

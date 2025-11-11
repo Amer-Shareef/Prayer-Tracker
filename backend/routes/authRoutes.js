@@ -79,8 +79,20 @@ router.post("/login", async (req, res) => {
 
       user = rows[0];
       loginIdentifier = username;
+    }
 
-      // Verify password for dashboard login
+    // Check if account is deleted (immediately after user is found, BEFORE password check and OTP)
+    if (user.status === "deleted") {
+      return res.status(403).json({
+        success: false,
+        message:
+          "This account has been deleted. Please contact support if you believe this is an error.",
+        code: "ACCOUNT_DELETED",
+      });
+    }
+
+    // Verify password for dashboard login (only if account is not deleted)
+    if (isDashboardLogin) {
       const isValidPassword = await bcrypt.compare(password, user.password);
 
       if (!isValidPassword) {

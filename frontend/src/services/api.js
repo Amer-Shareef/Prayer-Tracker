@@ -497,6 +497,10 @@ export const memberAPI = {
     const response = await api.delete(`/members/${id}`);
     return response.data;
   },
+  permanentDeleteMember: async (id) => {
+    const response = await api.delete(`/members/${id}/permanent`);
+    return response.data;
+  },
   getMemberPrayerStats: async (memberId, params = {}) => {
     try {
       console.log(
