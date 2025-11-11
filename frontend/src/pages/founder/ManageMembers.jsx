@@ -1301,6 +1301,23 @@ function ManageMembers() {
                                           </svg>
                                           Deactivate Member
                                         </>
+                                      ) : member.status === "deleted" ? (
+                                        <>
+                                          <svg
+                                            className="w-5 h-5 mr-3 text-green-600"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                          >
+                                            <path
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              strokeWidth={2}
+                                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                            />
+                                          </svg>
+                                          Restore Member
+                                        </>
                                       ) : (
                                         <>
                                           <svg
@@ -1350,80 +1367,113 @@ function ManageMembers() {
                                     {/* Divider */}
                                     <div className="border-t border-gray-100"></div>
 
-                                    {/* Delete */}
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteMember(member.id);
-                                        setOpenDropdown(null);
-                                      }}
-                                      disabled={operatingMembers.has(member.id)}
-                                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
-                                    >
-                                      {operatingMembers.has(member.id) ? (
-                                        <>
-                                          <svg
-                                            className="w-5 h-5 mr-3 animate-spin"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                          >
-                                            <circle
-                                              className="opacity-25"
-                                              cx="12"
-                                              cy="12"
-                                              r="10"
+                                    {/* Soft Delete (Deactivate) - For Active Members */}
+                                    {member.status !== "deleted" && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (
+                                            window.confirm(
+                                              `Deactivate ${
+                                                member.fullName ||
+                                                member.username
+                                              }?\n\nThis will mark the account as deleted but data can be restored later.`
+                                            )
+                                          ) {
+                                            handleDeleteMember(member.id);
+                                          }
+                                          setOpenDropdown(null);
+                                        }}
+                                        disabled={operatingMembers.has(
+                                          member.id
+                                        )}
+                                        className="w-full text-left px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 hover:text-orange-700 flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+                                      >
+                                        {operatingMembers.has(member.id) ? (
+                                          <>
+                                            <svg
+                                              className="w-5 h-5 mr-3 animate-spin"
+                                              fill="none"
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <circle
+                                                className="opacity-25"
+                                                cx="12"
+                                                cy="12"
+                                                r="10"
+                                                stroke="currentColor"
+                                                strokeWidth="4"
+                                              ></circle>
+                                              <path
+                                                className="opacity-75"
+                                                fill="currentColor"
+                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                              ></path>
+                                            </svg>
+                                            Processing...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <svg
+                                              className="w-5 h-5 mr-3"
+                                              fill="none"
                                               stroke="currentColor"
-                                              strokeWidth="4"
-                                            ></circle>
-                                            <path
-                                              className="opacity-75"
-                                              fill="currentColor"
-                                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                            ></path>
-                                          </svg>
-                                          Processing...
-                                        </>
-                                      ) : (
-                                        <>
-                                          <svg
-                                            className="w-5 h-5 mr-3"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                          >
-                                            <path
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                              strokeWidth={2}
-                                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                            />
-                                          </svg>
-                                            Permanent Delete Member
-                                        </>
-                                      )}
-                                    </button>
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                                              />
+                                            </svg>
+                                            Deactivate Member
+                                          </>
+                                        )}
+                                      </button>
+                                    )}
 
-                                    {/* SuperAdmin Options for Deleted Members */}
+                                    {/* SuperAdmin: Permanent Delete for Deleted Members */}
                                     {user?.role === "SuperAdmin" &&
                                       member.status === "deleted" && (
                                         <>
                                           {/* Divider */}
                                           <div className="border-t border-gray-100"></div>
 
-                                          {/* Restore Member */}
+                                          {/* Permanent Delete */}
                                           <button
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              handleUpdateStatus(
-                                                member.id,
-                                                "active"
-                                              );
+
+                                              const memberName =
+                                                member.fullName ||
+                                                member.username;
+                                              const confirmMessage = `⚠️ PERMANENT DELETE WARNING ⚠️\n\nYou are about to PERMANENTLY DELETE:\n\n👤 ${memberName}\n🆔 Member ID: ${
+                                                member.memberId || member.id
+                                              }\n\nThis will:\n✗ Remove ALL data from the database\n✗ Delete prayer records\n✗ Remove meeting history\n✗ Cannot be undone or recovered\n\nType 'DELETE PERMANENTLY' to confirm:`;
+
+                                              const userInput =
+                                                window.prompt(confirmMessage);
+
+                                              if (
+                                                userInput ===
+                                                "DELETE PERMANENTLY"
+                                              ) {
+                                                handlePermanentDeleteMember(
+                                                  member.id
+                                                );
+                                              } else if (userInput !== null) {
+                                                alert(
+                                                  '❌ Deletion cancelled. You must type "DELETE PERMANENTLY" exactly to confirm.'
+                                                );
+                                              }
+
                                               setOpenDropdown(null);
                                             }}
                                             disabled={operatingMembers.has(
                                               member.id
                                             )}
-                                            className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 hover:text-green-700 flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+                                            className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 hover:text-red-800 flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 font-semibold"
                                           >
                                             {operatingMembers.has(member.id) ? (
                                               <>
@@ -1446,7 +1496,7 @@ function ManageMembers() {
                                                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                                                   ></path>
                                                 </svg>
-                                                Processing...
+                                                Deleting...
                                               </>
                                             ) : (
                                               <>
@@ -1460,15 +1510,13 @@ function ManageMembers() {
                                                     strokeLinecap="round"
                                                     strokeLinejoin="round"
                                                     strokeWidth={2}
-                                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                                                   />
                                                 </svg>
-                                                Restore Member
+                                                Permanent Delete
                                               </>
                                             )}
                                           </button>
-
-                      
                                         </>
                                       )}
                                   </div>
