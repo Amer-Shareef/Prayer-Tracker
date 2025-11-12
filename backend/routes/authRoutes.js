@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto"); // Add crypto for enhanced token generation
 const { pool } = require("../config/database"); // Use same config
-const { authenticateToken } = require("../middleware/auth"); // Add this import
+const { authenticateToken, authorizeRole } = require("../middleware/auth"); // Add this import
 const {
   sendOtpEmail,
   sendPasswordResetEmail,
@@ -677,6 +677,129 @@ router.post("/change-password", authenticateToken, async (req, res) => {
     });
   }
 });
+
+// Admin change password route (no current password required)
+router.post(
+  "/admin/change-password/:userId",
+  authenticateToken,
+  authorizeRole(["SuperAdmin", "Founder"]),
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { newPassword } = req.body;
+
+      if (!newPassword) {
+        return res.status(400).json({
+          success: false,
+          message: "New password is required",
+        });
+      }
+
+      // Check if target user exists and is not deleted
+      const [userRows] = await pool.execute(
+        "SELECT id, username, status FROM users WHERE id = ?",
+        [userId]
+      );
+
+      if (userRows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      if (userRows[0].status === "deleted") {
+        return res.status(400).json({
+          success: false,
+          message: "Cannot change password for deleted user",
+        });
+      }
+
+      // Hash new password
+      const saltRounds = 10;
+      const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+
+      // Update password
+      await pool.execute(
+        "UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        [hashedNewPassword, userId]
+      );
+
+      res.json({
+        success: true,
+        message: `Password changed successfully for user ${userRows[0].username}`,
+      });
+    } catch (error) {
+      console.error("Admin change password error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Admin change password by username route (no current password required)
+router.post(
+  "/admin/change-password-by-username",
+  authenticateToken,
+  authorizeRole(["SuperAdmin", "Founder"]),
+  async (req, res) => {
+    try {
+      const { username, newPassword } = req.body;
+
+      if (!username || !newPassword) {
+        return res.status(400).json({
+          success: false,
+          message: "Username and new password are required",
+        });
+      }
+
+      // Check if target user exists and is not deleted
+      const [userRows] = await pool.execute(
+        "SELECT id, username, status FROM users WHERE username = ?",
+        [username]
+      );
+
+      if (userRows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      if (userRows[0].status === "deleted") {
+        return res.status(400).json({
+          success: false,
+          message: "Cannot change password for deleted user",
+        });
+      }
+
+      // Hash new password
+      const saltRounds = 10;
+      const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+
+      // Update password
+      await pool.execute(
+        "UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE username = ?",
+        [hashedNewPassword, username]
+      );
+
+      res.json({
+        success: true,
+        message: `Password changed successfully for user ${username}`,
+      });
+    } catch (error) {
+      console.error("Admin change password by username error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error",
+        error: error.message,
+      });
+    }
+  }
+);
 
 // Forgot password route - ENHANCED to actually send Gmail
 router.post("/forgot-password", async (req, res) => {
