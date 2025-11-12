@@ -173,4 +173,78 @@ router.put("/users/profile", authenticateToken, async (req, res) => {
   }
 });
 
+// Delete user account (soft delete - sets status to 'deleted')
+router.delete("/users/profile", authenticateToken, async (req, res) => {
+  try {
+    const { user } = req;
+
+    console.log(
+      "🗑️ Account deletion request from user:",
+      user.id,
+      user.username
+    );
+
+    // Verify user exists and is currently active
+    const [existingUser] = await pool.execute(
+      "SELECT id, username, email, status FROM users WHERE id = ?",
+      [user.id]
+    );
+
+    if (existingUser.length === 0) {
+      console.log("❌ User not found:", user.id);
+      return res.status(404).json({
+        success: false,
+        message: "User account not found",
+      });
+    }
+
+    if (existingUser[0].status === "deleted") {
+      console.log("⚠️ User account already deleted:", user.id);
+      return res.status(400).json({
+        success: false,
+        message: "Account is already deleted",
+      });
+    }
+
+    // Soft delete - update status to 'deleted' instead of hard delete
+    const [result] = await pool.execute(
+      "UPDATE users SET status = 'deleted', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      [user.id]
+    );
+
+    if (result.affectedRows === 0) {
+      console.log("❌ Failed to delete user account:", user.id);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to delete account. Please try again.",
+      });
+    }
+
+    console.log("✅ User account successfully marked as deleted:", {
+      id: user.id,
+      username: existingUser[0].username,
+      email: existingUser[0].email,
+      timestamp: new Date().toISOString(),
+    });
+
+    res.json({
+      success: true,
+      message:
+        "Your account has been successfully deleted. We're sorry to see you go.",
+      data: {
+        deletedAt: new Date().toISOString(),
+        username: existingUser[0].username,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error deleting user account:", error);
+    res.status(500).json({
+      success: false,
+      message:
+        "An error occurred while deleting your account. Please try again.",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+});
+
 module.exports = router;

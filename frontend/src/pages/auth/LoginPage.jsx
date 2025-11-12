@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { authService } from "../../services/api";
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, user, loading: authLoading } = useAuth();
   const [formData, setFormData] = useState({
     username: "",
@@ -20,10 +21,21 @@ const LoginPage = () => {
   const [testOtp, setTestOtp] = useState(""); // For development testing
   const [showPassword, setShowPassword] = useState(false);
 
+  // Get return URL from location state
+  const returnUrl = location.state?.returnUrl;
+  const loginMessage = location.state?.message;
+
   // Redirect if user is already logged in
   useEffect(() => {
     if (!authLoading && user) {
       console.log("✅ User already authenticated, redirecting to dashboard");
+
+      // If there's a return URL, go there instead
+      if (returnUrl) {
+        navigate(returnUrl, { replace: true });
+        return;
+      }
+
       const { role } = user;
       if (role === "Member" || role === "WCM") {
         navigate("/member/dashboard", { replace: true });
@@ -33,7 +45,7 @@ const LoginPage = () => {
         navigate("/member/dashboard", { replace: true });
       }
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, returnUrl]);
 
   // Show loading state while checking authentication or redirecting authenticated user
   if (authLoading || user) {
@@ -46,9 +58,11 @@ const LoginPage = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    // Trim whitespace for username field
+    const processedValue = name === "username" ? value.trim() : value;
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: processedValue,
     }));
     // Clear error when user starts typing
     if (error) setError("");
@@ -108,15 +122,22 @@ const LoginPage = () => {
             ...response.data.user,
             // Don't log sensitive information
             password: undefined,
-          }); // Redirect based on role
-          const { role } = response.data.user;
-          if (role === "Member" || role === "WCM") {
-            // WCM users get Member UI in web app
-            navigate("/member/dashboard");
-          } else if (role === "Founder" || role === "SuperAdmin") {
-            navigate("/founder/view-attendance");
+          });
+
+          // Redirect based on return URL or role
+          if (returnUrl) {
+            console.log("🔄 Redirecting to return URL:", returnUrl);
+            navigate(returnUrl, { replace: true });
           } else {
-            navigate("/member/dashboard");
+            const { role } = response.data.user;
+            if (role === "Member" || role === "WCM") {
+              // WCM users get Member UI in web app
+              navigate("/member/dashboard");
+            } else if (role === "Founder" || role === "SuperAdmin") {
+              navigate("/founder/view-attendance");
+            } else {
+              navigate("/member/dashboard");
+            }
           }
         }
       } else {
@@ -211,6 +232,13 @@ const LoginPage = () => {
                 ? `Enter the verification code sent to ${maskedEmail}`
                 : "Sign in to track your prayers"}
             </p>
+
+            {/* Show message if coming from delete account page */}
+            {loginMessage && !showOtpInput && (
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                <p className="text-sm text-yellow-800">{loginMessage}</p>
+              </div>
+            )}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
