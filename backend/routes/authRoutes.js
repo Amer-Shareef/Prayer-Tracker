@@ -495,6 +495,7 @@ router.post("/register", async (req, res) => {
     const {
       email,
       password,
+      username,
       role = "Member",
       area_id,
       sub_areas_id,
@@ -505,13 +506,17 @@ router.post("/register", async (req, res) => {
       address,
     } = req.body;
 
-    // Require full_name and contact phone; email and password are optional
-    if (!full_name || !phone) {
+    // Require full_name, phone, and username
+    if (!full_name || !phone || !username) {
       return res.status(400).json({
         success: false,
-        message: "Full name and contact phone number are required",
+        message: "Full name, phone number, and username are required",
       });
     }
+
+    // Use default email and password if not provided
+    const finalEmail = email || "thalibaan25@gmail.com";
+    const finalPassword = password || "123pass";
 
     // For Founders, area_id is mandatory
     if (role === "Founder" && !area_id) {
@@ -551,7 +556,7 @@ router.post("/register", async (req, res) => {
       }
     }
 
-    // Check if user already exists (by phone only, since email is shared dummy address)
+    // Check if user already exists by phone
     const [existingUsers] = await pool.execute(
       "SELECT * FROM users WHERE phone = ?",
       [phone]
@@ -564,15 +569,34 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    // Use default email and password if not provided
-    const defaultEmail = email || "thalibaan25@gmail.com";
-    const defaultPassword = password || "123pass";
+    // Check if username already exists
+    const [existingUsername] = await pool.execute(
+      "SELECT * FROM users WHERE username = ?",
+      [username]
+    );
 
-    // Hash password (either provided or default)
+    if (existingUsername.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: "Username already exists. Please provide a unique username.",
+      });
+    }
+
+    // Hash password
     const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(defaultPassword, saltRounds);
+    const hashedPassword = await bcrypt.hash(finalPassword, saltRounds);
 
-    // Insert new user with username set to full_name to avoid missing-username issues
+    console.log("📝 Registration Debug:");
+    console.log("  - Username:", username);
+    console.log("  - Email:", finalEmail);
+    console.log(
+      "  - Password received:",
+      password ? "YES" : "NO (using default)"
+    );
+    console.log("  - Final password:", finalPassword);
+    console.log("  - Hashed password:", hashedPassword ? "Generated" : "NULL");
+
+    // Insert new user with status set to 'inactive'
     const [result] = await pool.execute(
       `INSERT INTO users (
         username, full_name, email, password, role, area_id, sub_areas_id, 
@@ -580,9 +604,9 @@ router.post("/register", async (req, res) => {
         status, joined_date
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE())`,
       [
-        full_name || null,
-        full_name || null,
-        defaultEmail,
+        username,
+        full_name,
+        finalEmail,
         hashedPassword,
         role,
         area_id || null,
@@ -591,18 +615,20 @@ router.post("/register", async (req, res) => {
         mobility || null,
         phone || null,
         address || null,
-        "active",
+        "pending",
       ]
     );
     res.status(201).json({
       success: true,
-      message: "User registered successfully",
+      message: "User registered successfully with pending status",
       user: {
         id: result.insertId,
+        username: username,
         full_name,
-        email: defaultEmail,
+        email: finalEmail,
         phone,
         role,
+        status: "pending",
       },
     });
   } catch (error) {
@@ -946,6 +972,51 @@ router.post("/reset-password", async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Password reset error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+});
+
+// Get user status by user ID
+router.get("/user-status/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
+    // Get user status from database
+    const [users] = await pool.execute(
+      "SELECT id, username, status FROM users WHERE id = ?",
+      [userId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const user = users[0];
+
+    res.json({
+      success: true,
+      data: {
+        userId: user.id,
+        username: user.username,
+        status: user.status,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Get user status error:", error);
     res.status(500).json({
       success: false,
       message: "Server error",

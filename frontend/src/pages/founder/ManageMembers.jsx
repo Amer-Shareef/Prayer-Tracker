@@ -16,12 +16,8 @@ function ManageMembers() {
   const [successMessage, setSuccessMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("all");
-  const [filterMemberId, setFilterMemberId] = useState("");
-  const [filterFullName, setFilterFullName] = useState("");
   const [filterMinAge, setFilterMinAge] = useState("");
   const [filterMaxAge, setFilterMaxAge] = useState("");
-  const [filterUsername, setFilterUsername] = useState("");
-  const [filterEmail, setFilterEmail] = useState("");
   const [filterMobility, setFilterMobility] = useState("all");
   const [filterArea, setFilterArea] = useState("all");
   const [filterAdditionalInfo, setFilterAdditionalInfo] = useState("all");
@@ -32,6 +28,7 @@ function ManageMembers() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [memberToEdit, setMemberToEdit] = useState(null);
   const [openDropdown, setOpenDropdown] = useState(null); // Track which dropdown is open
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // Sorting state
   const [sortColumn, setSortColumn] = useState("fullName");
@@ -39,7 +36,7 @@ function ManageMembers() {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(50);
 
   // Add date and area state
   const [currentDate, setCurrentDate] = useState({
@@ -70,12 +67,8 @@ function ManageMembers() {
     return (
       searchTerm ||
       filterRole !== "all" ||
-      filterMemberId ||
-      filterFullName ||
       filterMinAge ||
       filterMaxAge ||
-      filterUsername ||
-      filterEmail ||
       filterMobility !== "all" ||
       // Don't consider area filter as active for Founder and WCM (it's locked)
       (user?.role !== "Founder" &&
@@ -84,6 +77,41 @@ function ManageMembers() {
       filterAdditionalInfo !== "all" ||
       (user?.role === "SuperAdmin" && filterStatus !== "all")
     );
+  };
+
+  const statusColorClasses = {
+    active: "text-green-600",
+    pending: "text-amber-600",
+    inactive: "text-slate-500",
+    deleted: "text-red-600",
+  };
+
+  const advancedFiltersActive = () => {
+    return (
+      filterMobility !== "all" ||
+      filterAdditionalInfo !== "all" ||
+      filterMinAge ||
+      filterMaxAge
+    );
+  };
+
+  const resetAdvancedFilters = () => {
+    setFilterMinAge("");
+    setFilterMaxAge("");
+    setFilterMobility("all");
+    setFilterAdditionalInfo("all");
+  };
+
+  const clearAllFilters = () => {
+    setSearchTerm("");
+    resetAdvancedFilters();
+    if (user?.role !== "Founder" && user?.role !== "WCM") {
+      setFilterArea("all");
+    }
+    setFilterRole("all");
+    if (user?.role === "SuperAdmin") {
+      setFilterStatus("all");
+    }
   };
 
   // Fetch current date
@@ -510,30 +538,15 @@ function ManageMembers() {
   // Filter members based on search and filters
   const filteredMembers = members.filter((member) => {
     const matchesSearch =
+      (member.memberId || "")
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
       (member.username || "")
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
       (member.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (member.fullName || "").toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = filterRole === "all" || member.role === filterRole;
-    const matchesMemberId =
-      !filterMemberId ||
-      (member.memberId || "")
-        .toLowerCase()
-        .includes(filterMemberId.toLowerCase());
-    const matchesFullName =
-      !filterFullName ||
-      (member.fullName || "")
-        .toLowerCase()
-        .includes(filterFullName.toLowerCase());
-    const matchesUsername =
-      !filterUsername ||
-      (member.username || "")
-        .toLowerCase()
-        .includes(filterUsername.toLowerCase());
-    const matchesEmail =
-      !filterEmail ||
-      (member.email || "").toLowerCase().includes(filterEmail.toLowerCase());
     const matchesMobility =
       filterMobility === "all" || member.mobility === filterMobility;
     const matchesArea = filterArea === "all" || member.area === filterArea;
@@ -560,10 +573,6 @@ function ManageMembers() {
     return (
       matchesSearch &&
       matchesRole &&
-      matchesMemberId &&
-      matchesFullName &&
-      matchesUsername &&
-      matchesEmail &&
       matchesMobility &&
       matchesArea &&
       matchesStatus &&
@@ -746,14 +755,38 @@ function ManageMembers() {
             </div>
           </div>
         )}
-        {/* Enhanced Search and Filters Section */}
-        <div className="bg-white rounded-lg shadow mb-6 overflow-hidden">
-          {/* Search Bar */}
-          <div className="p-4 border-b border-gray-200">
-            <div className="relative max-w-md">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        {/* Filters and Search */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="Search by ID, name, username, or email"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-4 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute inset-y-0 right-0 pr-3 text-gray-400 hover:text-gray-600"
+                  aria-label="Clear search"
+                >
+                  &times;
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAdvancedFilters((prev) => !prev)}
+                className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                aria-expanded={showAdvancedFilters}
+                aria-controls="advanced-filters-panel"
+              >
                 <svg
-                  className="h-5 w-5 text-gray-400"
+                  className={`mr-2 h-4 w-4 text-gray-500 transition-transform duration-200 ${
+                    showAdvancedFilters ? "rotate-180" : ""
+                  }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -762,199 +795,199 @@ function ManageMembers() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    d="M19 9l-7 7-7-7"
                   />
                 </svg>
-              </div>
-              <input
-                type="text"
-                placeholder="Search by name, username, or email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-700 placeholder-gray-400"
-              />
-              {searchTerm && (
+                {showAdvancedFilters
+                  ? "Hide advanced filters"
+                  : "Advanced filters"}
+                {advancedFiltersActive() && (
+                  <span className="ml-2 h-2 w-2 rounded-full bg-blue-500"></span>
+                )}
+              </button>
+              {hasActiveFilters() && (
                 <button
-                  onClick={() => setSearchTerm("")}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                  onClick={clearAllFilters}
+                  className="text-sm text-blue-600 hover:text-blue-800"
                 >
-                  <svg
-                    className="h-5 w-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
+                  Clear all
                 </button>
               )}
             </div>
           </div>
 
-          {/* Simplified Filters */}
-          <div className="p-6">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              {/* Role Filter */}
-              <div>
-                <select
-                  value={filterRole}
-                  onChange={(e) => setFilterRole(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-700"
-                >
-                  <option value="all">All Roles</option>
-                  <option value="Member">Member</option>
-                  <option value="WCM">WC</option>
-                  <option value="Founder">WC Admin</option>
-                  <option value="SuperAdmin">Super Admin</option>
-                </select>
-              </div>
-
-              {/* Status Filter - Only for SuperAdmin */}
-              {user?.role === "SuperAdmin" && (
-                <div>
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-700"
-                  >
-                    <option value="all">All Status</option>
-                    <option value="active">Active</option>
-                    <option value="deleted">Deleted</option>
-                  </select>
-                </div>
-              )}
-
-              {/* Area Filter */}
-              <div>
-                <select
-                  value={filterArea}
-                  onChange={(e) => setFilterArea(e.target.value)}
-                  disabled={user?.role === "Founder" || user?.role === "WCM"}
-                  className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-700 ${
-                    user?.role === "Founder" || user?.role === "WCM"
-                      ? "bg-gray-100 cursor-not-allowed"
-                      : ""
-                  }`}
-                >
-                  {user?.role === "Founder" || user?.role === "WCM" ? (
-                    <option value={filterArea}>{filterArea}</option>
-                  ) : (
-                    <>
-                      <option value="all">All Areas</option>
-                      {areas.map((area) => (
-                        <option key={area.area_id} value={area.area_name}>
-                          {area.area_name}
-                        </option>
-                      ))}
-                    </>
-                  )}
-                </select>
-              </div>
-
-              {/* Mobility Filter */}
-              <div>
-                <select
-                  value={filterMobility}
-                  onChange={(e) => setFilterMobility(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-700"
-                >
-                  <option value="all">All Mobility</option>
-                  <option value="Walking">Walking</option>
-                  <option value="Bicycle">Bicycle</option>
-                  <option value="Motorbike">Motorbike</option>
-                  <option value="Car">Car</option>
-                  <option value="Public Transport">Public Transport</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              {/* Additional Info Filter */}
-              <div>
-                <select
-                  value={filterAdditionalInfo}
-                  onChange={(e) => setFilterAdditionalInfo(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-700"
-                >
-                  <option value="all">Additional Info</option>
-                  <option value="zakath">Zakath Eligible</option>
-                  <option value="rent">On Rent</option>
-                  <option value="disabled">Differently Abled</option>
-                  <option value="convert">Convert</option>
-                </select>
-              </div>
-
-              {/* Age Range - Combined */}
-              <div className="flex space-x-1">
-                <input
-                  type="number"
-                  placeholder="Min Age"
-                  value={filterMinAge}
-                  onChange={(e) => setFilterMinAge(e.target.value)}
-                  className="w-1/2 px-2 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-700"
-                  min="0"
-                  max="120"
-                />
-                <input
-                  type="number"
-                  placeholder="Max"
-                  value={filterMaxAge}
-                  onChange={(e) => setFilterMaxAge(e.target.value)}
-                  className="w-1/2 px-2 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-700"
-                  min="0"
-                  max="120"
-                />
-              </div>
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-gray-500">Role</span>
+              <select
+                value={filterRole}
+                onChange={(e) => setFilterRole(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="all">All roles</option>
+                <option value="Member">Member</option>
+                <option value="WCM">WC</option>
+                <option value="Founder">WC Admin</option>
+                <option value="SuperAdmin">Super Admin</option>
+              </select>
             </div>
 
-            {/* Clear Filters - Only show when filters are active */}
-            {hasActiveFilters() && (
-              <div className="mt-3 flex justify-end">
-                <button
-                  onClick={() => {
-                    setSearchTerm("");
-                    setFilterMemberId("");
-                    setFilterFullName("");
-                    setFilterMinAge("");
-                    setFilterMaxAge("");
-                    setFilterUsername("");
-                    setFilterEmail("");
-                    setFilterMobility("all");
-                    // Don't reset area filter for Founder and WCM roles
-                    if (user?.role !== "Founder" && user?.role !== "WCM") {
-                      setFilterArea("all");
-                    }
-                    setFilterAdditionalInfo("all");
-                    setFilterRole("all");
-                    if (user?.role === "SuperAdmin") {
-                      setFilterStatus("all");
-                    }
-                  }}
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center transition-colors duration-200"
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-gray-500">Area</span>
+              <select
+                value={filterArea}
+                onChange={(e) => setFilterArea(e.target.value)}
+                disabled={user?.role === "Founder" || user?.role === "WCM"}
+                className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
+                  user?.role === "Founder" || user?.role === "WCM"
+                    ? "bg-gray-100 text-gray-500"
+                    : ""
+                }`}
+              >
+                {user?.role === "Founder" || user?.role === "WCM" ? (
+                  <option value={filterArea}>{filterArea}</option>
+                ) : (
+                  <>
+                    <option value="all">All areas</option>
+                    {areas.map((area) => (
+                      <option key={area.area_id} value={area.area_name}>
+                        {area.area_name}
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </div>
+
+            {user?.role === "SuperAdmin" && (
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-gray-500">Status</span>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
+                    statusColorClasses[filterStatus] || "text-gray-700"
+                  }`}
                 >
-                  <svg
-                    className="w-4 h-4 mr-1"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                  Clear Filters
-                </button>
+                  <option value="all" className="text-gray-700">
+                    All statuses
+                  </option>
+                  <option value="active" className="text-green-600">
+                    Active
+                  </option>
+                  <option value="pending" className="text-amber-600">
+                    Pending
+                  </option>
+                  <option value="inactive" className="text-slate-500">
+                    Inactive
+                  </option>
+                  <option value="deleted" className="text-red-600">
+                    Deleted
+                  </option>
+                </select>
               </div>
             )}
           </div>
-        </div>{" "}
+        </div>
+
+        <div
+          id="advanced-filters-panel"
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            showAdvancedFilters
+              ? "mb-6 max-h-[1200px] opacity-100"
+              : "max-h-0 opacity-0"
+          }`}
+        >
+          <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 shadow-inner">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Advanced filters
+            </p>
+            <div className="mt-4 grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs text-gray-500">
+                    Transportation
+                  </label>
+                  <select
+                    value={filterMobility}
+                    onChange={(e) => setFilterMobility(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="all">All types</option>
+                    <option value="Walking">Walking</option>
+                    <option value="Bicycle">Bicycle</option>
+                    <option value="Motorbike">Motorbike</option>
+                    <option value="Car">Car</option>
+                    <option value="Public Transport">Public Transport</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500">
+                    Additional info
+                  </label>
+                  <select
+                    value={filterAdditionalInfo}
+                    onChange={(e) => setFilterAdditionalInfo(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="all">All members</option>
+                    <option value="zakath">Zakath eligible</option>
+                    <option value="rent">Living on rent</option>
+                    <option value="disabled">Differently abled</option>
+                    <option value="convert">Convert</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">Age range</label>
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="number"
+                    placeholder="Min"
+                    value={filterMinAge}
+                    min="0"
+                    max="120"
+                    onChange={(e) => setFilterMinAge(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-400">to</span>
+                  <input
+                    type="number"
+                    placeholder="Max"
+                    value={filterMaxAge}
+                    min="0"
+                    max="120"
+                    onChange={(e) => setFilterMaxAge(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-4">
+              <button
+                onClick={resetAdvancedFilters}
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
+                Reset advanced filters
+              </button>
+              <div className="flex items-center gap-2">
+                {advancedFiltersActive() && (
+                  <span className="text-xs font-medium text-blue-600">
+                    Advanced filters on
+                  </span>
+                )}
+                <button
+                  onClick={() => setShowAdvancedFilters(false)}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+                >
+                  Hide filters
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Members Table */}
         <div
           className="bg-white rounded-lg shadow overflow-hidden flex flex-col"
@@ -1246,98 +1279,6 @@ function ManageMembers() {
                                       Download PDF Report
                                     </button>
 
-                                    {/* Activate/Deactivate */}
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleUpdateStatus(
-                                          member.id,
-                                          member.status === "active"
-                                            ? "inactive"
-                                            : "active"
-                                        );
-                                        setOpenDropdown(null);
-                                      }}
-                                      disabled={operatingMembers.has(member.id)}
-                                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
-                                    >
-                                      {operatingMembers.has(member.id) ? (
-                                        <>
-                                          <svg
-                                            className="w-5 h-5 mr-3 animate-spin text-gray-400"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                          >
-                                            <circle
-                                              className="opacity-25"
-                                              cx="12"
-                                              cy="12"
-                                              r="10"
-                                              stroke="currentColor"
-                                              strokeWidth="4"
-                                            ></circle>
-                                            <path
-                                              className="opacity-75"
-                                              fill="currentColor"
-                                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                            ></path>
-                                          </svg>
-                                          Processing...
-                                        </>
-                                      ) : member.status === "active" ? (
-                                        <>
-                                          <svg
-                                            className="w-5 h-5 mr-3 text-red-600"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                          >
-                                            <path
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                              strokeWidth={2}
-                                              d="M6 18L18 6M6 6l12 12"
-                                            />
-                                          </svg>
-                                          Deactivate Member
-                                        </>
-                                      ) : member.status === "deleted" ? (
-                                        <>
-                                          <svg
-                                            className="w-5 h-5 mr-3 text-green-600"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                          >
-                                            <path
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                              strokeWidth={2}
-                                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                                            />
-                                          </svg>
-                                          Restore Member
-                                        </>
-                                      ) : (
-                                        <>
-                                          <svg
-                                            className="w-5 h-5 mr-3 text-green-600"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                          >
-                                            <path
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                              strokeWidth={2}
-                                              d="M5 13l4 4L19 7"
-                                            />
-                                          </svg>
-                                          Activate Member
-                                        </>
-                                      )}
-                                    </button>
-
                                     {/* Edit Member */}
                                     {/* <button
                                       onClick={(e) => {
@@ -1367,21 +1308,17 @@ function ManageMembers() {
                                     {/* Divider */}
                                     <div className="border-t border-gray-100"></div>
 
-                                    {/* Soft Delete (Deactivate) - For Active Members */}
-                                    {member.status !== "deleted" && (
+                                    {/* Conditional Actions Based on Status */}
+
+                                    {/* For ACTIVE users: Show Deactivate option */}
+                                    {member.status === "active" && (
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          if (
-                                            window.confirm(
-                                              `Deactivate ${
-                                                member.fullName ||
-                                                member.username
-                                              }?\n\nThis will mark the account as deleted but data can be restored later.`
-                                            )
-                                          ) {
-                                            handleDeleteMember(member.id);
-                                          }
+                                          handleUpdateStatus(
+                                            member.id,
+                                            "inactive"
+                                          );
                                           setOpenDropdown(null);
                                         }}
                                         disabled={operatingMembers.has(
@@ -1428,6 +1365,133 @@ function ManageMembers() {
                                               />
                                             </svg>
                                             Deactivate Member
+                                          </>
+                                        )}
+                                      </button>
+                                    )}
+
+                                    {/* For INACTIVE or PENDING users: Show Activate option */}
+                                    {(member.status === "inactive" ||
+                                      member.status === "pending") && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleUpdateStatus(
+                                            member.id,
+                                            "active"
+                                          );
+                                          setOpenDropdown(null);
+                                        }}
+                                        disabled={operatingMembers.has(
+                                          member.id
+                                        )}
+                                        className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 hover:text-green-700 flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+                                      >
+                                        {operatingMembers.has(member.id) ? (
+                                          <>
+                                            <svg
+                                              className="w-5 h-5 mr-3 animate-spin"
+                                              fill="none"
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <circle
+                                                className="opacity-25"
+                                                cx="12"
+                                                cy="12"
+                                                r="10"
+                                                stroke="currentColor"
+                                                strokeWidth="4"
+                                              ></circle>
+                                              <path
+                                                className="opacity-75"
+                                                fill="currentColor"
+                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                              ></path>
+                                            </svg>
+                                            Processing...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <svg
+                                              className="w-5 h-5 mr-3"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                              />
+                                            </svg>
+                                            Activate Member
+                                          </>
+                                        )}
+                                      </button>
+                                    )}
+
+                                    {/* Soft Delete - For all non-deleted members */}
+                                    {member.status !== "deleted" && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (
+                                            window.confirm(
+                                              `Delete ${
+                                                member.fullName ||
+                                                member.username
+                                              }?\n\nThis will mark the account as deleted but data can be restored later.`
+                                            )
+                                          ) {
+                                            handleDeleteMember(member.id);
+                                          }
+                                          setOpenDropdown(null);
+                                        }}
+                                        disabled={operatingMembers.has(
+                                          member.id
+                                        )}
+                                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+                                      >
+                                        {operatingMembers.has(member.id) ? (
+                                          <>
+                                            <svg
+                                              className="w-5 h-5 mr-3 animate-spin"
+                                              fill="none"
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <circle
+                                                className="opacity-25"
+                                                cx="12"
+                                                cy="12"
+                                                r="10"
+                                                stroke="currentColor"
+                                                strokeWidth="4"
+                                              ></circle>
+                                              <path
+                                                className="opacity-75"
+                                                fill="currentColor"
+                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                              ></path>
+                                            </svg>
+                                            Processing...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <svg
+                                              className="w-5 h-5 mr-3"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                              />
+                                            </svg>
+                                            Delete Member
                                           </>
                                         )}
                                       </button>

@@ -1,5 +1,3 @@
-
-
 const express = require("express");
 const { pool } = require("../config/database");
 const { authenticateToken, authorizeRole } = require("../middleware/auth");
@@ -33,7 +31,7 @@ router.post(
 
       // You can optionally store upload metadata in a separate table
       // For now, we'll just return the URL for the client to use in feed creation
-      
+
       res.json({
         success: true,
         message: "Image URL processed successfully",
@@ -56,7 +54,7 @@ router.post(
 );
 
 // GET all feeds - No restrictions, returns all feeds
-router.get("/all", authenticateToken, async (req, res) => {
+router.get("/all", async (req, res) => {
   try {
     console.log("📋 Fetching all feeds without restrictions");
 
@@ -83,7 +81,8 @@ router.get("/all", authenticateToken, async (req, res) => {
         LIMIT ? OFFSET ?
       `;
 
-      const countQuery = "SELECT COUNT(*) as total FROM feeds WHERE is_active = TRUE";
+      const countQuery =
+        "SELECT COUNT(*) as total FROM feeds WHERE is_active = TRUE";
 
       const [feeds] = await pool.query(queryString, [limit, offset]);
       const [countResult] = await pool.execute(countQuery);
@@ -133,7 +132,7 @@ router.get("/all", authenticateToken, async (req, res) => {
 });
 
 // GET all feeds - Area-based version
-router.get("/", authenticateToken, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     console.log("📋 Fetching feeds for area-based system");
     const { user } = req;
@@ -163,7 +162,8 @@ router.get("/", authenticateToken, async (req, res) => {
           ORDER BY f.created_at DESC
         `;
         queryParams = [areaId];
-        countQuery = "SELECT COUNT(*) as total FROM feeds WHERE area_id = ? AND is_active = TRUE";
+        countQuery =
+          "SELECT COUNT(*) as total FROM feeds WHERE area_id = ? AND is_active = TRUE";
         countParams = [areaId];
       } else {
         // Show all feeds for SuperAdmin
@@ -179,7 +179,8 @@ router.get("/", authenticateToken, async (req, res) => {
           ORDER BY f.created_at DESC
         `;
         queryParams = [];
-        countQuery = "SELECT COUNT(*) as total FROM feeds WHERE is_active = TRUE";
+        countQuery =
+          "SELECT COUNT(*) as total FROM feeds WHERE is_active = TRUE";
         countParams = [];
       }
     } else {
@@ -215,7 +216,8 @@ router.get("/", authenticateToken, async (req, res) => {
         ORDER BY f.created_at DESC
       `;
       queryParams = [areaId];
-      countQuery = "SELECT COUNT(*) as total FROM feeds WHERE area_id = ? AND is_active = TRUE";
+      countQuery =
+        "SELECT COUNT(*) as total FROM feeds WHERE area_id = ? AND is_active = TRUE";
       countParams = [areaId];
     }
 
@@ -264,7 +266,7 @@ router.get("/", authenticateToken, async (req, res) => {
 });
 
 // GET single feed by ID
-router.get("/:id", authenticateToken, async (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     await pool.execute("UPDATE feeds SET views = views + 1 WHERE id = ?", [id]);
