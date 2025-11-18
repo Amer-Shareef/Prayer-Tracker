@@ -36,7 +36,7 @@ function ManageMembers() {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(50);
 
   // Add date and area state
   const [currentDate, setCurrentDate] = useState({
