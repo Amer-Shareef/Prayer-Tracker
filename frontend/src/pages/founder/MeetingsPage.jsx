@@ -960,7 +960,7 @@ const MeetingsPage = () => {
                       {members.map((member) => (
                         <option key={member.id} value={member.id}>
                           {member.full_name || member.username}
-                          {member.area && ` - ${member.area}`}
+                          {member.areaName && ` - ${member.areaName}`}
                         </option>
                       ))}
                     </select>

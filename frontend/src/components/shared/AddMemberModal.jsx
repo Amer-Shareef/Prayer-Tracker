@@ -33,6 +33,8 @@ const AddMemberModal = ({
     address: "",
     area_id: "",
     subarea_id: "",
+    custom_area_name: "",
+    useCustomArea: false,
     onRent: false,
     zakathEligible: false,
     differentlyAbled: false,
@@ -74,6 +76,8 @@ const AddMemberModal = ({
         address: memberToEdit.address || "",
         area_id: memberToEdit.area_id || "",
         subarea_id: memberToEdit.subarea_id || "",
+        custom_area_name: memberToEdit.customAreaName || "",
+        useCustomArea: !memberToEdit.area_id && memberToEdit.customAreaName,
         onRent: memberToEdit.onRent || false,
         zakathEligible: memberToEdit.zakathEligible || false,
         differentlyAbled: memberToEdit.differentlyAbled || false,
@@ -106,6 +110,8 @@ const AddMemberModal = ({
         address: "",
         area_id: "",
         subarea_id: "",
+        custom_area_name: "",
+        useCustomArea: false,
         onRent: false,
         zakathEligible: false,
         differentlyAbled: false,
@@ -183,13 +189,15 @@ const AddMemberModal = ({
   };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
+    const finalValue = type === "checkbox" ? checked : value;
 
     if (name === "area_id") {
       setFormData({
         ...formData,
         [name]: value,
         subarea_id: "",
+        useCustomArea: false, // Reset custom area when selecting official area
       });
 
       if (value) {
@@ -197,10 +205,22 @@ const AddMemberModal = ({
       } else {
         setSubAreas([]);
       }
+    } else if (name === "useCustomArea") {
+      setFormData({
+        ...formData,
+        [name]: finalValue,
+        area_id: finalValue ? "" : formData.area_id, // Clear area_id if switching to custom
+        subarea_id: finalValue ? "" : formData.subarea_id, // Clear subarea_id if switching to custom
+        custom_area_name: finalValue ? formData.custom_area_name : "", // Keep custom name if switching back
+      });
+
+      if (!finalValue) {
+        setSubAreas([]);
+      }
     } else {
       setFormData({
         ...formData,
-        [name]: value,
+        [name]: finalValue,
       });
     }
 
@@ -228,11 +248,17 @@ const AddMemberModal = ({
       !formData.username ||
       !formData.email ||
       !formData.phone ||
-      !formData.area_id
+      (!formData.area_id && !formData.useCustomArea)
     ) {
       setError(
         "Full name, username, email, phone number, and area are required"
       );
+      return false;
+    }
+
+    // Validate custom area name if using custom area
+    if (formData.useCustomArea && !formData.custom_area_name.trim()) {
+      setError("Custom area name is required when using custom area");
       return false;
     }
 
@@ -284,9 +310,29 @@ const AddMemberModal = ({
           delete updateData.password;
           delete updateData.confirmPassword;
         }
+
+        // Transform custom area data for backend
+        if (updateData.useCustomArea) {
+          updateData.area_id = 0; // Use 0 to indicate custom area
+        } else {
+          updateData.custom_area_name = ""; // Clear custom area name for official areas
+        }
+        delete updateData.useCustomArea; // Remove frontend-only field
+
         response = await memberAPI.updateMember(memberToEdit.id, updateData);
       } else {
-        response = await memberAPI.addMember(formData);
+        // Prepare add data
+        const addData = { ...formData };
+
+        // Transform custom area data for backend
+        if (addData.useCustomArea) {
+          addData.area_id = 0; // Use 0 to indicate custom area
+        } else {
+          addData.custom_area_name = ""; // Clear custom area name for official areas
+        }
+        delete addData.useCustomArea; // Remove frontend-only field
+
+        response = await memberAPI.addMember(addData);
       }
 
       if (response.success) {
@@ -303,6 +349,8 @@ const AddMemberModal = ({
           address: "",
           area_id: "",
           subarea_id: "",
+          custom_area_name: "",
+          useCustomArea: false,
           onRent: false,
           zakathEligible: false,
           differentlyAbled: false,
@@ -749,57 +797,129 @@ const AddMemberModal = ({
                       </div>
                     )}
 
-                    {/* Area */}
+                    {/* Area Type Selection */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Area <span className="text-red-500">*</span>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Area Type <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        name="area_id"
-                        value={formData.area_id}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      >
-                        <option value="">Select area</option>
-                        {loadingAreas ? (
-                          <option value="">Loading...</option>
-                        ) : (
-                          areas.map((area) => (
-                            <option key={area.area_id} value={area.area_id}>
-                              {area.area_name || `Area ${area.area_id}`}
-                            </option>
-                          ))
-                        )}
-                      </select>
+                      <div className="space-y-2">
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name="useCustomArea"
+                            checked={!formData.useCustomArea}
+                            onChange={() =>
+                              handleInputChange({
+                                target: {
+                                  name: "useCustomArea",
+                                  value: false,
+                                  type: "radio",
+                                },
+                              })
+                            }
+                            className="mr-2 text-green-600 focus:ring-green-500"
+                          />
+                          <span className="text-sm text-gray-700">
+                            Official Area
+                          </span>
+                        </label>
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name="useCustomArea"
+                            checked={formData.useCustomArea}
+                            onChange={() =>
+                              handleInputChange({
+                                target: {
+                                  name: "useCustomArea",
+                                  value: true,
+                                  type: "radio",
+                                },
+                              })
+                            }
+                            className="mr-2 text-green-600 focus:ring-green-500"
+                          />
+                          <span className="text-sm text-gray-700">
+                            Custom Area
+                          </span>
+                        </label>
+                      </div>
                     </div>
 
-                    {/* Sub-area */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Sub-area
-                      </label>
-                      <select
-                        name="subarea_id"
-                        value={formData.subarea_id}
-                        onChange={handleInputChange}
-                        disabled={!formData.area_id || loadingSubAreas}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100"
-                      >
-                        <option value="">
-                          {!formData.area_id
-                            ? "Select area first"
-                            : loadingSubAreas
-                            ? "Loading..."
-                            : "Select sub-area"}
-                        </option>
-                        {!loadingSubAreas &&
-                          subAreas.map((subArea) => (
-                            <option key={subArea.id} value={subArea.id}>
-                              {subArea.address}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
+                    {/* Official Area Selection */}
+                    {!formData.useCustomArea && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Select Official Area{" "}
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          name="area_id"
+                          value={formData.area_id}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        >
+                          <option value="">Select area</option>
+                          {loadingAreas ? (
+                            <option value="">Loading...</option>
+                          ) : (
+                            areas.map((area) => (
+                              <option key={area.area_id} value={area.area_id}>
+                                {area.area_name || `Area ${area.area_id}`}
+                              </option>
+                            ))
+                          )}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Custom Area Input */}
+                    {formData.useCustomArea && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Custom Area Name{" "}
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="custom_area_name"
+                          value={formData.custom_area_name}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          placeholder="Enter custom mahallah name"
+                        />
+                      </div>
+                    )}
+
+                    {/* Sub-area - Only show for official areas */}
+                    {!formData.useCustomArea && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Sub-area
+                        </label>
+                        <select
+                          name="subarea_id"
+                          value={formData.subarea_id}
+                          onChange={handleInputChange}
+                          disabled={!formData.area_id || loadingSubAreas}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100"
+                        >
+                          <option value="">
+                            {!formData.area_id
+                              ? "Select area first"
+                              : loadingSubAreas
+                              ? "Loading..."
+                              : "Select sub-area"}
+                          </option>
+                          {!loadingSubAreas &&
+                            subAreas.map((subArea) => (
+                              <option key={subArea.id} value={subArea.id}>
+                                {subArea.address}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Address */}

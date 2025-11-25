@@ -95,6 +95,40 @@ function ManageMembers() {
     );
   };
 
+  // Get all unique areas including custom areas for SuperAdmin
+  const getAllAreas = () => {
+    if (user?.role !== "SuperAdmin") {
+      return areas;
+    }
+
+    // For SuperAdmin, include both official areas and custom areas from members
+    const officialAreas = areas.map((area) => area.area_name);
+    const customAreas = members
+      .filter(
+        (member) =>
+          member.area_id === 0 && !officialAreas.includes(member.areaName)
+      )
+      .map((member) => member.areaName);
+
+    // Combine and deduplicate
+    const allAreaNames = [...new Set([...officialAreas, ...customAreas])];
+
+    // Return area objects for official areas, and create objects for custom areas
+    return allAreaNames.map((areaName) => {
+      const officialArea = areas.find((area) => area.area_name === areaName);
+      if (officialArea) {
+        return officialArea;
+      } else {
+        // Custom area
+        return {
+          area_id: 0,
+          area_name: areaName,
+          isCustom: true,
+        };
+      }
+    });
+  };
+
   const resetAdvancedFilters = () => {
     setFilterMinAge("");
     setFilterMaxAge("");
@@ -549,7 +583,7 @@ function ManageMembers() {
     const matchesRole = filterRole === "all" || member.role === filterRole;
     const matchesMobility =
       filterMobility === "all" || member.mobility === filterMobility;
-    const matchesArea = filterArea === "all" || member.area === filterArea;
+    const matchesArea = filterArea === "all" || member.areaName === filterArea;
 
     // Status filtering (only for SuperAdmin)
     const matchesStatus =
@@ -604,8 +638,8 @@ function ManageMembers() {
         bValue = b.role || "";
         break;
       case "area":
-        aValue = a.area || "";
-        bValue = b.area || "";
+        aValue = a.areaName || "";
+        bValue = b.areaName || "";
         break;
       case "contact":
         aValue = a.phone || "";
@@ -849,9 +883,12 @@ function ManageMembers() {
                 ) : (
                   <>
                     <option value="all">All areas</option>
-                    {areas.map((area) => (
-                      <option key={area.area_id} value={area.area_name}>
-                        {area.area_name}
+                    {getAllAreas().map((area) => (
+                      <option
+                        key={area.area_id || area.area_name}
+                        value={area.area_name}
+                      >
+                        {area.area_name} {area.isCustom ? "(Custom)" : ""}
                       </option>
                     ))}
                   </>
@@ -1196,8 +1233,25 @@ function ManageMembers() {
 
                           {/* Area - Only for SuperAdmin */}
                           {user?.role === "SuperAdmin" && (
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {member.area || "-"}
+                            <td
+                              className={`px-4 py-4 whitespace-nowrap text-sm ${
+                                !member.areaName || member.area_id === 0
+                                  ? "bg-yellow-50 font-semibold text-amber-800"
+                                  : "text-gray-500"
+                              }`}
+                            >
+                              <div className="flex items-center space-x-2">
+                                <span>
+                                  {member.area_id === 0
+                                    ? member.custom_area_name
+                                    : member.areaName || "No Area"}
+                                </span>
+                                {/* {member.area_id === 0 && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                    Custom
+                                  </span>
+                                )} */}
+                              </div>
                             </td>
                           )}
 
@@ -1280,14 +1334,14 @@ function ManageMembers() {
                                     </button>
 
                                     {/* Edit Member */}
-                                    {/* <button
+                                    <button
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleEditMember(member);
                                         setOpenDropdown(null);
                                       }}
                                       disabled={operatingMembers.has(member.id)}
-                                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+                                      className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 hover:text-blue-700 flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
                                     >
                                       <svg
                                         className="w-5 h-5 mr-3 text-blue-600"
@@ -1303,7 +1357,7 @@ function ManageMembers() {
                                         />
                                       </svg>
                                       Edit Member
-                                    </button> */}
+                                    </button>
 
                                     {/* Divider */}
                                     <div className="border-t border-gray-100"></div>
@@ -1670,7 +1724,12 @@ function ManageMembers() {
                                     Area
                                   </span>
                                   <span className="text-gray-900 font-medium mt-1">
-                                    {member.area || "-"}
+                                    {member.areaName || "-"}
+                                    {member.customAreaName && (
+                                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                        Custom
+                                      </span>
+                                    )}
                                   </span>
                                 </div>
 
