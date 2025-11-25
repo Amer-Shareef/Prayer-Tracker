@@ -532,6 +532,7 @@ router.post("/register", async (req, res) => {
 
     // Handle custom areas: if area_id is 0, custom_area_name is required
     let processedAreaId = area_id;
+    let processedSubAreasId = sub_areas_id;
     if (area_id === 0) {
       if (!custom_area_name || custom_area_name.trim() === "") {
         return res.status(400).json({
@@ -539,8 +540,9 @@ router.post("/register", async (req, res) => {
           message: "Custom area name is required when selecting custom area",
         });
       }
-      // For custom areas, set area_id to null and store custom_area_name
-      processedAreaId = null;
+      // For custom areas, set area_id to 0 and sub_areas_id to null
+      processedAreaId = 0;
+      processedSubAreasId = null;
     } else if (area_id) {
       // Verify area exists if area_id is provided and not 0
       const [areaExists] = await pool.execute(
@@ -558,10 +560,10 @@ router.post("/register", async (req, res) => {
     }
 
     // Verify sub-area exists if sub_areas_id is provided (only for official areas)
-    if (sub_areas_id && processedAreaId !== null) {
+    if (processedSubAreasId && processedAreaId !== 0) {
       const [subAreaExists] = await pool.execute(
         "SELECT id FROM sub_areas WHERE id = ? AND area_id = ?",
-        [sub_areas_id, area_id]
+        [processedSubAreasId, processedAreaId]
       );
 
       if (subAreaExists.length === 0) {
@@ -626,7 +628,7 @@ router.post("/register", async (req, res) => {
         hashedPassword,
         role,
         processedAreaId,
-        sub_areas_id || null,
+        processedSubAreasId,
         custom_area_name || null,
         date_of_birth || null,
         mobility || null,

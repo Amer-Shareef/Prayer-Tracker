@@ -577,16 +577,16 @@ router.put(
         familyStatus,
         widowAssistance,
         area_id,
-        sub_areas_id,
+        subarea_id,
         custom_area_name,
-        full_name,
-        date_of_birth,
+        fullName,
+        dateOfBirth,
         address,
         mobility,
-        living_on_rent,
-        zakath_eligible,
-        differently_abled,
-        muallafathil_quloob,
+        zakathEligible,
+        differentlyAbled,
+        MuallafathilQuloob,
+        onRent,
       } = req.body;
       const { user } = req;
 
@@ -628,32 +628,52 @@ router.put(
         familyStatus: "family_status",
         widowAssistance: "widow_assistance",
         area_id: "area_id",
-        sub_areas_id: "sub_areas_id",
+        subarea_id: "sub_areas_id",
         custom_area_name: "custom_area_name",
-        full_name: "full_name",
-        date_of_birth: "date_of_birth",
+        fullName: "full_name",
+        dateOfBirth: "date_of_birth",
         address: "address",
         mobility: "mobility",
-        living_on_rent: "living_on_rent",
-        zakath_eligible: "zakath_eligible",
-        differently_abled: "differently_abled",
-        muallafathil_quloob: "muallafathil_quloob",
+        zakathEligible: "zakath_eligible",
+        differentlyAbled: "differently_abled",
+        MuallafathilQuloob: "muallafathil_quloob",
+        onRent: "living_on_rent",
       };
 
       // Only add fields that are provided in the request
-      Object.keys(fieldMapping).forEach((frontendField) => {
+      Object.keys(fieldMapping).forEach(async (frontendField) => {
         if (req.body[frontendField] !== undefined) {
           const dbField = fieldMapping[frontendField];
+
+          // Special handling for subarea_id
+          if (
+            frontendField === "subarea_id" &&
+            req.body.area_id !== undefined &&
+            req.body.area_id !== 0
+          ) {
+            // Check if the area has any sub-areas
+            const [areaHasSubAreas] = await pool.execute(
+              "SELECT COUNT(*) as count FROM sub_areas WHERE area_id = ?",
+              [req.body.area_id]
+            );
+
+            if (areaHasSubAreas[0].count === 0) {
+              // Area has no sub-areas, set to NULL
+              updateFields.push(`${dbField} = NULL`);
+              return; // Skip adding to updateValues
+            }
+          }
+
           updateFields.push(`${dbField} = ?`);
 
           // Handle special cases for data conversion
           if (
             [
               "widowAssistance",
-              "living_on_rent",
-              "zakath_eligible",
-              "differently_abled",
-              "muallafathil_quloob",
+              "zakathEligible",
+              "differentlyAbled",
+              "MuallafathilQuloob",
+              "onRent",
             ].includes(frontendField)
           ) {
             updateValues.push(req.body[frontendField] ? 1 : 0);
@@ -689,25 +709,6 @@ router.put(
               message: "Invalid area selected",
             });
           }
-        }
-      }
-
-      // Validate sub_areas_id if provided and area_id is also provided
-      if (
-        req.body.sub_areas_id !== undefined &&
-        req.body.area_id !== undefined &&
-        req.body.area_id !== 0
-      ) {
-        const [subAreaExists] = await pool.execute(
-          "SELECT id FROM sub_areas WHERE id = ? AND area_id = ?",
-          [req.body.sub_areas_id, req.body.area_id]
-        );
-
-        if (subAreaExists.length === 0) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid sub-area selected for this area",
-          });
         }
       }
 
