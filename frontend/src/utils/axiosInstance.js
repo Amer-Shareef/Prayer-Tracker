@@ -82,11 +82,15 @@ axiosInstance.interceptors.response.use(
         );
 
         if (response.data.success) {
-          const { token: newAccessToken } = response.data;
+          const { token: newAccessToken, refreshToken: newRefreshToken } =
+            response.data;
           console.log("✅ Access token refreshed successfully");
 
-          // Update stored token
+          // Update stored tokens
           localStorage.setItem("token", newAccessToken);
+          if (newRefreshToken) {
+            localStorage.setItem("refreshToken", newRefreshToken);
+          }
 
           // Update axios instance default header
           axiosInstance.defaults.headers.common[
