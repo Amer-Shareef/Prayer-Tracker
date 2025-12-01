@@ -23,15 +23,16 @@ router.get(
       const baseQuery = `
         SELECT u.id, u.full_name as fullName, u.username, u.email, u.phone, u.role, u.status, 
                u.joined_date, u.last_login, u.created_at, u.date_of_birth as dateOfBirth, 
-               u.address, u.area_id, u.sub_areas_id, u.mobility, u.living_on_rent as onRent, 
+               u.address, u.area_id, u.sub_areas_id, u.custom_area_name, u.mobility, u.living_on_rent as onRent, 
                u.zakath_eligible as zakathEligible, u.differently_abled as differentlyAbled, 
                u.muallafathil_quloob as MuallafathilQuloob, 
                u.place_of_birth as placeOfBirth, u.nic_no as nicNo, u.occupation, 
                u.workplace_address as workplaceAddress, u.family_status as familyStatus, 
                u.widow_assistance as widowAssistance,
                a.area_name as area, a.address as area_address,
+               CASE WHEN u.area_id = 0 THEN u.custom_area_name ELSE a.area_name END as areaName,
                sa.address as subarea,
-               CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId,
+               CONCAT(UPPER(LEFT(CASE WHEN u.area_id = 0 THEN u.custom_area_name ELSE a.area_name END, 2)), LPAD(u.id, 4, '0')) as memberId,
                COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) as prayed_count,
                CASE 
                  WHEN DATEDIFF(CURDATE(), u.joined_date) >= 39 THEN 200
@@ -201,15 +202,16 @@ router.get(
       let baseQuery = `
         SELECT u.id, u.full_name as fullName, u.username, u.email, u.phone, u.role, u.status, 
                u.joined_date, u.last_login, u.created_at, u.date_of_birth as dateOfBirth, 
-               u.address, u.area_id, u.sub_areas_id, u.mobility, u.living_on_rent as onRent, 
+               u.address, u.area_id, u.sub_areas_id, u.custom_area_name, u.mobility, u.living_on_rent as onRent, 
                u.zakath_eligible as zakathEligible, u.differently_abled as differentlyAbled, 
                u.muallafathil_quloob as MuallafathilQuloob, 
                u.place_of_birth as placeOfBirth, u.nic_no as nicNo, u.occupation, 
                u.workplace_address as workplaceAddress, u.family_status as familyStatus, 
                u.widow_assistance as widowAssistance,
                a.area_name as area, a.address as area_address,
+               CASE WHEN u.area_id = 0 THEN u.custom_area_name ELSE a.area_name END as areaName,
                sa.address as subarea,
-               CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId,
+               CONCAT(UPPER(LEFT(CASE WHEN u.area_id = 0 THEN u.custom_area_name ELSE a.area_name END, 2)), LPAD(u.id, 4, '0')) as memberId,
                COALESCE(SUM(COALESCE(p.fajr, 0) + COALESCE(p.dhuhr, 0) + COALESCE(p.asr, 0) + COALESCE(p.maghrib, 0) + COALESCE(p.isha, 0)), 0) as prayed_count,
                CASE 
                  WHEN DATEDIFF(CURDATE(), u.joined_date) >= 39 THEN 200
@@ -574,6 +576,17 @@ router.put(
         workplaceAddress,
         familyStatus,
         widowAssistance,
+        area_id,
+        subarea_id,
+        custom_area_name,
+        fullName,
+        dateOfBirth,
+        address,
+        mobility,
+        zakathEligible,
+        differentlyAbled,
+        MuallafathilQuloob,
+        onRent,
       } = req.body;
       const { user } = req;
 
@@ -614,22 +627,90 @@ router.put(
         workplaceAddress: "workplace_address",
         familyStatus: "family_status",
         widowAssistance: "widow_assistance",
+        area_id: "area_id",
+        subarea_id: "sub_areas_id",
+        custom_area_name: "custom_area_name",
+        fullName: "full_name",
+        dateOfBirth: "date_of_birth",
+        address: "address",
+        mobility: "mobility",
+        zakathEligible: "zakath_eligible",
+        differentlyAbled: "differently_abled",
+        MuallafathilQuloob: "muallafathil_quloob",
+        onRent: "living_on_rent",
       };
 
       // Only add fields that are provided in the request
-      Object.keys(fieldMapping).forEach((frontendField) => {
+      Object.keys(fieldMapping).forEach(async (frontendField) => {
         if (req.body[frontendField] !== undefined) {
           const dbField = fieldMapping[frontendField];
+
+          // Special handling for subarea_id
+          if (
+            frontendField === "subarea_id" &&
+            req.body.area_id !== undefined &&
+            req.body.area_id !== 0
+          ) {
+            // Check if the area has any sub-areas
+            const [areaHasSubAreas] = await pool.execute(
+              "SELECT COUNT(*) as count FROM sub_areas WHERE area_id = ?",
+              [req.body.area_id]
+            );
+
+            if (areaHasSubAreas[0].count === 0) {
+              // Area has no sub-areas, set to NULL
+              updateFields.push(`${dbField} = NULL`);
+              return; // Skip adding to updateValues
+            }
+          }
+
           updateFields.push(`${dbField} = ?`);
 
           // Handle special cases for data conversion
-          if (frontendField === "widowAssistance") {
+          if (
+            [
+              "widowAssistance",
+              "zakathEligible",
+              "differentlyAbled",
+              "MuallafathilQuloob",
+              "onRent",
+            ].includes(frontendField)
+          ) {
             updateValues.push(req.body[frontendField] ? 1 : 0);
           } else {
             updateValues.push(req.body[frontendField]);
           }
         }
       });
+
+      // Validate area_id if provided
+      if (req.body.area_id !== undefined) {
+        if (req.body.area_id === 0) {
+          // Custom area - require custom_area_name
+          if (
+            !req.body.custom_area_name ||
+            req.body.custom_area_name.trim() === ""
+          ) {
+            return res.status(400).json({
+              success: false,
+              message: "Custom area name is required when area_id is 0",
+            });
+          }
+        } else if (req.body.area_id) {
+          // Official area - verify it exists
+          const [areaExists] = await pool.execute(
+            "SELECT area_id FROM areas WHERE area_id = ?",
+            [req.body.area_id]
+          );
+
+          if (areaExists.length === 0) {
+            return res.status(400).json({
+              success: false,
+              message: "Invalid area selected",
+            });
+          }
+        }
+      }
 
       // Always update the timestamp
       updateFields.push("updated_at = CURRENT_TIMESTAMP");

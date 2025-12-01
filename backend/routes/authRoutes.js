@@ -42,7 +42,8 @@ router.post("/login", async (req, res) => {
       const [rows] = await pool.execute(
         `SELECT u.*, 
                 a.area_name, a.address as area_address,
-                CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId
+                CASE WHEN u.area_id = 0 THEN u.custom_area_name ELSE a.area_name END as effective_area_name,
+                CONCAT(UPPER(LEFT(CASE WHEN u.area_id = 0 THEN u.custom_area_name ELSE a.area_name END, 2)), LPAD(u.id, 4, '0')) as memberId
          FROM users u
          LEFT JOIN areas a ON u.area_id = a.area_id
          WHERE u.phone = ?`,
@@ -63,7 +64,8 @@ router.post("/login", async (req, res) => {
       const [rows] = await pool.execute(
         `SELECT u.*, 
                 a.area_name, a.address as area_address,
-                CONCAT(UPPER(LEFT(COALESCE(a.area_name, 'GEN'), 2)), LPAD(u.id, 4, '0')) as memberId
+                CASE WHEN u.area_id = 0 THEN u.custom_area_name ELSE a.area_name END as effective_area_name,
+                CONCAT(UPPER(LEFT(CASE WHEN u.area_id = 0 THEN u.custom_area_name ELSE a.area_name END, 2)), LPAD(u.id, 4, '0')) as memberId
          FROM users u
          LEFT JOIN areas a ON u.area_id = a.area_id
          WHERE u.username = ?`,
@@ -166,7 +168,8 @@ router.post("/login", async (req, res) => {
         address: user.address,
         areaId: user.area_id,
         subAreasId: user.sub_areas_id,
-        areaName: user.area_name,
+        customAreaName: user.custom_area_name,
+        areaName: user.effective_area_name,
         mobility: user.mobility,
         onRent: user.living_on_rent === 1,
         zakathEligible: user.zakath_eligible === 1,
@@ -499,6 +502,7 @@ router.post("/register", async (req, res) => {
       role = "Member",
       area_id,
       sub_areas_id,
+      custom_area_name,
       date_of_birth,
       mobility,
       full_name,
@@ -526,8 +530,21 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    // Verify area exists if area_id is provided
-    if (area_id) {
+    // Handle custom areas: if area_id is 0, custom_area_name is required
+    let processedAreaId = area_id;
+    let processedSubAreasId = sub_areas_id;
+    if (area_id === 0) {
+      if (!custom_area_name || custom_area_name.trim() === "") {
+        return res.status(400).json({
+          success: false,
+          message: "Custom area name is required when selecting custom area",
+        });
+      }
+      // For custom areas, set area_id to 0 and sub_areas_id to null
+      processedAreaId = 0;
+      processedSubAreasId = null;
+    } else if (area_id) {
+      // Verify area exists if area_id is provided and not 0
       const [areaExists] = await pool.execute(
         "SELECT area_id FROM areas WHERE area_id = ?",
         [area_id]
@@ -539,13 +556,14 @@ router.post("/register", async (req, res) => {
           message: "Invalid area selected",
         });
       }
+      processedAreaId = area_id;
     }
 
-    // Verify sub-area exists if sub_areas_id is provided
-    if (sub_areas_id) {
+    // Verify sub-area exists if sub_areas_id is provided (only for official areas)
+    if (processedSubAreasId && processedAreaId !== 0) {
       const [subAreaExists] = await pool.execute(
         "SELECT id FROM sub_areas WHERE id = ? AND area_id = ?",
-        [sub_areas_id, area_id]
+        [processedSubAreasId, processedAreaId]
       );
 
       if (subAreaExists.length === 0) {
@@ -599,18 +617,19 @@ router.post("/register", async (req, res) => {
     // Insert new user with status set to 'inactive'
     const [result] = await pool.execute(
       `INSERT INTO users (
-        username, full_name, email, password, role, area_id, sub_areas_id, 
+        username, full_name, email, password, role, area_id, sub_areas_id, custom_area_name,
         date_of_birth, mobility, phone, address, 
         status, joined_date
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE())`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE())`,
       [
         username,
         full_name,
         finalEmail,
         hashedPassword,
         role,
-        area_id || null,
-        sub_areas_id || null,
+        processedAreaId,
+        processedSubAreasId,
+        custom_area_name || null,
         date_of_birth || null,
         mobility || null,
         phone || null,
@@ -640,6 +659,68 @@ router.post("/register", async (req, res) => {
     });
   }
 });
+
+// Convert custom area to official area (Super Admin only)
+router.post(
+  "/convert-custom-area",
+  authenticateToken,
+  authorizeRole("SuperAdmin"),
+  async (req, res) => {
+    try {
+      const { custom_area_name, official_area_id } = req.body;
+
+      if (!custom_area_name || !official_area_id) {
+        return res.status(400).json({
+          success: false,
+          message: "Custom area name and official area ID are required",
+        });
+      }
+
+      // Verify the official area exists
+      const [areaExists] = await pool.execute(
+        "SELECT area_id, area_name FROM areas WHERE area_id = ?",
+        [official_area_id]
+      );
+
+      if (areaExists.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid official area selected",
+        });
+      }
+
+      // Update all users with this custom area name to use the official area
+      const [updateResult] = await pool.execute(
+        "UPDATE users SET area_id = ?, custom_area_name = NULL WHERE custom_area_name = ? AND area_id IS NULL",
+        [official_area_id, custom_area_name]
+      );
+
+      if (updateResult.affectedRows === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "No users found with this custom area name",
+        });
+      }
+
+      res.json({
+        success: true,
+        message: `Successfully converted ${updateResult.affectedRows} users from custom area "${custom_area_name}" to official area "${areaExists[0].area_name}"`,
+        convertedUsers: updateResult.affectedRows,
+        officialArea: {
+          id: official_area_id,
+          name: areaExists[0].area_name,
+        },
+      });
+    } catch (error) {
+      console.error("Convert custom area error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error",
+        error: error.message,
+      });
+    }
+  }
+);
 
 // Change password route
 router.post("/change-password", authenticateToken, async (req, res) => {
