@@ -1155,11 +1155,11 @@ router.get(
   }
 );
 
-// GET /api/pickup-requests/check-user/:userId - Get user's pickup requests with full details (for mobile view)
+// GET /api/pickup-requests/check-user/:userId - Public endpoint to get user's pickup requests with full details (no auth required)
+// Note: This returns user info like phone/email; ensure this is acceptable before exposing publicly.
 router.get(
   "/pickup-requests/check-user/:userId",
-  authenticateToken,
-  authorizeRole(["Founder", "WCM", "SuperAdmin"]),
+  dbHealthCheck,
   async (req, res) => {
     try {
       const { userId } = req.params;

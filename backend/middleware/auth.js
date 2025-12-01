@@ -52,8 +52,8 @@ const authenticateToken = async (req, res, next) => {
         });
       }
 
-      // Check if account is active
-      if (user.status !== "active") {
+      // Check if account is active or pending (pending users can still use mobile app)
+      if (user.status !== "active" && user.status !== "pending") {
         console.log("❌ Account is not active. Status:", user.status);
         return res.status(401).json({
           success: false,

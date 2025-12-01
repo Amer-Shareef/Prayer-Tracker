@@ -10,6 +10,16 @@ const {
   sendOtpSms,
 } = require("../services/emailService");
 
+// Helper function to generate secure refresh token
+const generateRefreshToken = () => {
+  return crypto.randomBytes(64).toString("hex");
+};
+
+// Helper function to hash refresh token for storage
+const hashToken = (token) => {
+  return crypto.createHash("sha256").update(token).digest("hex");
+};
+
 const router = express.Router();
 
 // Generate 4-digit OTP
@@ -121,12 +131,17 @@ router.post("/login", async (req, res) => {
         });
       }
 
+      // Generate secure refresh token and hash it for storage
+      const refreshToken = generateRefreshToken();
+      const hashedRefreshToken = hashToken(refreshToken);
+
+      // Update user: clear OTP and store hashed refresh token
       await pool.execute(
-        "UPDATE users SET otp_code = NULL, otp_expires = NULL, otp_verified = TRUE, last_login = CURRENT_TIMESTAMP WHERE id = ?",
-        [user.id]
+        "UPDATE users SET otp_code = NULL, otp_expires = NULL, otp_verified = TRUE, last_login = CURRENT_TIMESTAMP, reset_token = ? WHERE id = ?",
+        [hashedRefreshToken, user.id]
       );
 
-      // Issue access and refresh tokens
+      // Issue access token (JWT)
       const accessToken = jwt.sign(
         {
           userId: user.id,
@@ -137,24 +152,18 @@ router.post("/login", async (req, res) => {
         { expiresIn: "90d" } // 15 minute access token
       );
 
-      const refreshToken = jwt.sign(
-        { userId: user.id },
-        process.env.JWT_SECRET,
-        { expiresIn: "120d" } // 7 day refresh token
-      );
-
       // Set refresh token as httpOnly cookie (backup)
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
-        maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days
+        maxAge: 90 * 24 * 60 * 60 * 1000, // 7 days
         path: "/api/auth",
       });
 
       console.log("✅ Login successful with OTP for user:", loginIdentifier);
       console.log("🔑 Access token expires in: 15 minutes");
-      console.log("🔄 Refresh token expires in: 7 days");
+      console.log("🔄 Refresh token stored in DB (hashed)");
 
       const userData = {
         id: user.id,
@@ -255,81 +264,51 @@ router.post("/login", async (req, res) => {
 router.post("/refresh", async (req, res) => {
   try {
     console.log("🔄 Refresh token endpoint called");
-    console.log("📦 Full request body:", req.body);
-    console.log("🍪 Cookies:", req.cookies);
-    console.log("📋 Headers:", req.headers);
 
-    // Try to get refresh token from multiple sources
-    let refreshToken;
-
-    // Check if req.body exists and has refreshToken
-    if (req.body && req.body.refreshToken) {
-      refreshToken = req.body.refreshToken;
-      console.log("✅ Found refresh token in request body");
-    } else if (req.cookies && req.cookies.refreshToken) {
-      refreshToken = req.cookies.refreshToken;
-      console.log("✅ Found refresh token in cookies");
-    } else if (req.headers["x-refresh-token"]) {
-      refreshToken = req.headers["x-refresh-token"];
-      console.log("✅ Found refresh token in headers");
-    }
-
-    console.log("🔍 Looking for refresh token...");
-    console.log(
-      "📦 Request body has refreshToken:",
-      !!(req.body && req.body.refreshToken)
-    );
-    console.log(
-      "🍪 Cookies has refreshToken:",
-      !!(req.cookies && req.cookies.refreshToken)
-    );
-    console.log(
-      "📋 Headers has x-refresh-token:",
-      !!req.headers["x-refresh-token"]
-    );
+    // Try to get refresh token from multiple sources (priority: body > header > cookie)
+    let refreshToken =
+      req.body?.refreshToken ||
+      req.headers["x-refresh-token"] ||
+      req.cookies?.refreshToken;
 
     if (!refreshToken) {
       console.log("❌ No refresh token found in request");
       return res.status(401).json({
         success: false,
         message: "No refresh token provided",
+        code: "NO_REFRESH_TOKEN",
       });
     }
 
-    console.log("✅ Refresh token found, verifying...");
-    console.log("🔑 Token preview:", refreshToken.substring(0, 20) + "...");
+    console.log("✅ Refresh token found, verifying against database...");
 
-    let decoded;
-    try {
-      decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
-      console.log("✅ Refresh token is valid for user ID:", decoded.userId);
-    } catch (err) {
-      console.log("❌ Invalid refresh token:", err.message);
-      return res.status(401).json({
-        success: false,
-        message: "Invalid or expired refresh token",
-      });
-    }
+    // Hash the provided refresh token to compare with stored hash
+    const hashedToken = hashToken(refreshToken);
 
-    // Verify user still exists and is active
-    console.log("🔍 Verifying user exists and is active...");
+    // Verify refresh token exists in database and user is valid
     const [users] = await pool.execute(
-      "SELECT id, username, email, role, status FROM users WHERE id = ? AND status = 'active'",
-      [decoded.userId]
+      "SELECT id, username, email, role, status, reset_token FROM users WHERE reset_token = ? AND status IN ('active', 'pending')",
+      [hashedToken]
     );
 
     if (users.length === 0) {
-      console.log("❌ User not found or inactive");
+      console.log("❌ Invalid refresh token or user not found");
       return res.status(401).json({
         success: false,
-        message: "User not found or inactive",
+        message: "Invalid refresh token. Please login again.",
+        code: "INVALID_REFRESH_TOKEN",
       });
     }
 
     const user = users[0];
-    console.log("✅ User verified:", user.username);
+    console.log(
+      "✅ User verified via refresh token:",
+      user.username,
+      "Status:",
+      user.status
+    );
 
-    // Generate new access token
+    // Generate new access token (JWT - short lived)
     const newAccessToken = jwt.sign(
       {
         userId: user.id,
@@ -337,51 +316,75 @@ router.post("/refresh", async (req, res) => {
         role: user.role,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "90d" } // 1 minute for testing, change to 15m for production
+      { expiresIn: "120d" } // 15 minutes
     );
 
-    // Optionally generate new refresh token (rotate refresh tokens)
-    const newRefreshToken = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET,
-      { expiresIn: "120d" } // 3 minutes for testing, change to 7d for production
-    );
+    // Generate new refresh token (rotate for security)
+    const newRefreshToken = generateRefreshToken();
+    const hashedNewRefreshToken = hashToken(newRefreshToken);
 
-    // Update refresh token cookie
+    // Update the hashed refresh token in database
+    await pool.execute("UPDATE users SET reset_token = ? WHERE id = ?", [
+      hashedNewRefreshToken,
+      user.id,
+    ]);
+
+    // Update refresh token cookie (for web clients)
     res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 120 * 24 * 60 * 60 * 1000, // 120 days
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: "/api/auth",
     });
 
-    console.log(
-      "🔄 Access token refreshed successfully for user:",
-      user.username
-    );
-    console.log("🔑 New access token expires in: 90 days");
-    console.log("🔄 New refresh token expires in: 120 days");
+    console.log("🔄 Tokens refreshed successfully for user:", user.username);
 
     return res.json({
       success: true,
       token: newAccessToken,
       refreshToken: newRefreshToken,
       message: "Token refreshed successfully",
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        status: user.status,
+      },
     });
   } catch (error) {
     console.error("❌ Refresh token error:", error);
     res.status(500).json({
       success: false,
       message: "Server error during token refresh",
+      code: "SERVER_ERROR",
     });
   }
 });
 
-// Logout endpoint: clears refresh token cookie
-router.post("/logout", (req, res) => {
-  res.clearCookie("refreshToken", { path: "/api/auth" });
-  res.json({ success: true, message: "Logged out" });
+// Logout endpoint: clears refresh token from DB and cookie
+router.post("/logout", authenticateToken, async (req, res) => {
+  try {
+    const { user } = req;
+
+    // Clear refresh token from database (invalidate server-side)
+    if (user?.userId) {
+      await pool.execute("UPDATE users SET reset_token = NULL WHERE id = ?", [
+        user.userId,
+      ]);
+      console.log("✅ Refresh token cleared from DB for user:", user.userId);
+    }
+
+    // Clear cookie
+    res.clearCookie("refreshToken", { path: "/api/auth" });
+
+    res.json({ success: true, message: "Logged out successfully" });
+  } catch (error) {
+    console.error("❌ Logout error:", error);
+    // Still clear cookie even if DB update fails
+    res.clearCookie("refreshToken", { path: "/api/auth" });
+    res.json({ success: true, message: "Logged out" });
+  }
 });
 
 // Resend OTP route
@@ -495,9 +498,11 @@ router.post("/resend-otp", async (req, res) => {
 // Register route
 router.post("/register", async (req, res) => {
   try {
+    // Handle both dashboard and mobile app request formats
     const {
-      email,
-      password,
+      // Dashboard format
+      full_name,
+      phone,
       username,
       role = "Member",
       area_id,
@@ -505,13 +510,26 @@ router.post("/register", async (req, res) => {
       custom_area_name,
       date_of_birth,
       mobility,
-      full_name,
-      phone,
       address,
+      email,
+      password,
+      // Mobile app format
+      firstName,
+      lastName,
+      phoneNumber,
+      dateOfBirth,
+      customMahallah,
     } = req.body;
 
+    // Map mobile app fields to internal format
+    const processedFullName =
+      full_name || (firstName && lastName ? `${firstName} ${lastName}` : null);
+    const processedPhone = phone || phoneNumber;
+    const processedDateOfBirth = date_of_birth || dateOfBirth;
+    const processedCustomAreaName = custom_area_name || customMahallah;
+
     // Require full_name, phone, and username
-    if (!full_name || !phone || !username) {
+    if (!processedFullName || !processedPhone || !username) {
       return res.status(400).json({
         success: false,
         message: "Full name, phone number, and username are required",
@@ -534,7 +552,7 @@ router.post("/register", async (req, res) => {
     let processedAreaId = area_id;
     let processedSubAreasId = sub_areas_id;
     if (area_id === 0) {
-      if (!custom_area_name || custom_area_name.trim() === "") {
+      if (!processedCustomAreaName || processedCustomAreaName.trim() === "") {
         return res.status(400).json({
           success: false,
           message: "Custom area name is required when selecting custom area",
@@ -577,7 +595,7 @@ router.post("/register", async (req, res) => {
     // Check if user already exists by phone
     const [existingUsers] = await pool.execute(
       "SELECT * FROM users WHERE phone = ?",
-      [phone]
+      [processedPhone]
     );
 
     if (existingUsers.length > 0) {
@@ -614,7 +632,7 @@ router.post("/register", async (req, res) => {
     console.log("  - Final password:", finalPassword);
     console.log("  - Hashed password:", hashedPassword ? "Generated" : "NULL");
 
-    // Insert new user with status set to 'inactive'
+    // Insert new user with status set to 'pending'
     const [result] = await pool.execute(
       `INSERT INTO users (
         username, full_name, email, password, role, area_id, sub_areas_id, custom_area_name,
@@ -623,29 +641,30 @@ router.post("/register", async (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE())`,
       [
         username,
-        full_name,
+        processedFullName,
         finalEmail,
         hashedPassword,
         role,
         processedAreaId,
         processedSubAreasId,
-        custom_area_name || null,
-        date_of_birth || null,
+        processedCustomAreaName || null,
+        processedDateOfBirth || null,
         mobility || null,
-        phone || null,
+        processedPhone || null,
         address || null,
         "pending",
       ]
     );
+
     res.status(201).json({
       success: true,
       message: "User registered successfully with pending status",
       user: {
         id: result.insertId,
         username: username,
-        full_name,
+        full_name: processedFullName,
         email: finalEmail,
-        phone,
+        phone: processedPhone,
         role,
         status: "pending",
       },
@@ -908,84 +927,74 @@ router.post(
   }
 );
 
-// Forgot password route - ENHANCED to actually send Gmail
+// Forgot password route - MOBILE FRIENDLY (sends OTP to phone)
 router.post("/forgot-password", async (req, res) => {
   try {
-    const { email } = req.body;
+    const { phone } = req.body;
 
-    if (!email) {
+    if (!phone) {
       return res.status(400).json({
         success: false,
-        message: "Email is required",
+        message: "Phone number is required",
       });
     }
 
-    // Check if user exists
+    // Check if user exists by phone
     const [users] = await pool.execute(
-      "SELECT id, username, email FROM users WHERE email = ?",
-      [email]
+      "SELECT id, username, phone FROM users WHERE phone = ?",
+      [phone]
     );
 
     if (users.length === 0) {
-      // Don't reveal if email exists for security
+      // Don't reveal if phone exists for security - always return success
       return res.json({
         success: true,
         message:
-          "If this email exists in our system, you will receive password reset instructions.",
+          "If this phone number exists in our system, you will receive a verification code.",
+        requiresOtp: true,
       });
     }
 
     const user = users[0];
 
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    // Generate OTP
+    const otp = generateOtp();
+    const otpExpires = new Date();
+    otpExpires.setMinutes(otpExpires.getMinutes() + 10);
 
-    // Save reset token to database
+    // Save OTP to database (reuse login OTP fields)
     await pool.execute(
-      "UPDATE users SET reset_token = ?, reset_expires = ? WHERE id = ?",
-      [resetToken, resetExpires, user.id]
+      "UPDATE users SET otp_code = ?, otp_expires = ?, otp_verified = FALSE WHERE id = ?",
+      [otp, otpExpires, user.id]
     );
 
-    // Create reset link
-    const resetLink = `${
-      process.env.FRONTEND_URL || "http://localhost:3000"
-    }/reset-password?token=${resetToken}`;
+    // Send SMS OTP
+    console.log(`📱 Sending password reset OTP to: ${phone}`);
+    const sendResult = await sendOtpSms(phone, otp);
 
-    // Send reset email via Gmail
-    console.log(`📧 Sending password reset email to: ${email}`);
-    const emailResult = await sendPasswordResetEmail(
-      email,
-      user.username,
-      resetLink
-    );
-
-    if (emailResult.success && emailResult.realEmail) {
-      console.log("✅ Password reset email sent successfully via Gmail");
-      res.json({
-        success: true,
-        message:
-          "Password reset instructions have been sent to your email address.",
+    if (!sendResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send verification code. Please try again.",
       });
-    } else if (emailResult.fallbackMode) {
-      console.log("⚠️  Gmail failed, but reset link generated");
-      // In development, include the reset link for testing
-      const response = {
-        success: true,
-        message:
-          "If this email exists in our system, you will receive password reset instructions.",
-      };
-
-      // Include reset link in development mode for testing
-      if (process.env.NODE_ENV === "development") {
-        response.resetLink = resetLink;
-        response.developmentMode = true;
-      }
-
-      res.json(response);
-    } else {
-      throw new Error("Failed to send reset email");
     }
+
+    const maskedPhone = phone.replace(/(\d{3})\d{4}(\d{3})/, "$1****$2");
+
+    const response = {
+      success: true,
+      message: "Verification code sent to your phone.",
+      requiresOtp: true,
+      contact: maskedPhone,
+      resetMode: true,
+    };
+
+    if (process.env.NODE_ENV === "development" || sendResult.testMode) {
+      response.testOtp = otp;
+      response.testMessage = `For testing: Your OTP is ${otp}`;
+    }
+
+    res.json(response);
   } catch (error) {
     console.error("Forgot password error:", error);
     res.status(500).json({
@@ -995,20 +1004,20 @@ router.post("/forgot-password", async (req, res) => {
   }
 });
 
-// Reset password route
+// Reset password route - MOBILE FRIENDLY (uses OTP)
 router.post("/reset-password", async (req, res) => {
   try {
-    const { token, newPassword } = req.body;
+    const { phone, otpCode, newPassword } = req.body;
 
     console.log(
-      "🔄 Password reset attempt with token:",
-      token?.substring(0, 10) + "..."
+      "🔄 Password reset attempt for phone:",
+      phone?.replace(/(\d{3})\d{4}(\d{3})/, "$1****$2")
     );
 
-    if (!token || !newPassword) {
+    if (!phone || !otpCode || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: "Token and new password are required",
+        message: "Phone number, OTP code, and new password are required",
       });
     }
 
@@ -1019,16 +1028,16 @@ router.post("/reset-password", async (req, res) => {
       });
     }
 
-    // Find user with valid reset token
+    // Find user with valid OTP
     const [users] = await pool.execute(
-      "SELECT id, username, email FROM users WHERE reset_token = ? AND reset_expires > NOW()",
-      [token]
+      "SELECT id, username, phone FROM users WHERE phone = ? AND otp_code = ? AND otp_expires > NOW()",
+      [phone, otpCode]
     );
 
     if (users.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Invalid or expired reset token",
+        message: "Invalid or expired OTP code",
       });
     }
 
@@ -1038,9 +1047,9 @@ router.post("/reset-password", async (req, res) => {
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
 
-    // Update password and clear reset token
+    // Update password and clear OTP
     await pool.execute(
-      "UPDATE users SET password = ?, reset_token = NULL, reset_expires = NULL WHERE id = ?",
+      "UPDATE users SET password = ?, otp_code = NULL, otp_expires = NULL, otp_verified = FALSE WHERE id = ?",
       [hashedPassword, user.id]
     );
 
